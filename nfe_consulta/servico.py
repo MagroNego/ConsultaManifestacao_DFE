@@ -118,6 +118,8 @@ def executar_consulta(
         raise FileNotFoundError(f"Arquivo de chaves não encontrado: {chaves_path}")
     if saida_path.suffix.lower() != ".xlsx":
         raise ValueError("A saída deve ser uma planilha .xlsx.")
+    if not parametros.sincronizar_sefaz and not banco_path.is_file():
+        raise FileNotFoundError(f"Banco local não encontrado: {banco_path}")
     if parametros.max_lotes < 1 or parametros.max_lotes > 500:
         raise ValueError("max_lotes deve estar entre 1 e 500.")
 
