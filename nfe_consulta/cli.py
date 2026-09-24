@@ -23,6 +23,8 @@ from nfe_consulta.modelos import (
 )
 from nfe_consulta.validacao import validar_cnpj, validar_uf
 from nfe_consulta.assistente import CNPJ_YAB, UF_YAB, NOME_PLANILHA
+from nfe_consulta.config import resolver_caminhos
+from nfe_consulta.servico import ParametrosConsulta, executar_consulta
 
 
 def _ler_senha(pergunta: str) -> str:
@@ -84,6 +86,99 @@ def _gravar_resultados(caminho: str, resultados: list, cobertura: str) -> None:
     erros = sum(1 for resultado in resultados if resultado.erro)
     print(f"CSV gerado: {caminho}")
     print(f"Total: {len(resultados)} | Validas: {len(resultados)-erros} | Erros: {erros}")
+
+
+NOVOS_COMANDOS = {"gui", "atualizar", "excel", "status", "proteger-banco"}
+
+
+def _parser_v1() -> argparse.ArgumentParser:
+    caminhos = resolver_caminhos()
+    parser = argparse.ArgumentParser(
+        prog="nfe-consulta",
+        description="Consulta de manifestação de NF-e",
+    )
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
+    comandos = parser.add_subparsers(dest="comando", required=True)
+
+    comandos.add_parser("gui", help="Abrir a interface gráfica")
+
+    atualizar = comandos.add_parser("atualizar", help="Sincronizar com a SEFAZ e gerar Excel")
+    atualizar.add_argument("chaves", nargs="?", default=str(caminhos.chaves))
+    atualizar.add_argument("--banco", default=str(caminhos.banco))
+    atualizar.add_argument("--saida", default=str(caminhos.saida))
+    atualizar.add_argument("--max-lotes", type=int, default=50)
+    atualizar.add_argument("--cert-indice", type=int)
+
+    excel = comandos.add_parser("excel", help="Gerar Excel usando somente o banco local")
+    excel.add_argument("chaves", nargs="?", default=str(caminhos.chaves))
+    excel.add_argument("--banco", default=str(caminhos.banco))
+    excel.add_argument("--saida", default=str(caminhos.saida))
+
+    status = comandos.add_parser("status", help="Mostrar o estado local da sincronização")
+    status.add_argument("--banco", default=str(caminhos.banco))
+
+    proteger = comandos.add_parser("proteger-banco", help="Criar uma cópia SQLCipher do banco")
+    proteger.add_argument("origem")
+    proteger.add_argument("destino")
+    return parser
+
+
+def _executar_comando_v1(argv: list[str]) -> None:
+    parser = _parser_v1()
+    args = parser.parse_args(argv)
+
+    if args.comando == "gui":
+        from nfe_consulta.gui import main as iniciar_interface
+        iniciar_interface()
+        return
+
+    if args.comando == "status":
+        senha = _ler_senha("Senha do banco: ") if criptografado(args.banco) else None
+        print(consultar_status(args.banco, CNPJ_YAB, senha=senha))
+        return
+
+    if args.comando == "proteger-banco":
+        senha = _ler_senha("Nova senha do banco protegido: ")
+        if senha != _ler_senha("Repita a senha: "):
+            parser.error("As senhas não coincidem.")
+        migrar_banco(args.origem, args.destino, senha)
+        print(f"Banco protegido criado: {args.destino}")
+        return
+
+    senha = _ler_senha("Senha do banco: ") if criptografado(args.banco) else None
+    sincronizar_sefaz = args.comando == "atualizar"
+    parametros = ParametrosConsulta(
+        chaves=Path(args.chaves),
+        banco=Path(args.banco),
+        saida=Path(args.saida),
+        cnpj=CNPJ_YAB,
+        uf=UF_YAB,
+        sincronizar_sefaz=sincronizar_sefaz,
+        max_lotes=args.max_lotes if sincronizar_sefaz else 50,
+        senha_banco=senha,
+        cert_indice=args.cert_indice if sincronizar_sefaz else None,
+    )
+    try:
+        resultado = executar_consulta(
+            parametros,
+            progresso_sincronizacao=(
+                lambda lote, ult, maximo, novos: print(
+                    f"SEFAZ {lote}: NSU {ult}/{maximo} | +{novos} evento(s)",
+                    flush=True,
+                )
+                if sincronizar_sefaz else None
+            ),
+            progresso_lote=_progresso,
+        )
+    except (OSError, ValueError, RuntimeError, sqlite3.DatabaseError, NfeConsultaErro) as exc:
+        print(f"Erro: {exc}", file=sys.stderr)
+        raise SystemExit(1) from exc
+    print()
+    print(
+        f"Planilha: {resultado.saida} | "
+        f"{resultado.total} nota(s) | {resultado.com_evento} com evento | {resultado.com_erro} erro(s)"
+    )
+
 
 
 def _criar_parser() -> argparse.ArgumentParser:
@@ -149,6 +244,16 @@ def _criar_parser() -> argparse.ArgumentParser:
 
 
 def main() -> None:
+    argumentos = sys.argv[1:]
+    if not argumentos:
+        _executar_comando_v1(["gui"])
+        return
+    if argumentos[0] in NOVOS_COMANDOS:
+        _executar_comando_v1(argumentos)
+        return
+
+    # Compatibilidade da v0.9.4. Os comandos antigos continuam funcionando,
+    # mas a documentação da v1 usa apenas os subcomandos acima.
     parser = _criar_parser()
     args = parser.parse_args()
 
