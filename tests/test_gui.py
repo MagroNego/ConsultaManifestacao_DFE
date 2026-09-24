@@ -66,7 +66,7 @@ def test_gui_mostra_cursor_salvo_e_distingue_pausa_de_fila_percorrida():
     base = ("Ultima resposta da SEFAZ salva: 24/09/2026 09:30:00 -0300 (horario local)\n"
             "ultNSU salvo: 000000000563245 | maxNSU conhecido: 000000000563245\n")
     assert resumir_status(base) == ("24/09/2026 09:30", "000000000563245",
-                                   "000000000563245", "Fila percorrida")
+                                   "000000000563245", "Sincronizado")
     assert resumir_status(base + "Pausa por 656: aguarde ate 10:30")[-1] == "Em pausa"
     assert resumir_status("Banco nao encontrado: arquivo.db")[-1] == "Banco indisponível"
 
