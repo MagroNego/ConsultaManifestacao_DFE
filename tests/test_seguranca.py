@@ -52,11 +52,11 @@ def test_exportacoes_tratam_texto_que_parece_formula(tmp_path):
 def test_assistente_nao_usa_shell_e_help_funciona(tmp_path):
     comando = montar_comando(tmp_path / "chaves.txt", tmp_path / NOME_PLANILHA, tmp_path / "banco.db", True)
     assert comando[:3] == [sys.executable, "-m", "nfe_consulta.cli"]
-    assert "--manifestacoes" in comando
+    assert "atualizar" in comando
     assert "--max-lotes" in comando
-    retorno = subprocess.run([sys.executable, "-m", "nfe_consulta.cli", "-help"], capture_output=True, text=True)
+    retorno = subprocess.run([sys.executable, "-m", "nfe_consulta.cli", "--help"], capture_output=True, text=True)
     assert retorno.returncode == 0
-    assert "EXEMPLOS" in retorno.stdout
+    assert "atualizar" in retorno.stdout
 
 
 def test_assistente_reutiliza_banco_antigo_e_nome_padrao(tmp_path, monkeypatch):
@@ -77,5 +77,5 @@ def test_assistente_reutiliza_banco_antigo_e_nome_padrao(tmp_path, monkeypatch):
     assert assistente.main() == 0
     args, cwd = comandos[0]
     assert args[args.index("--banco") + 1] == str(downloads / "nfe_manifestacoes.db")
-    assert args[args.index("--xlsx") + 1] == str(pacote / "saidas" / NOME_PLANILHA)
-    assert "--manifestacoes" not in args
+    assert args[args.index("--saida") + 1] == str(pacote / "saidas" / NOME_PLANILHA)
+    assert "excel" in args
