@@ -1,77 +1,105 @@
-# nfe-consulta — Evento manifestação NFs emitidas
+# Consulta de Manifestação — v1.0
 
+Aplicativo Windows para consultar eventos de manifestação de NF-e pelo **NFeDistribuicaoDFe**, manter o histórico em SQLite/SQLCipher e gerar uma planilha Excel.
 
+## Interface gráfica
 
-**Interface gráfica:** no PowerShell, `nfe-consulta --gui`, ou dê duplo clique em `ABRIR_CONSULTA.cmd`. A tela mostra o status local, os arquivos e os resultados. Escolha o TXT e o banco; a ação padrão gera Excel usando somente o banco local. A atualização remota exige escolher o botão da SEFAZ. Para o assistente antigo em texto, use `ABRIR_CONSULTA_TEXTO.cmd`.
+Depois da instalação:
 
-Consulta os eventos de manifestação dos destinatários pelo serviço **NFeDistribuicaoDFe**, usando o certificado A1 já instalado no Windows. Lê um TXT com uma chave de 44 dígitos por linha e gera um CSV com a manifestação mais recente e o histórico. A sincronização busca eventos pelo `distNSU` do CNPJ emitente; **não faz uma requisição por chave**.
+```powershell
+nfe-consulta gui
+```
 
-## Requisitos
+Ou dê duplo clique em `ABRIR_CONSULTA.cmd`.
 
-- Windows 10/11 e Python 3.11 ou mais recente.
-- Certificado do CNPJ com chave privada em `Cert:\CurrentUser\My` e acesso HTTPS ao Ambiente Nacional da NF-e.
-- CNPJ do emitente e sua UF. Para certificado em outro repositório, o app precisa ser adaptado.
+A tela v1 usa o mesmo núcleo da CLI. A interface não abre outro processo do terminal para executar a consulta.
+
+## CLI
+
+Os comandos principais são:
+
+```powershell
+nfe-consulta atualizar
+nfe-consulta excel
+nfe-consulta status
+nfe-consulta gui
+```
+
+- `atualizar`: sincroniza o histórico com a SEFAZ e gera o Excel.
+- `excel`: gera o Excel usando somente o banco local.
+- `status`: mostra o estado da última sincronização gravada no banco.
+- `gui`: abre a interface gráfica.
+
+Os caminhos padrão são resolvidos nas pastas `entrada`, `dados` e `saidas`. Também é possível informar os arquivos explicitamente:
+
+```powershell
+nfe-consulta atualizar entrada\CHAVES.txt `
+  --banco dados\nfe_manifestacoes_seguro.db `
+  --saida saidas\Consulta_Manifestacao_YAB.xlsx `
+  --max-lotes 50
+```
+
+Consulta local:
+
+```powershell
+nfe-consulta excel entrada\CHAVES.txt `
+  --banco dados\nfe_manifestacoes_seguro.db `
+  --saida saidas\Consulta_Manifestacao_YAB.xlsx
+```
 
 ## Instalação
 
-Abra o PowerShell nesta pasta (que contém `pyproject.toml`):
+Requisitos:
+
+- Windows 10/11.
+- Python 3.11 ou mais recente.
+- Certificado A1 da empresa instalado no repositório do usuário do Windows.
+- Acesso ao Ambiente Nacional da NF-e.
+
+Na pasta do projeto:
 
 ```powershell
-py -m pip install -e . --force-reinstall
+py -m pip install -e .
 nfe-consulta --version
 ```
 
-## Uso
+Ou execute `INSTALAR.cmd`.
 
-Crie `CHAVES.txt` com uma chave por linha. No PowerShell:
+## Estrutura
 
-```powershell
-nfe-consulta --manifestacoes `
-  --cnpj 16840128000101 --uf RJ `
-  --lote "$HOME\Downloads\CHAVES.txt" `
-  --csv "$HOME\Downloads\resultado.csv" `
-  --banco "$HOME\Downloads\nfe_manifestacoes.db"
+```text
+entrada/     CHAVES.txt
+dados/       banco SQLite ou SQLCipher
+saidas/      planilhas geradas
+nfe_consulta/
+  servico.py       fluxo compartilhado pela GUI e CLI
+  distribuicao.py  comunicação NFeDistribuicaoDFe
+  banco.py         persistência e controle de NSU
+  gui.py           interface
+  cli.py           terminal
 ```
 
-Para gerar uma planilha Excel com chave como texto, número da NF-e, série, filtros e histórico legível, use `--xlsx`. Se o banco já foi sincronizado, **não precisa consultar a SEFAZ novamente**:
+## Controle de consumo
+
+O cursor NSU é persistido no banco. Quando a SEFAZ retorna rejeição **656 — Consumo Indevido**, o aplicativo grava uma pausa preventiva antes de permitir nova sincronização. Uma sincronização completa recente também é reaproveitada para evitar consultas desnecessárias.
+
+O histórico disponível depende do que o Ambiente Nacional ainda disponibiliza para distribuição. A ausência de evento no banco local não prova que nunca houve manifestação.
+
+## Banco protegido
+
+Para criar uma cópia SQLCipher:
 
 ```powershell
-nfe-consulta --cnpj 16840128000101 `
-  --lote "$HOME\Downloads\CHAVES.txt" `
-  --xlsx "$HOME\Downloads\resultado_formatado.xlsx" `
-  --banco "$HOME\Downloads\nfe_manifestacoes.db"
+nfe-consulta proteger-banco dados\nfe_manifestacoes.db dados\nfe_manifestacoes_seguro.db
 ```
 
-O número e a série são extraídos da chave de 44 dígitos. Ambos também aparecem no CSV. É possível informar `--csv` e `--xlsx` juntos para gerar os dois formatos.
+O banco de origem é preservado.
 
-É possível usar `--consultar-sefaz` ou `--sincronizar` no lugar de `--manifestacoes`, para compatibilidade de comando. As três opções **agora sincronizam por NSU**. O app seleciona automaticamente o certificado correspondente ao `--cnpj`. Se houver mais de um certificado compatível, informe `--cert-indice N` após conferir a lista exibida. `--max-lotes 50` limita a quantidade de lotes nesta execução; se ela não terminar, execute novamente para continuar. A primeira sincronização pode levar vários lotes de até 50 documentos.
-
-Para consultar apenas o banco local, sem acessar a SEFAZ:
-
-```powershell
-nfe-consulta --cnpj 16840128000101 --lote "$HOME\Downloads\CHAVES.txt" `
-  --csv "$HOME\Downloads\resultado.csv" --banco "$HOME\Downloads\nfe_manifestacoes.db"
-```
-
-Para uma única chave use o mesmo comando com a chave como argumento posicional e sem `--lote`/`--csv`/`--xlsx`. O CSV contém `;` e UTF-8 BOM; ao abri-lo diretamente, o Excel pode converter a chave longa em número e perder dígitos. Use a planilha `.xlsx` para preservar a chave. Mantenha o mesmo arquivo de banco entre execuções.
-
-## Interpretação do resultado
-
-Para ver a última sincronização registrada sem chamar a SEFAZ: `nfe-consulta --status --cnpj 16840128000101 --banco "$HOME\Downloads\nfe_manifestacoes.db"`. A mesma consulta está na opção `3` do assistente. O status informa a hora da última resposta salva e se o cursor chegou ao máximo conhecido, mas não detecta novos eventos posteriores sem uma nova consulta remota.
-
-- **Sem manifestação localizada no histórico local** significa apenas que o app não encontrou evento no período disponibilizado e sincronizado; não comprova que o destinatário nunca manifestou.
-- No CSV, a coluna `cobertura` distingue histórico local, sincronização concluída e sincronização parcial. Se aparecer parcial, repita o comando para avançar o NSU antes de tirar conclusões.
-- Se a primeira consulta começar de NSU zero, só eventos ainda disponibilizados pela SEFAZ poderão ser recuperados. O histórico anterior não pode ser reconstruído por esse serviço. Continue sincronizando periodicamente.
-- O programa não consulta a situação da NF-e (autorização/cancelamento) e não usa `NFeConsultaProtocolo` como complemento de manifestação: conforme o MOC, a consulta de situação retorna apenas os eventos de cancelamento, carta de correção e EPEC.
-- Se outra aplicação consultar o mesmo CNPJ, podem ocorrer limites compartilhados ou bloqueios `656`. Ao atingir o fim dos NSUs ou receber `137`, o programa espera pelo menos uma hora antes de nova consulta; após `656`, registra também a pausa no banco local. Não faça consultas repetidas fora do programa durante o bloqueio.
-
-## Teste local
+## Testes
 
 ```powershell
 py -m pip install -e ".[dev]"
 py -m pytest -q
 ```
 
-Os testes não fazem consulta real à SEFAZ. Validar o certificado, a conectividade e o retorno de produção requer rodar no Windows com o certificado.
-
-Referências técnicas: [MOC 7.0, seções 5.4 e 5.7](https://www.confaz.fazenda.gov.br/legislacao/arquivo-manuais/moc7-visao-geral.pdf) e [NT 2014.002, Distribuição de DF-e](https://www.nfe.fazenda.gov.br/POrtal/exibirArquivo.aspx?conteudo=wLVBlKchUb4%3D).
+Os testes automatizados não fazem consulta real à SEFAZ.
