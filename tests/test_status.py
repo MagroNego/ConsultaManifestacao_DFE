@@ -68,8 +68,8 @@ def test_assistente_status_nao_pede_txt_ou_planilha(tmp_path, monkeypatch):
     comandos = []
     monkeypatch.setattr(assistente.subprocess, "call", lambda args, cwd: comandos.append(args) or 0)
     assert abrir_assistente() == 0
-    assert "--status" in comandos[0]
-    assert "--lote" not in comandos[0]
+    assert "status" in comandos[0]
+    assert "excel" not in comandos[0]
 
 
 def test_motivo_656_persistido_sem_avancar_cursor(tmp_path, monkeypatch):
