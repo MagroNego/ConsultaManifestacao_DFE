@@ -1,6 +1,7 @@
 # nfe-consulta — Evento manifestação NFs emitidas
 
 
+
 **Interface gráfica:** no PowerShell, `nfe-consulta --gui`, ou dê duplo clique em `ABRIR_CONSULTA.cmd`. A tela mostra o status local, os arquivos e os resultados. Escolha o TXT e o banco; a ação padrão gera Excel usando somente o banco local. A atualização remota exige escolher o botão da SEFAZ. Para o assistente antigo em texto, use `ABRIR_CONSULTA_TEXTO.cmd`.
 
 Consulta os eventos de manifestação dos destinatários pelo serviço **NFeDistribuicaoDFe**, usando o certificado A1 já instalado no Windows. Lê um TXT com uma chave de 44 dígitos por linha e gera um CSV com a manifestação mais recente e o histórico. A sincronização busca eventos pelo `distNSU` do CNPJ emitente; **não faz uma requisição por chave**.
