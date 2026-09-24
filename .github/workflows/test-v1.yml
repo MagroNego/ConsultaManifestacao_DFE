@@ -1,0 +1,33 @@
+name: Testes v1
+
+on:
+  push:
+    branches:
+      - refactor/v1.0
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  testes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Dependencias do SQLCipher
+        run: sudo apt-get update && sudo apt-get install -y libsqlcipher-dev
+
+      - name: Instalar projeto
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: Verificar sintaxe
+        run: python -m compileall -q nfe_consulta
+
+      - name: Rodar testes
+        run: python -m pytest -q
