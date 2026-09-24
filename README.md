@@ -1,6 +1,5 @@
-# nfe-consulta 0.9.4 — manifestações das NF-e emitidas
+# nfe-consulta 0.9.4 — Eventos manifestação NFs emitidas
 
-Comece por [LEIA_PRIMEIRO.md](LEIA_PRIMEIRO.md).
 
 **Interface gráfica:** no PowerShell, `nfe-consulta --gui`, ou dê duplo clique em `ABRIR_CONSULTA.cmd`. A tela mostra o status local, os arquivos e os resultados. Escolha o TXT e o banco; a ação padrão gera Excel usando somente o banco local. A atualização remota exige escolher o botão da SEFAZ. Para o assistente antigo em texto, use `ABRIR_CONSULTA_TEXTO.cmd`.
 
