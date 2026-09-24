@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nfe-consulta"
-version = "0.9.4"
-description = "CLI Windows para consultar manifestacoes de NF-e por chave"
+version = "1.0.0"
+description = "Aplicativo Windows para consulta de manifestacoes de NF-e"
 readme = "README.md"
 requires-python = ">=3.11"
 authors = [{ name = "Luan" }]
