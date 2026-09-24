@@ -37,11 +37,12 @@ def resolver_caminhos(
     if projeto_em_uso:
         chaves = entrada_projeto
         banco = banco_seguro_projeto if banco_seguro_projeto.exists() else banco_projeto
-        saida = raiz / "saidas" / NOME_PLANILHA
     else:
         chaves = downloads / "CHAVES.txt"
         banco_seguro = downloads / NOME_BANCO_SEGURO
         banco = banco_seguro if banco_seguro.exists() else downloads / NOME_BANCO
-        saida = downloads / NOME_PLANILHA
 
+    # A saída pertence ao aplicativo, mesmo quando o histórico legado ainda está
+    # em Downloads. Isso evita espalhar novos arquivos pelo perfil do usuário.
+    saida = raiz / "saidas" / NOME_PLANILHA
     return CaminhosApp(raiz=raiz, chaves=chaves, banco=banco, saida=saida)
