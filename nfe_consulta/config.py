@@ -34,13 +34,17 @@ def resolver_caminhos(
     banco_projeto = raiz / "dados" / NOME_BANCO
 
     projeto_em_uso = entrada_projeto.exists() or banco_seguro_projeto.exists() or banco_projeto.exists()
-    if projeto_em_uso:
+    banco_seguro_downloads = downloads / NOME_BANCO_SEGURO
+    banco_downloads = downloads / NOME_BANCO
+    chaves_downloads = downloads / "CHAVES.txt"
+    downloads_em_uso = chaves_downloads.exists() or banco_seguro_downloads.exists() or banco_downloads.exists()
+
+    if projeto_em_uso or not downloads_em_uso:
         chaves = entrada_projeto
         banco = banco_seguro_projeto if banco_seguro_projeto.exists() else banco_projeto
     else:
-        chaves = downloads / "CHAVES.txt"
-        banco_seguro = downloads / NOME_BANCO_SEGURO
-        banco = banco_seguro if banco_seguro.exists() else downloads / NOME_BANCO
+        chaves = chaves_downloads
+        banco = banco_seguro_downloads if banco_seguro_downloads.exists() else banco_downloads
 
     # A saída pertence ao aplicativo, mesmo quando o histórico legado ainda está
     # em Downloads. Isso evita espalhar novos arquivos pelo perfil do usuário.
