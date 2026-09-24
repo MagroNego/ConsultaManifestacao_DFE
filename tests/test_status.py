@@ -15,8 +15,9 @@ CNPJ = "16840128000101"
 def test_status_banco_inexistente_nao_cria_arquivo(tmp_path):
     caminho = tmp_path / "nao_existe.db"
     retorno = subprocess.run(
-        [sys.executable, "-m", "nfe_consulta.cli", "--status", "--cnpj", CNPJ,
-         "--banco", str(caminho)], capture_output=True, text=True,
+        [sys.executable, "-m", "nfe_consulta.cli", "status", "--banco", str(caminho)],
+        capture_output=True,
+        text=True,
     )
     assert retorno.returncode == 0
     assert "Banco nao encontrado" in retorno.stdout
