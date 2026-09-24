@@ -75,6 +75,6 @@ def test_cli_gui_aciona_a_interface_sem_requerer_chave(monkeypatch):
     import nfe_consulta.gui as gui
     chamadas = []
     monkeypatch.setattr(gui, "main", lambda: chamadas.append(True))
-    monkeypatch.setattr(sys, "argv", ["nfe-consulta", "--gui"])
+    monkeypatch.setattr(sys, "argv", ["nfe-consulta", "gui"])
     cli_main()
     assert chamadas == [True]
