@@ -6,14 +6,11 @@ import os
 import queue
 import re
 import sqlite3
-import sys
 import threading
 import tkinter as tk
 from datetime import datetime
 from pathlib import Path
 from tkinter import filedialog, messagebox, simpledialog, ttk
-
-from openpyxl import load_workbook
 
 from nfe_consulta import __version__
 from nfe_consulta.config import (
@@ -37,73 +34,11 @@ BORDA = "#E4E7EC"
 PRIMARIA = "#243B53"
 PRIMARIA_HOVER = "#1B2F44"
 SUAVE = "#EEF2F6"
-SUCESSO = "#147D64"
-ALERTA = "#B54708"
-ERRO = "#B42318"
 
 
 def caminhos_iniciais(pasta: Path, downloads: Path) -> tuple[Path, Path, Path]:
     caminhos = resolver_caminhos(pasta, downloads)
     return caminhos.chaves, caminhos.banco, caminhos.saida
-
-
-def montar_comando(
-    chaves: Path,
-    banco: Path,
-    saida: Path,
-    sincronizar: bool,
-    max_lotes: int = 50,
-) -> list[str]:
-    """Compatibilidade para integrações da v0.9.4; a GUI v1 não usa subprocesso."""
-    comando = [
-        sys.executable,
-        "-u",
-        "-m",
-        "nfe_consulta.cli",
-        "--cnpj",
-        CNPJ_PADRAO,
-        "--lote",
-        str(chaves),
-        "--xlsx",
-        str(saida),
-        "--banco",
-        str(banco),
-    ]
-    if sincronizar:
-        if not 1 <= max_lotes <= 500:
-            raise ValueError("Lotes por execução devem estar entre 1 e 500")
-        comando += ["--manifestacoes", "--uf", UF_PADRAO, "--max-lotes", str(max_lotes)]
-    return comando
-
-
-def ler_previa(caminho: Path) -> tuple[list[tuple[str, ...]], str]:
-    arquivo = load_workbook(caminho, read_only=True, data_only=True)
-    try:
-        aba = arquivo.active
-        resumo = str(aba["A2"].value or "")
-        linhas: list[tuple[str, ...]] = []
-        for chave, numero, serie, evento, data, protocolo, _, _, historico, erro in aba.iter_rows(
-            min_row=5, min_col=1, max_col=10, values_only=True
-        ):
-            if chave is not None:
-                linhas.append(
-                    tuple(
-                        str(valor) if valor is not None else ""
-                        for valor in (
-                            chave,
-                            numero,
-                            serie,
-                            evento,
-                            data,
-                            protocolo,
-                            historico,
-                            erro,
-                        )
-                    )
-                )
-        return linhas, resumo
-    finally:
-        arquivo.close()
 
 
 def resumir_status(texto: str) -> tuple[str, str, str, str]:
