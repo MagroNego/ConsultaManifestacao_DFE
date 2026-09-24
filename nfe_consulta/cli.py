@@ -1,3 +1,7 @@
+"""Interface de linha de comando da Consulta de Manifestação v1."""
+
+from __future__ import annotations
+
 import argparse
 import sqlite3
 import sys
@@ -5,26 +9,15 @@ from getpass import getpass
 from pathlib import Path
 
 from nfe_consulta import __version__
-from nfe_consulta.banco import BancoManifestacoes
-from nfe_consulta.certificado_windows import (
-    listar_certificados_cliente,
-    selecionar_certificado,
+from nfe_consulta.config import (
+    CNPJ_PADRAO,
+    UF_PADRAO,
+    resolver_caminhos,
 )
-from nfe_consulta.csv_writer import gravar_csv
-from nfe_consulta.xlsx_writer import gravar_xlsx
-from nfe_consulta.formatador import formatar_resultado
-from nfe_consulta.lote import ler_chaves, processar_lote
-from nfe_consulta.sincronizacao import sincronizar
-from nfe_consulta.status import consultar_status
+from nfe_consulta.modelos import NfeConsultaErro
 from nfe_consulta.seguranca_banco import criptografado, migrar_banco
-from nfe_consulta.modelos import (
-    NfeConsultaErro,
-    NfeErroCertificado,
-)
-from nfe_consulta.validacao import validar_cnpj, validar_uf
-from nfe_consulta.assistente import CNPJ_YAB, UF_YAB, NOME_PLANILHA
-from nfe_consulta.config import resolver_caminhos
 from nfe_consulta.servico import ParametrosConsulta, executar_consulta
+from nfe_consulta.status import consultar_status
 
 
 def _ler_senha(pergunta: str) -> str:
@@ -32,370 +25,159 @@ def _ler_senha(pergunta: str) -> str:
         return getpass(pergunta)
     senha = sys.stdin.readline().rstrip("\r\n")
     if not senha:
-        raise ValueError("Senha não recebida. Execute em um terminal interativo.")
+        raise ValueError("Senha não recebida.")
     return senha
 
 
-def _configurar_atalho(args, downloads: Path, *, pasta: Path | None = None,
-                      sincronizar: bool = True) -> None:
-    """Atalho conservador: nunca cria um banco novo nem usa o banco antigo."""
-    pasta = pasta or Path(__file__).resolve().parent.parent
-    entrada_projeto = pasta / "entrada" / "CHAVES.txt"
-    banco_projeto = pasta / "dados" / "nfe_manifestacoes_seguro.db"
-    usar_projeto = entrada_projeto.exists() or banco_projeto.exists()
-    args.cnpj, args.uf, args.manifestacoes = CNPJ_YAB, UF_YAB if sincronizar else None, sincronizar
-    args.lote = str(entrada_projeto if usar_projeto else downloads / "CHAVES.txt")
-    args.xlsx = str((pasta / "saidas" if usar_projeto else downloads) / NOME_PLANILHA)
-    args.banco = str(banco_projeto if usar_projeto else downloads / "nfe_manifestacoes_seguro.db")
-    for rotulo, arquivo in (("TXT de chaves", args.lote), ("banco protegido", args.banco)):
-        if not Path(arquivo).is_file():
-            raise ValueError(f"{rotulo} não encontrado: {arquivo}")
-    if not criptografado(args.banco):
-        raise ValueError(f"O banco do atalho não está criptografado: {args.banco}")
-
-
 def _progresso(atual: int, total: int) -> None:
-    print(f"\r{atual}/{total} chaves processadas", end="", flush=True)
+    print(f"\r{atual}/{total}", end="", flush=True)
 
 
-def _selecionar_certificado(indice: int | None, cnpj: str):
-    certs = listar_certificados_cliente()
-    if len(certs) > 1:
-        print("Certificados disponiveis:")
-        for i, cert in enumerate(certs):
-            cert_cnpj = f" | CNPJ {cert.cnpj}" if cert.cnpj else ""
-            print(f"  [{i}] {cert.subject} | valido ate {cert.valid_to}{cert_cnpj}")
-    if indice is None:
-        candidatos = [i for i, cert in enumerate(certs) if cert.cnpj == cnpj]
-        if len(candidatos) != 1:
-            candidatos = [i for i, cert in enumerate(certs)
-                          if cert.cnpj and cert.cnpj[:8] == cnpj[:8]]
-        if len(candidatos) != 1:
-            raise NfeErroCertificado(
-                "Nao foi possivel identificar um unico certificado do CNPJ informado. "
-                "Informe --cert-indice apos conferir a lista de certificados do Windows."
-            )
-        indice = candidatos[0]
-    print(f"Usando certificado [{indice}]")
-    return selecionar_certificado(certs, indice)
-
-
-def _gravar_resultados(caminho: str, resultados: list, cobertura: str) -> None:
-    with open(caminho, "w", encoding="utf-8-sig", newline="") as arquivo:
-        gravar_csv(arquivo, resultados, cobertura)
-    erros = sum(1 for resultado in resultados if resultado.erro)
-    print(f"CSV gerado: {caminho}")
-    print(f"Total: {len(resultados)} | Validas: {len(resultados)-erros} | Erros: {erros}")
-
-
-NOVOS_COMANDOS = {"gui", "atualizar", "excel", "status", "proteger-banco"}
-
-
-def _parser_v1() -> argparse.ArgumentParser:
+def _criar_parser() -> argparse.ArgumentParser:
     caminhos = resolver_caminhos()
     parser = argparse.ArgumentParser(
         prog="nfe-consulta",
         description="Consulta de manifestação de NF-e",
     )
-    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
-    comandos = parser.add_subparsers(dest="comando", required=True)
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {__version__}",
+    )
+
+    comandos = parser.add_subparsers(dest="comando")
 
     comandos.add_parser("gui", help="Abrir a interface gráfica")
 
-    atualizar = comandos.add_parser("atualizar", help="Sincronizar com a SEFAZ e gerar Excel")
-    atualizar.add_argument("chaves", nargs="?", default=str(caminhos.chaves))
+    atualizar = comandos.add_parser(
+        "atualizar",
+        help="Sincronizar com a SEFAZ e gerar Excel",
+    )
+    atualizar.add_argument(
+        "chaves",
+        nargs="?",
+        default=str(caminhos.chaves),
+        help="TXT com as chaves",
+    )
     atualizar.add_argument("--banco", default=str(caminhos.banco))
     atualizar.add_argument("--saida", default=str(caminhos.saida))
     atualizar.add_argument("--max-lotes", type=int, default=50)
     atualizar.add_argument("--cert-indice", type=int)
 
-    excel = comandos.add_parser("excel", help="Gerar Excel usando somente o banco local")
-    excel.add_argument("chaves", nargs="?", default=str(caminhos.chaves))
+    excel = comandos.add_parser(
+        "excel",
+        help="Gerar Excel usando somente o banco local",
+    )
+    excel.add_argument(
+        "chaves",
+        nargs="?",
+        default=str(caminhos.chaves),
+        help="TXT com as chaves",
+    )
     excel.add_argument("--banco", default=str(caminhos.banco))
     excel.add_argument("--saida", default=str(caminhos.saida))
 
-    status = comandos.add_parser("status", help="Mostrar o estado local da sincronização")
+    status = comandos.add_parser(
+        "status",
+        help="Mostrar o estado local da sincronização",
+    )
     status.add_argument("--banco", default=str(caminhos.banco))
 
-    proteger = comandos.add_parser("proteger-banco", help="Criar uma cópia SQLCipher do banco")
+    proteger = comandos.add_parser(
+        "proteger-banco",
+        help="Criar uma cópia SQLCipher do banco",
+    )
     proteger.add_argument("origem")
     proteger.add_argument("destino")
+
     return parser
 
 
-def _executar_comando_v1(argv: list[str]) -> None:
-    parser = _parser_v1()
-    args = parser.parse_args(argv)
+def _abrir_gui() -> None:
+    from nfe_consulta.gui import main as iniciar_interface
 
-    if args.comando == "gui":
-        from nfe_consulta.gui import main as iniciar_interface
-        iniciar_interface()
-        return
+    iniciar_interface()
 
-    if args.comando == "status":
-        senha = _ler_senha("Senha do banco: ") if criptografado(args.banco) else None
-        print(consultar_status(args.banco, CNPJ_YAB, senha=senha))
-        return
 
-    if args.comando == "proteger-banco":
-        senha = _ler_senha("Nova senha do banco protegido: ")
-        if senha != _ler_senha("Repita a senha: "):
-            parser.error("As senhas não coincidem.")
-        migrar_banco(args.origem, args.destino, senha)
-        print(f"Banco protegido criado: {args.destino}")
-        return
+def _senha_do_banco(caminho: str | Path) -> str | None:
+    return _ler_senha("Senha do banco: ") if criptografado(caminho) else None
 
-    senha = _ler_senha("Senha do banco: ") if criptografado(args.banco) else None
-    sincronizar_sefaz = args.comando == "atualizar"
+
+def _executar_status(args: argparse.Namespace) -> None:
+    senha = _senha_do_banco(args.banco)
+    print(consultar_status(args.banco, CNPJ_PADRAO, senha=senha))
+
+
+def _proteger_banco(args: argparse.Namespace) -> None:
+    senha = _ler_senha("Nova senha do banco protegido: ")
+    confirmacao = _ler_senha("Repita a senha: ")
+    if senha != confirmacao:
+        raise ValueError("As senhas não coincidem.")
+    migrar_banco(args.origem, args.destino, senha)
+    print(f"Banco protegido criado: {args.destino}")
+
+
+def _executar_consulta(args: argparse.Namespace) -> None:
+    sincronizar = args.comando == "atualizar"
+    senha = _senha_do_banco(args.banco)
+
     parametros = ParametrosConsulta(
         chaves=Path(args.chaves),
         banco=Path(args.banco),
         saida=Path(args.saida),
-        cnpj=CNPJ_YAB,
-        uf=UF_YAB,
-        sincronizar_sefaz=sincronizar_sefaz,
-        max_lotes=args.max_lotes if sincronizar_sefaz else 50,
+        cnpj=CNPJ_PADRAO,
+        uf=UF_PADRAO,
+        sincronizar_sefaz=sincronizar,
+        max_lotes=args.max_lotes if sincronizar else 50,
         senha_banco=senha,
-        cert_indice=args.cert_indice if sincronizar_sefaz else None,
+        cert_indice=args.cert_indice if sincronizar else None,
     )
+
+    resultado = executar_consulta(
+        parametros,
+        progresso_sincronizacao=(
+            lambda lote, ult, maximo, novos: print(
+                f"SEFAZ {lote}: NSU {ult}/{maximo} | +{novos} evento(s)",
+                flush=True,
+            )
+            if sincronizar
+            else None
+        ),
+        progresso_lote=_progresso,
+    )
+    print()
+    print(
+        f"{resultado.total} nota(s) | "
+        f"{resultado.com_evento} com evento | "
+        f"{resultado.com_erro} erro(s)"
+    )
+    print(f"Planilha: {resultado.saida}")
+
+
+def main(argv: list[str] | None = None) -> None:
+    argumentos = list(sys.argv[1:] if argv is None else argv)
+
+    if not argumentos:
+        _abrir_gui()
+        return
+
+    parser = _criar_parser()
+    args = parser.parse_args(argumentos)
+
     try:
-        resultado = executar_consulta(
-            parametros,
-            progresso_sincronizacao=(
-                lambda lote, ult, maximo, novos: print(
-                    f"SEFAZ {lote}: NSU {ult}/{maximo} | +{novos} evento(s)",
-                    flush=True,
-                )
-                if sincronizar_sefaz else None
-            ),
-            progresso_lote=_progresso,
-        )
+        if args.comando == "gui":
+            _abrir_gui()
+        elif args.comando == "status":
+            _executar_status(args)
+        elif args.comando == "proteger-banco":
+            _proteger_banco(args)
+        elif args.comando in {"atualizar", "excel"}:
+            _executar_consulta(args)
+        else:
+            parser.print_help()
     except (OSError, ValueError, RuntimeError, sqlite3.DatabaseError, NfeConsultaErro) as exc:
         print(f"Erro: {exc}", file=sys.stderr)
         raise SystemExit(1) from exc
-    print()
-    print(
-        f"Planilha: {resultado.saida} | "
-        f"{resultado.total} nota(s) | {resultado.com_evento} com evento | {resultado.com_erro} erro(s)"
-    )
-
-
-
-def _criar_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        prog="nfe-consulta",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        description=(
-            "Consulta manifestacoes de NF-e emitidas por NSU e cruza as chaves com o historico local"
-        ),
-        epilog=(
-            "EXEMPLOS (PowerShell):\n"
-            "  nfe-consulta --atualizar\n"
-            "  nfe-consulta --excel\n"
-            "  nfe-consulta --gui\n"
-            "  nfe-consulta --cnpj 16840128000101 --lote CHAVES.txt "
-            "--xlsx Consulta_Manifestacao_YAB.xlsx --banco nfe_manifestacoes.db\n"
-            "  nfe-consulta --manifestacoes --cnpj 16840128000101 --uf RJ "
-            "--lote CHAVES.txt --xlsx Consulta_Manifestacao_YAB.xlsx "
-            "--banco nfe_manifestacoes.db\n"
-            "  nfe-consulta --status --cnpj 16840128000101 "
-            "--banco nfe_manifestacoes.db\n\n"
-            "  nfe-consulta --criptografar-banco nfe_manifestacoes_seguro.db "
-            "--banco nfe_manifestacoes.db\n\n"
-            "Para um passo a passo, abra MANUAL_DE_USO.md na pasta do aplicativo.\n"
-            "Sem --manifestacoes, usa apenas dados locais; nenhuma chamada a SEFAZ."
-        ),
-    )
-    parser.add_argument("-help", action="help", help="Exibir este manual rapido e sair")
-    parser.add_argument("--gui", action="store_true", help="Abrir a interface grafica de consulta")
-    parser.add_argument("--atualizar", action="store_true",
-                        help="Atualizar na SEFAZ e gerar XLSX usando CHAVES.txt e banco protegido de Downloads")
-    parser.add_argument("--excel", action="store_true",
-                        help="Gerar XLSX apenas com dados locais do banco protegido em Downloads (sem SEFAZ)")
-    parser.add_argument("--status", action="store_true", help="Mostrar o estado local da sincronizacao, sem consultar a SEFAZ")
-    parser.add_argument("--criptografar-banco", metavar="NOVO_ARQUIVO",
-                        help="Criar copia protegida do banco indicado em --banco (solicita senha)")
-    parser.add_argument("chave", nargs="?", help="Chave de 44 digitos da NF-e")
-    parser.add_argument(
-        "--manifestacoes", "--consultar-sefaz", "--sincronizar",
-        dest="manifestacoes",
-        action="store_true",
-        help="Sincronizar eventos do emitente via distNSU antes de exportar",
-    )
-    parser.add_argument("--cnpj", help="CNPJ do emitente consultado")
-    parser.add_argument("--uf", help="UF do emitente, por sigla ou codigo IBGE (ex.: RJ)")
-    parser.add_argument("--lote", help="Arquivo .txt com uma chave por linha")
-    parser.add_argument("--csv", help="Caminho do CSV de saida (usado com --lote)")
-    parser.add_argument("--xlsx", help="Planilha Excel formatada (usado com --lote)")
-    parser.add_argument("--max-lotes", type=int, default=50, help="Maximo de lotes de 50 NSUs por execucao (padrao: 50)")
-    parser.add_argument(
-        "--banco",
-        default="nfe_manifestacoes.db",
-        help="Banco SQLite local (padrao: nfe_manifestacoes.db)",
-    )
-    parser.add_argument(
-        "--cert-indice",
-        type=int,
-        default=None,
-        help="Indice do certificado do Windows (padrao: selecao pelo CNPJ)",
-    )
-    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
-    return parser
-
-
-def main() -> None:
-    argumentos = sys.argv[1:]
-    if not argumentos:
-        _executar_comando_v1(["gui"])
-        return
-    if argumentos[0] in NOVOS_COMANDOS or argumentos[0] in {"-h", "--help", "--version"}:
-        _executar_comando_v1(argumentos)
-        return
-
-    # Compatibilidade da v0.9.4. Os comandos antigos continuam funcionando,
-    # mas a documentação da v1 usa apenas os subcomandos acima.
-    parser = _criar_parser()
-    args = parser.parse_args()
-
-    if args.atualizar or args.excel:
-        if any((args.gui, args.status, args.criptografar_banco, args.manifestacoes,
-                args.chave, args.lote, args.csv, args.xlsx, args.cnpj, args.uf,
-                args.cert_indice is not None, args.banco != "nfe_manifestacoes.db",
-                args.max_lotes != 50, args.atualizar and args.excel)):
-            parser.error("--atualizar e --excel devem ser usados separadamente")
-        try:
-            _configurar_atalho(args, Path.home() / "Downloads",
-                              pasta=Path(__file__).resolve().parent.parent,
-                              sincronizar=args.atualizar)
-        except ValueError as exc:
-            parser.error(str(exc))
-        print(f"TXT: {args.lote}\nBanco: {args.banco}\nExcel: {args.xlsx}")
-
-    if args.criptografar_banco:
-        if any((args.gui, args.status, args.manifestacoes, args.chave, args.lote, args.csv,
-                args.xlsx, args.cnpj, args.uf, args.cert_indice is not None)):
-            parser.error("--criptografar-banco aceita apenas --banco e o caminho do novo arquivo")
-        try:
-            senha = _ler_senha("Nova senha do banco protegido: ")
-            if senha != _ler_senha("Repita a senha: "):
-                raise ValueError("As senhas não coincidem.")
-            migrar_banco(args.banco, args.criptografar_banco, senha)
-            print(f"Banco protegido criado: {args.criptografar_banco}")
-            print("O banco original permanece sem criptografia. Use --banco com o novo arquivo daqui em diante.")
-        except (ValueError, RuntimeError, OSError, sqlite3.DatabaseError) as exc:
-            print(f"Falha na migração: {exc}", file=sys.stderr)
-            sys.exit(1)
-        return
-
-    if args.gui:
-        if any((args.status, args.manifestacoes, args.chave, args.lote, args.csv, args.xlsx,
-                args.cnpj, args.uf, args.cert_indice is not None)):
-            parser.error("--gui deve ser usado sozinho")
-        from nfe_consulta.gui import main as iniciar_interface
-        iniciar_interface()
-        return
-
-    if args.status:
-        if not args.cnpj:
-            parser.error("Informe --cnpj com --status")
-        if args.chave or args.lote or args.csv or args.xlsx or args.manifestacoes or args.uf or args.cert_indice is not None:
-            parser.error("--status aceita apenas --cnpj e --banco")
-        try:
-            cnpj = validar_cnpj(args.cnpj)
-            senha = _ler_senha("Senha do banco: ") if criptografado(args.banco) else None
-            print(consultar_status(args.banco, cnpj, senha=senha))
-        except ValueError as exc:
-            parser.error(str(exc))
-        except (OSError, UnicodeError, sqlite3.DatabaseError, RuntimeError) as exc:
-            print(f"Erro ao ler banco: {exc}", file=sys.stderr)
-            sys.exit(1)
-        return
-
-    if not args.chave and not args.lote:
-        parser.error("Informe uma chave ou use --lote arquivo.txt")
-    if args.lote and not (args.csv or args.xlsx):
-        parser.error("Informe --csv ou --xlsx com --lote")
-    if (args.csv or args.xlsx) and not args.lote:
-        parser.error("--csv e --xlsx so podem ser usados com --lote")
-    if args.manifestacoes and (not args.cnpj or not args.uf):
-        parser.error("--cnpj e --uf sao obrigatorios com --manifestacoes")
-    if args.max_lotes < 1:
-        parser.error("--max-lotes deve ser maior que zero")
-
-    try:
-        cnpj = validar_cnpj(args.cnpj) if args.cnpj else None
-        c_uf = validar_uf(args.uf) if args.uf else None
-    except ValueError as exc:
-        parser.error(str(exc))
-
-    try:
-        chaves_raw = ler_chaves(args.lote) if args.lote else [args.chave]
-    except (OSError, UnicodeError, NfeConsultaErro) as exc:
-        print(f"Erro ao abrir lote: {exc}", file=sys.stderr)
-        sys.exit(1)
-
-    try:
-        senha = _ler_senha("Senha do banco: ") if criptografado(args.banco) else None
-        banco = BancoManifestacoes(args.banco, senha=senha)
-    except (ValueError, RuntimeError, OSError, sqlite3.DatabaseError) as exc:
-        print(f"Erro ao abrir banco: {exc}", file=sys.stderr)
-        sys.exit(1)
-    try:
-        cobertura = "Somente historico local; sincronizacao nao executada"
-        if cnpj:
-            ult_local, max_local = banco.obter_estado(cnpj)
-            if int(ult_local) or int(max_local):
-                cobertura += f"; ultimo NSU salvo {ult_local}; maximo conhecido {max_local}"
-        if args.manifestacoes:
-            try:
-                certificado = _selecionar_certificado(args.cert_indice, cnpj)
-                if not certificado.cnpj or certificado.cnpj[:8] != cnpj[:8]:
-                    raise NfeErroCertificado(
-                        "O certificado selecionado nao apresenta CNPJ compativel. "
-                        "Selecione o certificado da empresa no repositorio do Windows."
-                    )
-                resumo = sincronizar(
-                    banco, cnpj, c_uf, certificado, max_lotes=args.max_lotes,
-                    progresso_fn=lambda n, ult, maximo, novos: print(
-                        f"Lote {n} | ultNSU {ult} | maxNSU {maximo} | eventos novos {novos}",
-                        flush=True,
-                    ),
-                )
-                cobertura = (
-                    "Sincronizacao concluida; eventos antigos podem estar indisponiveis"
-                    if resumo.completo else
-                    "Sincronizacao parcial; rode novamente para continuar do ultimo NSU"
-                )
-                if resumo.cache:
-                    print("Sincronizacao recente concluida; usando historico local (intervalo minimo de 1 hora).")
-                if not resumo.completo:
-                    print(f"AVISO: {cobertura}. ultNSU {resumo.ult_nsu} / maxNSU {resumo.max_nsu}")
-            except NfeConsultaErro as exc:
-                print(f"\nConsulta interrompida: {exc}", file=sys.stderr)
-                sys.exit(3)
-        resultados = processar_lote(
-            chaves_raw, lambda chave: banco.consultar_chave(chave, cnpj), _progresso
-        )
-        print()
-
-        if args.lote:
-            if args.csv:
-                try:
-                    _gravar_resultados(args.csv, resultados, cobertura)
-                except OSError as exc:
-                    print(f"Erro ao gravar CSV: {exc}", file=sys.stderr)
-                    sys.exit(4)
-            if args.xlsx:
-                try:
-                    gravar_xlsx(args.xlsx, resultados, cobertura)
-                    print(f"Planilha gerada: {args.xlsx}")
-                except OSError as exc:
-                    print(f"Erro ao gravar planilha: {exc}", file=sys.stderr)
-                    sys.exit(4)
-        else:
-            print(formatar_resultado(resultados[0]))
-    finally:
-        banco.fechar()
 
 
 if __name__ == "__main__":
