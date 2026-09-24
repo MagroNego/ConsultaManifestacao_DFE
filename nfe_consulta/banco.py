@@ -1,0 +1,223 @@
+import sqlite3
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from nfe_consulta.seguranca_banco import abrir_banco
+
+from nfe_consulta.modelos import (
+    Manifestacao,
+    NfeLimiteConsultaErro,
+    NfeErroResposta,
+    ResultadoConsulta,
+    RetornoDistribuicao,
+)
+
+
+NSU_INICIAL = "000000000000000"
+
+
+class BancoManifestacoes:
+    def __init__(self, caminho: str, senha: str | None = None):
+        Path(caminho).parent.mkdir(parents=True, exist_ok=True)
+        self.conexao = abrir_banco(caminho, senha)
+        self.conexao.execute("PRAGMA foreign_keys = ON")
+        self._criar_schema()
+
+    def _criar_schema(self) -> None:
+        self.conexao.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS estado_distribuicao (
+                cnpj TEXT PRIMARY KEY,
+                ult_nsu TEXT NOT NULL,
+                max_nsu TEXT NOT NULL,
+                atualizado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS manifestacoes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                cnpj TEXT NOT NULL,
+                chave TEXT NOT NULL,
+                codigo TEXT NOT NULL,
+                descricao TEXT NOT NULL,
+                data_evento TEXT NOT NULL,
+                protocolo TEXT NOT NULL,
+                nsu TEXT NOT NULL,
+                schema_xml TEXT NOT NULL,
+                recebido_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(cnpj, chave, codigo, protocolo, nsu)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_manifestacoes_chave
+                ON manifestacoes(chave);
+
+            CREATE TABLE IF NOT EXISTS consultas_pontuais (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                cnpj TEXT NOT NULL,
+                chave TEXT NOT NULL,
+                consultado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_consultas_pontuais_hora
+                ON consultas_pontuais(cnpj, consultado_em);
+
+            CREATE TABLE IF NOT EXISTS pausa_distribuicao (
+                cnpj TEXT PRIMARY KEY,
+                ate_utc TEXT NOT NULL,
+                motivo TEXT NOT NULL
+            );
+            """
+        )
+        self.conexao.commit()
+
+    def fechar(self) -> None:
+        self.conexao.close()
+
+    def obter_estado(self, cnpj: str) -> tuple[str, str]:
+        linha = self.conexao.execute(
+            "SELECT ult_nsu, max_nsu FROM estado_distribuicao WHERE cnpj = ?",
+            (cnpj,),
+        ).fetchone()
+        return linha if linha else (NSU_INICIAL, NSU_INICIAL)
+
+    def pausa_ativa(self, cnpj: str) -> str | None:
+        linha = self.conexao.execute(
+            "SELECT ate_utc, motivo FROM pausa_distribuicao WHERE cnpj = ?", (cnpj,)
+        ).fetchone()
+        if linha and datetime.fromisoformat(linha[0]) > datetime.now(timezone.utc):
+            return f"{linha[1]} (nova tentativa apos {linha[0]})"
+        return None
+
+    def pausar_distribuicao(self, cnpj: str, motivo: str) -> None:
+        ate = (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat(timespec="seconds")
+        with self.conexao:
+            self.conexao.execute(
+                "INSERT INTO pausa_distribuicao(cnpj, ate_utc, motivo) VALUES (?, ?, ?) "
+                "ON CONFLICT(cnpj) DO UPDATE SET ate_utc=excluded.ate_utc, motivo=excluded.motivo",
+                (cnpj, ate, motivo),
+            )
+
+    def sincronizacao_recente_e_completa(self, cnpj: str) -> bool:
+        linha = self.conexao.execute(
+            "SELECT ult_nsu, max_nsu, atualizado_em FROM estado_distribuicao "
+            "WHERE cnpj = ?", (cnpj,)
+        ).fetchone()
+        if not linha or linha[0] != linha[1]:
+            return False
+        atualizado = datetime.strptime(linha[2], "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+        return datetime.now(timezone.utc) - atualizado < timedelta(hours=1)
+
+    def salvar_manifestacoes(self, cnpj: str, retorno: RetornoDistribuicao) -> int:
+        inseridos = 0
+        with self.conexao:
+            for chave, evento in retorno.manifestacoes:
+                cursor = self.conexao.execute(
+                    """
+                    INSERT OR IGNORE INTO manifestacoes
+                    (cnpj, chave, codigo, descricao, data_evento, protocolo, nsu, schema_xml)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        cnpj,
+                        chave,
+                        evento.codigo,
+                        evento.descricao,
+                        evento.data,
+                        evento.protocolo,
+                        evento.nsu,
+                        evento.schema,
+                    ),
+                )
+                inseridos += cursor.rowcount
+        return inseridos
+
+    def salvar_retorno(self, cnpj: str, retorno: RetornoDistribuicao) -> int:
+        anterior, _ = self.obter_estado(cnpj)
+        if (not retorno.ult_nsu.isdigit() or not retorno.max_nsu.isdigit()
+                or int(retorno.ult_nsu) < int(anterior)
+                or int(retorno.ult_nsu) > int(retorno.max_nsu)):
+            raise NfeErroResposta("Cursor NSU invalido ou anterior ao ja salvo; lote nao gravado")
+        inseridos = 0
+        with self.conexao:
+            for chave, evento in retorno.manifestacoes:
+                cursor = self.conexao.execute(
+                    """INSERT OR IGNORE INTO manifestacoes
+                    (cnpj, chave, codigo, descricao, data_evento, protocolo, nsu, schema_xml)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (cnpj, chave, evento.codigo, evento.descricao, evento.data,
+                     evento.protocolo, evento.nsu, evento.schema),
+                )
+                inseridos += cursor.rowcount
+            self.conexao.execute(
+                """
+                INSERT INTO estado_distribuicao(cnpj, ult_nsu, max_nsu)
+                VALUES (?, ?, ?)
+                ON CONFLICT(cnpj) DO UPDATE SET
+                    ult_nsu = excluded.ult_nsu,
+                    max_nsu = excluded.max_nsu,
+                    atualizado_em = CURRENT_TIMESTAMP
+                """,
+                (cnpj, retorno.ult_nsu, retorno.max_nsu),
+            )
+        return inseridos
+
+    def consultas_na_ultima_hora(self, cnpj: str) -> int:
+        linha = self.conexao.execute(
+            """
+            SELECT COUNT(*) FROM consultas_pontuais
+            WHERE cnpj = ? AND consultado_em >= datetime('now', '-1 hour')
+            """,
+            (cnpj,),
+        ).fetchone()
+        return int(linha[0])
+
+    def chave_consultada_na_ultima_hora(self, cnpj: str, chave: str) -> bool:
+        linha = self.conexao.execute(
+            """
+            SELECT 1 FROM consultas_pontuais
+            WHERE cnpj = ? AND chave = ?
+              AND consultado_em >= datetime('now', '-1 hour')
+            LIMIT 1
+            """,
+            (cnpj, chave),
+        ).fetchone()
+        return linha is not None
+
+    def validar_limite_pontual(self, cnpj: str, chaves: list[str]) -> None:
+        novas = {
+            chave
+            for chave in chaves
+            if not self.chave_consultada_na_ultima_hora(cnpj, chave)
+        }
+        usadas = self.consultas_na_ultima_hora(cnpj)
+        if usadas + len(novas) > 20:
+            disponiveis = max(0, 20 - usadas)
+            raise NfeLimiteConsultaErro(
+                f"Limite preventivo: apenas {disponiveis} consulta(s) disponivel(is) "
+                "nesta janela de uma hora. Nenhuma chamada foi enviada."
+            )
+
+    def registrar_consulta_pontual(self, cnpj: str, chave: str) -> None:
+        with self.conexao:
+            self.conexao.execute(
+                "INSERT INTO consultas_pontuais(cnpj, chave) VALUES (?, ?)",
+                (cnpj, chave),
+            )
+
+    def consultar_chave(self, chave: str, cnpj: str | None = None) -> ResultadoConsulta:
+        sql = (
+            "SELECT codigo, descricao, data_evento, protocolo, nsu, schema_xml "
+            "FROM manifestacoes WHERE chave = ?"
+        )
+        parametros = [chave]
+        if cnpj:
+            sql += " AND cnpj = ?"
+            parametros.append(cnpj)
+        sql += " ORDER BY data_evento, CAST(nsu AS INTEGER), id"
+        linhas = self.conexao.execute(sql, parametros).fetchall()
+        eventos = tuple(Manifestacao(*linha) for linha in linhas)
+        return ResultadoConsulta(
+            chave=chave,
+            status_codigo=0,
+            status_motivo="Historico local da Distribuicao DF-e",
+            protocolo_nfe=None,
+            manifestacoes=eventos,
+        )

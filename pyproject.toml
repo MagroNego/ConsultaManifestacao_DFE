@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nfe-consulta"
+version = "0.9.4"
+description = "CLI Windows para consultar manifestacoes de NF-e por chave"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "Luan" }]
+dependencies = ["openpyxl>=3.1,<4", "defusedxml>=0.7.1,<1", "sqlcipher3==0.6.2"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+nfe-consulta = "nfe_consulta.cli:main"
+
+[tool.setuptools]
+packages = ["nfe_consulta"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

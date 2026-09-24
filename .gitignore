@@ -1,0 +1,38 @@
+# Dados locais e resultados fiscais: nunca versionar.
+/dados/*
+!/dados/.gitkeep
+/entrada/*
+!/entrada/.gitkeep
+/saidas/*
+!/saidas/.gitkeep
+*.db
+*.db-*
+*.sqlite*
+*.xlsx
+*.xls
+*.csv
+*.txt
+*.zip
+*.7z
+*.pfx
+*.p12
+*.pem
+*.key
+*.crt
+*.cer
+*.env
+.env.*
+
+# XML fiscal real; somente os exemplos sintéticos em testes são versionados.
+*.xml
+!tests/fixtures/*.xml
+
+# Arquivos produzidos pelo Python e pelos testes.
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+build/
+dist/

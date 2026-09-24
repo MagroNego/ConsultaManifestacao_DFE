@@ -1,0 +1,85 @@
+<retConsSitNFe xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00">
+  <tpAmb>1</tpAmb>
+  <verAplic>SP_NFE_PL_009_V4</verAplic>
+  <cStat>100</cStat>
+  <xMotivo>Autorizado o uso da NF-e</xMotivo>
+  <cUF>35</cUF>
+  <dhRecbto>2026-08-10T12:00:00-03:00</dhRecbto>
+  <chNFe>35260123456789000123550010000012341000012345</chNFe>
+  <protNFe versao="4.00">
+    <infProt>
+      <tpAmb>1</tpAmb>
+      <verAplic>SP_NFE_PL_009_V4</verAplic>
+      <chNFe>35260123456789000123550010000012341000012345</chNFe>
+      <dhRecbto>2026-08-10T11:00:00-03:00</dhRecbto>
+      <nProt>135260000000000</nProt>
+      <digVal>abc123def456=</digVal>
+      <cStat>100</cStat>
+      <xMotivo>Autorizado o uso da NF-e</xMotivo>
+    </infProt>
+  </protNFe>
+  <procEventoNFe versao="1.00">
+    <evento xmlns="http://www.portalfiscal.inf.br/nfe" versao="1.00">
+      <infEvento Id="ID2102103526012345678900012355001000001234100001234501">
+        <cOrgao>91</cOrgao>
+        <tpAmb>1</tpAmb>
+        <CNPJ>00000000000000</CNPJ>
+        <chNFe>35260123456789000123550010000012341000012345</chNFe>
+        <dhEvento>2026-08-10T09:14:00-03:00</dhEvento>
+        <tpEvento>210210</tpEvento>
+        <nSeqEvento>1</nSeqEvento>
+        <verEvento>1.00</verEvento>
+        <detEvento versao="1.00">
+          <descEvento>Ciencia da Operacao</descEvento>
+        </detEvento>
+      </infEvento>
+    </evento>
+    <retEvento xmlns="http://www.portalfiscal.inf.br/nfe" versao="1.00">
+      <infEvento Id="ID135260000000001">
+        <tpAmb>1</tpAmb>
+        <verAplic>AN_1.0.0</verAplic>
+        <cOrgao>91</cOrgao>
+        <cStat>135</cStat>
+        <xMotivo>Evento registrado e vinculado a NF-e</xMotivo>
+        <chNFe>35260123456789000123550010000012341000012345</chNFe>
+        <tpEvento>210210</tpEvento>
+        <xEvento>Ciencia da Operacao</xEvento>
+        <nSeqEvento>1</nSeqEvento>
+        <dhRegEvento>2026-08-10T09:14:00-03:00</dhRegEvento>
+        <nProt>135260000000001</nProt>
+      </infEvento>
+    </retEvento>
+  </procEventoNFe>
+  <procEventoNFe versao="1.00">
+    <evento xmlns="http://www.portalfiscal.inf.br/nfe" versao="1.00">
+      <infEvento Id="ID2102003526012345678900012355001000001234100001234502">
+        <cOrgao>91</cOrgao>
+        <tpAmb>1</tpAmb>
+        <CNPJ>00000000000000</CNPJ>
+        <chNFe>35260123456789000123550010000012341000012345</chNFe>
+        <dhEvento>2026-08-10T10:22:00-03:00</dhEvento>
+        <tpEvento>210200</tpEvento>
+        <nSeqEvento>2</nSeqEvento>
+        <verEvento>1.00</verEvento>
+        <detEvento versao="1.00">
+          <descEvento>Confirmacao da Operacao</descEvento>
+        </detEvento>
+      </infEvento>
+    </evento>
+    <retEvento xmlns="http://www.portalfiscal.inf.br/nfe" versao="1.00">
+      <infEvento Id="ID135260000000002">
+        <tpAmb>1</tpAmb>
+        <verAplic>AN_1.0.0</verAplic>
+        <cOrgao>91</cOrgao>
+        <cStat>135</cStat>
+        <xMotivo>Evento registrado e vinculado a NF-e</xMotivo>
+        <chNFe>35260123456789000123550010000012341000012345</chNFe>
+        <tpEvento>210200</tpEvento>
+        <xEvento>Confirmacao da Operacao</xEvento>
+        <nSeqEvento>2</nSeqEvento>
+        <dhRegEvento>2026-08-10T10:22:00-03:00</dhRegEvento>
+        <nProt>135260000000002</nProt>
+      </infEvento>
+    </retEvento>
+  </procEventoNFe>
+</retConsSitNFe>

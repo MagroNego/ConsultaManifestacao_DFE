@@ -1,0 +1,21 @@
+<retConsSitNFe xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00">
+  <tpAmb>1</tpAmb>
+  <verAplic>SP_NFE_PL_009_V4</verAplic>
+  <cStat>100</cStat>
+  <xMotivo>Autorizado o uso da NF-e</xMotivo>
+  <cUF>35</cUF>
+  <dhRecbto>2026-08-10T12:00:00-03:00</dhRecbto>
+  <chNFe>35260123456789000123550010000012341000012345</chNFe>
+  <protNFe versao="4.00">
+    <infProt>
+      <tpAmb>1</tpAmb>
+      <verAplic>SP_NFE_PL_009_V4</verAplic>
+      <chNFe>35260123456789000123550010000012341000012345</chNFe>
+      <dhRecbto>2026-08-10T11:00:00-03:00</dhRecbto>
+      <nProt>135260000000000</nProt>
+      <digVal>abc123def456=</digVal>
+      <cStat>100</cStat>
+      <xMotivo>Autorizado o uso da NF-e</xMotivo>
+    </infProt>
+  </protNFe>
+</retConsSitNFe>
