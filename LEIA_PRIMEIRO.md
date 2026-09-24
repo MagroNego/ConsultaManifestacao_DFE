@@ -1,18 +1,24 @@
-# Consulta de manifestação YAB — versão 0.9.4
+# Consulta de Manifestação YAB — versão 1.0
 
-O código-fonte, os testes, o instalador e os manuais estão juntos. **Não há certificado digital, senha, chaves reais, banco de dados ou resultado fiscal dentro deste pacote.**
+Este pacote contém código-fonte, testes, instalador e documentação. Não inclui certificado digital, senha, banco real, chaves reais ou resultado fiscal.
 
-1. TI: leia [REVISAO.md](REVISAO.md) e [MANUAL_DE_INSTALACAO.md](MANUAL_DE_INSTALACAO.md).
-2. Instale pelo `INSTALAR.cmd` ou pelo comando de instalação descrito no manual.
-3. Dê duplo clique em `ABRIR_CONSULTA.cmd` ou use `nfe-consulta --gui` para abrir a interface gráfica. O botão verde gera Excel com o banco local; a atualização da SEFAZ tem um botão separado. `ABRIR_CONSULTA_TEXTO.cmd` mantém o assistente em texto.
-4. A planilha padrão é `saidas/Consulta_Manifestacao_YAB.xlsx`; a aba tem o mesmo nome sem `.xlsx`.
+## Início rápido
 
-Na primeira utilização, coloque seu `CHAVES.txt` em `entrada` ou selecione outro caminho no assistente. Quem já tem `nfe_manifestacoes.db` em Downloads pode reutilizá-lo; o assistente detecta esse arquivo, sem copiá-lo.
+1. Leia `MANUAL_DE_INSTALACAO.md`.
+2. Execute `INSTALAR.cmd`.
+3. Abra `ABRIR_CONSULTA.cmd`.
+4. Coloque o TXT em `entrada/CHAVES.txt` ou escolha outro arquivo na tela.
+5. Mantenha o mesmo banco entre as sincronizações.
 
-Para todos os comandos: `py -m nfe_consulta.cli --help` ou `py -m nfe_consulta.cli -help`.
+CLI principal:
 
-Para proteger o histórico existente, veja [SEGURANCA_BANCO.md](SEGURANCA_BANCO.md).
+```powershell
+nfe-consulta atualizar
+nfe-consulta excel
+nfe-consulta status
+nfe-consulta gui
+```
 
-Atalho para atualizar com banco seguro em `dados/` e TXT em `entrada/`, ou com ambos em Downloads: `nfe-consulta --atualizar`.
+A planilha padrão é `saidas/Consulta_Manifestacao_YAB.xlsx`.
 
-Atalho para gerar somente a planilha do banco seguro, sem SEFAZ: `nfe-consulta --excel`.
+Para proteção do banco, consulte `SEGURANCA_BANCO.md`. Para revisão técnica e de segurança, consulte `REVISAO.md`.
