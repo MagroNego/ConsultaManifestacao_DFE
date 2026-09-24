@@ -248,7 +248,7 @@ def main() -> None:
     if not argumentos:
         _executar_comando_v1(["gui"])
         return
-    if argumentos[0] in NOVOS_COMANDOS:
+    if argumentos[0] in NOVOS_COMANDOS or argumentos[0] in {"-h", "--help", "--version"}:
         _executar_comando_v1(argumentos)
         return
 
