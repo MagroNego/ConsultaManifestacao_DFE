@@ -1,12 +1,13 @@
-"""Autenticação e autorização da aplicação web."""
+"""Autenticação simples da área administrativa."""
 
 from __future__ import annotations
 
 import hashlib
 import hmac
+import time
 from dataclasses import dataclass
 
-from fastapi import HTTPException, Request, status
+from fastapi import HTTPException, Request, Response, status
 
 from nfe_consulta.web.settings import WebSettings
 
@@ -18,53 +19,121 @@ class WebUser:
     is_admin: bool
 
 
-def _admin(username: str, settings: WebSettings) -> bool:
-    return username.casefold() in settings.admin_users
+PUBLIC_USER = WebUser(
+    username="usuario-interno",
+    display_name="Usuário",
+    is_admin=False,
+)
+
+
+def _session_key(settings: WebSettings) -> bytes:
+    material = settings.admin_password or "admin-not-configured"
+    return hmac.new(
+        settings.csrf_secret.encode("utf-8"),
+        material.encode("utf-8"),
+        hashlib.sha256,
+    ).digest()
+
+
+def _session_signature(payload: str, settings: WebSettings) -> str:
+    return hmac.new(
+        _session_key(settings),
+        payload.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+
+
+def _new_session_token(settings: WebSettings) -> str:
+    expires_at = int(time.time()) + settings.admin_session_minutes * 60
+    payload = f"{settings.admin_username}|{expires_at}"
+    return f"{payload}|{_session_signature(payload, settings)}"
+
+
+def _valid_session_token(token: str, settings: WebSettings) -> bool:
+    if not token:
+        return False
+
+    try:
+        username, expires_raw, signature = token.rsplit("|", 2)
+        expires_at = int(expires_raw)
+    except (ValueError, TypeError):
+        return False
+
+    if username.casefold() != settings.admin_username.casefold():
+        return False
+    if expires_at <= int(time.time()):
+        return False
+
+    payload = f"{username}|{expires_at}"
+    esperado = _session_signature(payload, settings)
+    return hmac.compare_digest(signature, esperado)
+
+
+def admin_session_active(request: Request) -> bool:
+    settings: WebSettings = request.app.state.settings
+    token = request.cookies.get(settings.admin_cookie_name, "")
+    return _valid_session_token(token, settings)
 
 
 def current_user(request: Request) -> WebUser:
     settings: WebSettings = request.app.state.settings
 
-    if settings.auth_mode == "dev":
+    if admin_session_active(request):
         return WebUser(
-            username=settings.dev_user,
-            display_name=settings.dev_name or settings.dev_user,
-            is_admin=settings.dev_admin or _admin(settings.dev_user, settings),
+            username=settings.admin_username,
+            display_name="Administrador",
+            is_admin=True,
         )
 
-    segredo_recebido = request.headers.get(settings.proxy_secret_header, "")
-    if not settings.proxy_secret or not hmac.compare_digest(
-        segredo_recebido,
-        settings.proxy_secret,
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Requisição não autenticada pelo proxy corporativo.",
-        )
-
-    username = request.headers.get(settings.user_header, "").strip()
-    if not username:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Usuário corporativo não informado pelo proxy.",
-        )
-
-    display_name = request.headers.get(settings.name_header, "").strip() or username
-    return WebUser(
-        username=username,
-        display_name=display_name,
-        is_admin=_admin(username, settings),
-    )
+    return PUBLIC_USER
 
 
 def require_admin(request: Request) -> WebUser:
     user = current_user(request)
     if not user.is_admin:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Acesso restrito a administradores.",
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Faça login para acessar a área Atualizar.",
         )
     return user
+
+
+def authenticate_admin(
+    username: str,
+    password: str,
+    settings: WebSettings,
+) -> bool:
+    if not settings.admin_password:
+        return False
+
+    usuario_ok = hmac.compare_digest(
+        username.strip().casefold(),
+        settings.admin_username.casefold(),
+    )
+    senha_ok = hmac.compare_digest(password, settings.admin_password)
+    return usuario_ok and senha_ok
+
+
+def set_admin_cookie(response: Response, settings: WebSettings) -> None:
+    response.set_cookie(
+        key=settings.admin_cookie_name,
+        value=_new_session_token(settings),
+        max_age=settings.admin_session_minutes * 60,
+        httponly=True,
+        secure=settings.production,
+        samesite="strict",
+        path="/",
+    )
+
+
+def clear_admin_cookie(response: Response, settings: WebSettings) -> None:
+    response.delete_cookie(
+        key=settings.admin_cookie_name,
+        path="/",
+        secure=settings.production,
+        httponly=True,
+        samesite="strict",
+    )
 
 
 def csrf_token(user: WebUser, settings: WebSettings) -> str:
