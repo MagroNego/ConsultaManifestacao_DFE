@@ -1,163 +1,199 @@
-# Consulta de Manifestação — v2.0 Web
+# Consulta de Manifestação NF-e
 
-Aplicação corporativa para consultar o histórico local de manifestações de NF-e, gerar Excel e sincronizar o banco com o **NFeDistribuicaoDFe**.
+Aplicação corporativa para consulta de manifestações de NF-e, geração de relatórios em Excel e sincronização controlada com o serviço **NFeDistribuicaoDFe** da SEFAZ.
 
-A v2 mantém o núcleo Python da v1, mas adiciona uma interface Web para uso na rede interna da empresa.
+A versão Web foi projetada para uso em rede interna, com separação entre operações de consulta e ações administrativas.
 
-## Fluxos separados
+## Visão geral
 
-A aplicação possui três ações distintas:
+| Item | Tecnologia |
+| --- | --- |
+| Backend | FastAPI / Uvicorn |
+| Interface | HTML, CSS e JavaScript |
+| Persistência | SQLite / SQLCipher |
+| Certificado | A1 PFX/P12 ou Windows Certificate Store |
+| Plataforma alvo | Windows / Windows Server |
+| Versão atual | 2.0.0 |
 
-- **Excel**: usa somente o banco local. O usuário seleciona um `CHAVES.txt` e recebe a planilha.
-- **Consulta rápida**: busca pelo número da NF diretamente no banco local e mostra os eventos encontrados, sem acessar a SEFAZ.
-- **Status**: lê o estado da última gravação no banco, incluindo `ultNSU`, `maxNSU` e disponibilidade da próxima sincronização.
-- **Atualizar**: sincroniza somente o banco com a SEFAZ. Não recebe TXT e não gera Excel.
+## Funcionalidades
 
-A área **Atualizar** é protegida por um único login administrativo. Excel, Consulta rápida e Status não exigem login adicional.
+- geração de planilha Excel a partir de um arquivo `CHAVES.txt`;
+- consulta rápida de manifestações pelo número da NF;
+- painel de status com `ultNSU`, `maxNSU` e disponibilidade da próxima sincronização;
+- sincronização independente com o Ambiente Nacional da NF-e;
+- cooldown persistente para controle de consumo da SEFAZ;
+- tratamento específico para rejeição 656;
+- autenticação administrativa para configuração e atualização;
+- seleção e validação do banco central pela interface administrativa;
+- seleção e validação de certificado A1 pela interface administrativa;
+- log de auditoria com rotação;
+- modo claro e escuro;
+- job para atualização agendada no Windows.
 
-## Cooldown SEFAZ
+## Fluxo da aplicação
 
-Após uma tentativa válida de sincronização, a aplicação grava um bloqueio padrão de **120 minutos** no próprio banco.
+```text
+Usuários internos
+        |
+        +-- Excel ---------> banco central -> XLSX
+        |
+        +-- Consulta ------> banco central
+        |
+        +-- Status --------> banco central
+        |
+        +-- Atualizar ----- login administrativo
+                               |
+                               +-- banco
+                               +-- certificado A1
+                               +-- SEFAZ
+```
 
-O bloqueio:
+As operações de Excel, Consulta rápida e Status não acessam a SEFAZ.
 
-- é validado no backend;
-- sobrevive a reinícios do serviço;
-- também é aplicado pela CLI da v2;
-- não substitui o tratamento específico da rejeição 656.
+## Instalação
 
-## Interface Web
+Requisitos:
 
-Instalação no Windows:
+- Windows 10/11 ou Windows Server;
+- Python 3.11 ou superior;
+- acesso HTTPS ao Ambiente Nacional da NF-e;
+- certificado A1 válido;
+- acesso ao banco SQLite/SQLCipher utilizado pela aplicação.
+
+Execute:
 
 ```powershell
 INSTALAR.cmd
 ```
 
-O instalador cria `.venv`, instala a aplicação e prepara as pastas `dados`, `secrets` e `logs`.
+O instalador cria o ambiente virtual e prepara as pastas locais necessárias.
 
-Depois:
+Depois configure o acesso administrativo:
 
 ```powershell
 CONFIGURAR_ADMIN.cmd
+```
+
+E inicie a aplicação:
+
+```powershell
 INICIAR_WEB.cmd
 ```
 
-Em produção, a aplicação deve ficar atrás de um reverse proxy corporativo para HTTPS e publicação na rede interna. Consulte `SERVIDOR_WEB.md`.
+## Administração
 
-## CLI
+A área **Atualizar** permite configurar os recursos utilizados pelo servidor.
 
-```powershell
-nfe-consulta atualizar --banco dados\nfe_manifestacoes_seguro.db
-nfe-consulta excel entrada\CHAVES.txt --banco dados\nfe_manifestacoes_seguro.db --saida saidas\Consulta_Manifestacao_YAB.xlsx
-nfe-consulta status --banco dados\nfe_manifestacoes_seguro.db
-```
+### Banco de dados
 
-- `atualizar`: somente SEFAZ → banco.
-- `excel`: somente banco + TXT → XLSX.
-- `status`: somente leitura do banco.
-
-## Acesso administrativo
-
-Somente a área **Atualizar** exige login. O usuário interno acessa normalmente Excel, Consulta rápida e Status.
-
-O login administrativo usa:
-
-```text
-NFE_ADMIN_USER_FILE=C:\ConsultaManifestacao\secrets\admin-user.txt
-NFE_ADMIN_PASSWORD_FILE=C:\ConsultaManifestacao\secrets\admin-password.txt
-NFE_ADMIN_SESSION_MINUTES=30
-```
-
-O projeto inclui `CONFIGURAR_ADMIN.cmd`, que grava o usuário e a senha em `secrets\admin-user.txt` e `secrets\admin-password.txt`. Esses arquivos não são versionados. A senha não deve ser gravada no código nem enviada ao GitHub. Em produção, use ACL restrita no Windows.
-
-A sessão usa cookie assinado, `HttpOnly`, `SameSite=Strict` e expira após o período configurado de inatividade. Alterar o HTML ou chamar diretamente a rota de sincronização não libera acesso sem sessão administrativa válida.
-
-## Tema
-
-A interface possui modo claro e escuro. A preferência é salva localmente no navegador.
-
-## Certificado
-
-A área **Atualizar** permite apontar diretamente para um certificado A1 `.pfx` ou `.p12` armazenado em uma pasta protegida do servidor.
-
-A aplicação:
-
-- não copia o PFX para o projeto;
-- valida o arquivo e o CNPJ antes de salvar a configuração;
-- grava somente o caminho em `secrets\cert-path.txt`;
-- guarda a senha em `secrets\cert-password.txt`, que deve ter ACL restrita;
-- usa a mesma configuração na Web e no job `ATUALIZAR_BANCO_MANHA.cmd`.
-
-A conta que executa a aplicação e o job precisa ter permissão de leitura sobre o arquivo do certificado.
-
-O modo anterior via Windows Certificate Store continua disponível como alternativa:
-
-```text
-Cert:\CurrentUser\My
-Cert:\LocalMachine\My
-```
-
-## Banco
-
-SQLite/SQLCipher continua suportado na primeira versão Web.
-
-O administrador pode apontar o banco central diretamente pela aba **Atualizar**. O caminho validado é salvo em:
+O caminho validado é persistido em:
 
 ```text
 secrets\db-path.txt
 ```
 
-A senha SQLCipher continua separada em `secrets\db-password.txt`. Excel, Consulta rápida, Status, atualização manual e o job matinal passam a usar o mesmo banco selecionado.
+A senha SQLCipher permanece separada em:
 
-Enquanto SQLite for utilizado:
+```text
+secrets\db-password.txt
+```
 
-- execute somente **1 worker**;
-- mantenha um único arquivo de banco ativo;
-- prefira disco local do servidor em vez de compartilhamento de rede;
-- faça backup regular.
+### Certificado A1
 
-Caso a aplicação evolua para múltiplas instâncias, alta disponibilidade ou concorrência maior, a persistência deve ser migrada para SQL Server ou PostgreSQL.
+A aplicação pode utilizar um certificado `.pfx` ou `.p12` armazenado em uma pasta protegida.
+
+A configuração local utiliza:
+
+```text
+secrets\cert-path.txt
+secrets\cert-password.txt
+```
+
+O certificado não é copiado para dentro do projeto.
+
+### Credenciais administrativas
+
+```text
+secrets\admin-user.txt
+secrets\admin-password.txt
+```
+
+Arquivos em `secrets` não devem ser versionados e devem ter ACL restrita no servidor.
 
 ## Segurança
 
-A v2 inclui:
+A aplicação inclui:
 
 - autorização no backend;
 - proteção CSRF;
+- cookie administrativo assinado, `HttpOnly` e `SameSite=Strict`;
 - headers HTTP de segurança;
-- limite de upload;
-- sanitização e validação das chaves existentes;
-- log de auditoria sem registrar as chaves de acesso;
-- cooldown persistente para SEFAZ;
-- SQLCipher opcional.
+- validação de uploads;
+- separação de credenciais e arquivos de configuração;
+- SQLCipher para banco protegido;
+- auditoria sem registrar chaves de NF-e ou credenciais;
+- limite de uma sincronização simultânea.
 
-## Estrutura principal
+O pacote de release não contém banco, senhas ou certificado A1.
+
+## Implantação
+
+Para ambiente corporativo, a arquitetura recomendada é:
 
 ```text
-nfe_consulta/
-  servico.py
-  banco.py
-  distribuicao.py
-  certificado_windows.py
-  web/
-    app.py
-    auth.py
-    settings.py
-    status_view.py
-    uploads.py
-    audit.py
-    templates/
-    static/
+Rede interna
+    |
+   HTTPS
+    |
+   IIS
+    |
+127.0.0.1:8080
+    |
+FastAPI / Uvicorn
+    |
+SQLite / SQLCipher
 ```
 
-## Testes
+Enquanto SQLite/SQLCipher for utilizado, execute a aplicação com **1 worker** e mantenha o banco em disco local do servidor sempre que possível.
+
+As instruções de implantação estão em `SERVIDOR_WEB.md`.
+
+## Atualização agendada
+
+O arquivo:
+
+```text
+ATUALIZAR_BANCO_MANHA.cmd
+```
+
+pode ser executado pelo Agendador de Tarefas do Windows. Ele utiliza o mesmo banco e certificado configurados pela área administrativa.
+
+## Desenvolvimento
+
+Instale as dependências de desenvolvimento:
 
 ```powershell
 py -m pip install -e ".[dev]"
+```
+
+Execute a suíte:
+
+```powershell
 py -m pytest -q
 ```
 
-A CI da branch `web/v2.0` executa a suíte em Windows e Linux.
+A integração contínua valida o projeto em Windows e Linux.
 
-Os testes automatizados não fazem consulta real à SEFAZ nem usam certificado real.
+Os testes automatizados não acessam a SEFAZ real e não utilizam certificado de produção.
+
+## Releases
+
+A versão estável atual é **v2.0.0**.
+
+Os pacotes de instalação são publicados em **GitHub Releases**. Para implantação, utilize o arquivo `ConsultaManifestacao_DFE-vX.Y.Z.zip`, e não os pacotes automáticos de source code gerados pelo GitHub.
+
+## Histórico
+
+- **v0.9.4**: versão legada preservada na branch `main`;
+- **v1.0**: refatoração da arquitetura desktop e CLI;
+- **v2.0.0**: interface Web corporativa, administração centralizada e publicação para rede interna.
