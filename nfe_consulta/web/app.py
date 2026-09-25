@@ -27,6 +27,7 @@ from nfe_consulta.servico import (
 )
 from nfe_consulta.web.status_view import WebStatus, read_web_status
 from nfe_consulta.web.audit import AuditLog
+from nfe_consulta.web.consulta_local import consultar_numero_nota
 from nfe_consulta.web.auth import (
     WebUser,
     csrf_token,
@@ -181,6 +182,54 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             "excel.html",
             user,
             database_ready=settings.database_path.is_file(),
+            consulta_numero="",
+            consulta_eventos=(),
+        )
+
+    @app.get("/consulta", response_class=HTMLResponse)
+    async def consulta_rapida(
+        request: Request,
+        user: Annotated[WebUser, Depends(current_user)],
+        numero: str = "",
+    ):
+        numero_limpo = numero.strip()
+        eventos = ()
+        erro_consulta = None
+
+        if numero_limpo:
+            if not numero_limpo.isdigit():
+                erro_consulta = "Informe somente o número da NF."
+            elif not settings.database_path.is_file():
+                erro_consulta = "Banco de manifestações indisponível no servidor."
+            else:
+                try:
+                    eventos = await run_in_threadpool(
+                        consultar_numero_nota,
+                        settings.database_path,
+                        CNPJ_PADRAO,
+                        int(numero_limpo),
+                        password=settings.database_password,
+                    )
+                    app.state.audit.write(
+                        request,
+                        user,
+                        "consulta_nf",
+                        "ok",
+                        resultados=len(eventos),
+                    )
+                except (ValueError, OSError, RuntimeError) as exc:
+                    erro_consulta = str(exc)
+                except Exception as exc:
+                    erro_consulta = _database_error_message(exc, settings, user)
+
+        return _render(
+            request,
+            "excel.html",
+            user,
+            database_ready=settings.database_path.is_file(),
+            consulta_numero=numero_limpo,
+            consulta_eventos=eventos,
+            consulta_error=erro_consulta,
         )
 
     @app.post("/excel")
@@ -188,8 +237,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         request: Request,
         user: Annotated[WebUser, Depends(current_user)],
         csrf: str = Form(...),
-        files: list[UploadFile] = File(default=[]),
-        folder_files: list[UploadFile] = File(default=[]),
+        files: UploadFile = File(...),
     ):
         validate_csrf(csrf, user, settings)
 
@@ -214,7 +262,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         try:
             chaves = temporario / "CHAVES.txt"
             resumo_upload = await consolidar_txts(
-                [*files, *folder_files],
+                [files],
                 chaves,
                 max_bytes=settings.max_upload_bytes,
                 max_chaves=settings.max_keys,
