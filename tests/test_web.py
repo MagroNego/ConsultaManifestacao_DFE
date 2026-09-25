@@ -41,6 +41,7 @@ def settings_web(tmp_path, *, admin=False, auth_mode="dev", admin_users=frozense
         admin_cookie_name="nfe_admin_session",
         certificate_path_file=tmp_path / "secrets" / "cert-path.txt",
         certificate_password_file=tmp_path / "secrets" / "cert-password.txt",
+        database_path_file=tmp_path / "secrets" / "db-path.txt",
     )
 
 
@@ -443,3 +444,92 @@ def test_sincronizacao_web_usa_certificado_configurado_em_arquivo(tmp_path, monk
     assert chamadas[0].cert_arquivo == cert_path.resolve()
     assert chamadas[0].cert_senha_arquivo == "Senha-PFX-123!"
     assert chamadas[0].cert_thumbprint is None
+
+
+
+def test_admin_configura_banco_por_caminho_e_aplicacao_passa_a_usar(tmp_path):
+    cfg = settings_web(tmp_path)
+    criar_banco(cfg.database_path)
+
+    banco_novo = tmp_path / "TI" / "dados" / "central.db"
+    banco = BancoManifestacoes(str(banco_novo))
+    evento = Manifestacao(
+        codigo="210210",
+        descricao="Ciência da Operação",
+        data="2026-09-25T08:00:00-03:00",
+        protocolo="135260000000099",
+        nsu="563700",
+        schema="procEventoNFe_v1.00.xsd",
+    )
+    banco.salvar_retorno(
+        "16840128000101",
+        RetornoDistribuicao(
+            status_codigo=138,
+            status_motivo="Documento localizado",
+            ult_nsu="563700".zfill(15),
+            max_nsu="563700".zfill(15),
+            manifestacoes=((CHAVE, evento),),
+        ),
+    )
+    banco.fechar()
+
+    app = create_app(cfg)
+    with TestClient(app) as client:
+        login = client.post(
+            "/admin/login",
+            data={
+                "csrf": csrf_token(PUBLIC_USER, cfg),
+                "username": cfg.admin_username,
+                "password": cfg.admin_password,
+            },
+            follow_redirects=False,
+        )
+        assert login.status_code == 303
+
+        admin = WebUser(cfg.admin_username, "Administrador", True)
+        resposta = client.post(
+            "/atualizar/banco",
+            data={
+                "csrf": csrf_token(admin, cfg),
+                "database_path": str(banco_novo),
+            },
+            follow_redirects=False,
+        )
+        assert resposta.status_code == 303
+        assert "db_ok=1" in resposta.headers["location"]
+
+        consulta = client.get("/consulta", params={"numero": "91779"})
+
+    assert cfg.database_path_file.read_text(encoding="utf-8") == str(banco_novo.resolve())
+    assert consulta.status_code == 200
+    assert "135260000000099" in consulta.text
+
+
+def test_admin_rejeita_arquivo_que_nao_e_banco_de_manifestacoes(tmp_path):
+    cfg = settings_web(tmp_path)
+    criar_banco(cfg.database_path)
+    invalido = tmp_path / "qualquer.db"
+    invalido.write_bytes(b"nao-e-um-banco")
+
+    app = create_app(cfg)
+    with TestClient(app) as client:
+        client.post(
+            "/admin/login",
+            data={
+                "csrf": csrf_token(PUBLIC_USER, cfg),
+                "username": cfg.admin_username,
+                "password": cfg.admin_password,
+            },
+            follow_redirects=False,
+        )
+        admin = WebUser(cfg.admin_username, "Administrador", True)
+        resposta = client.post(
+            "/atualizar/banco",
+            data={
+                "csrf": csrf_token(admin, cfg),
+                "database_path": str(invalido),
+            },
+        )
+
+    assert resposta.status_code == 400
+    assert not cfg.database_path_file.exists()
