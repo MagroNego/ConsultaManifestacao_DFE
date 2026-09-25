@@ -49,6 +49,23 @@ def _senha_admin() -> str | None:
     )
 
 
+def _usuario_admin() -> str:
+    arquivo = os.getenv("NFE_ADMIN_USER_FILE", "").strip()
+    if arquivo:
+        caminho = Path(arquivo).expanduser()
+        if not caminho.is_file():
+            raise RuntimeError(f"Arquivo de usuário administrador não encontrado: {caminho}")
+        usuario = caminho.read_text(encoding="utf-8").strip()
+    else:
+        usuario = os.getenv("NFE_ADMIN_USER", "admin").strip()
+
+    if not usuario:
+        raise RuntimeError("Usuário administrador não pode ficar vazio.")
+    if len(usuario) > 64 or any(c in usuario for c in "\r\n\t"):
+        raise RuntimeError("Usuário administrador inválido.")
+    return usuario
+
+
 @dataclass(frozen=True)
 class WebSettings:
     environment: str
@@ -104,9 +121,7 @@ def get_settings() -> WebSettings:
         csrf_secret = secrets.token_urlsafe(32)
 
     admin_password = _senha_admin()
-    admin_username = os.getenv("NFE_ADMIN_USER", "admin").strip()
-    if not admin_username:
-        raise RuntimeError("NFE_ADMIN_USER não pode ficar vazio.")
+    admin_username = _usuario_admin()
     if admin_password and len(admin_password) < 12:
         raise RuntimeError("A senha do administrador deve ter pelo menos 12 caracteres.")
     if ambiente == "production" and not admin_password:
