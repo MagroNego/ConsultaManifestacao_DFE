@@ -79,16 +79,24 @@ A interface possui modo claro e escuro. A preferência é salva localmente no na
 
 ## Certificado
 
-A v2 aceita certificado Windows em:
+A área **Atualizar** permite apontar diretamente para um certificado A1 `.pfx` ou `.p12` armazenado em uma pasta protegida do servidor.
+
+A aplicação:
+
+- não copia o PFX para o projeto;
+- valida o arquivo e o CNPJ antes de salvar a configuração;
+- grava somente o caminho em `secrets\cert-path.txt`;
+- guarda a senha em `secrets\cert-password.txt`, que deve ter ACL restrita;
+- usa a mesma configuração na Web e no job `ATUALIZAR_BANCO_MANHA.cmd`.
+
+A conta que executa a aplicação e o job precisa ter permissão de leitura sobre o arquivo do certificado.
+
+O modo anterior via Windows Certificate Store continua disponível como alternativa:
 
 ```text
 Cert:\CurrentUser\My
 Cert:\LocalMachine\My
 ```
-
-Para servidor corporativo, `LocalMachine` é o cenário recomendado, com a conta do serviço autorizada a ler a chave privada.
-
-O certificado pode ser fixado por thumbprint.
 
 ## Banco
 
