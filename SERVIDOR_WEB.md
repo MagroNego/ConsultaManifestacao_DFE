@@ -51,21 +51,33 @@ py -m pip install -e ".[dev]"
 py -m pytest -q
 ```
 
-## Variáveis obrigatórias em produção
+## Configuração de produção
+
+As senhas não são fornecidas por variável de ambiente. A aplicação lê exclusivamente os arquivos locais da pasta `secrets`:
+
+```text
+C:\ConsultaManifestacao\secrets\admin-user.txt
+C:\ConsultaManifestacao\secrets\admin-password.txt
+C:\ConsultaManifestacao\secrets\db-password.txt
+C:\ConsultaManifestacao\secrets\cert-path.txt
+C:\ConsultaManifestacao\secrets\cert-password.txt
+C:\ConsultaManifestacao\secrets\db-path.txt
+```
+
+Variáveis como `NFE_ADMIN_PASSWORD`, `NFE_DATABASE_PASSWORD` e `NFE_CERT_PASSWORD` não são usadas como fallback.
+
+As variáveis de ambiente continuam disponíveis apenas para configuração não sensível ou operacional, por exemplo:
 
 ```text
 NFE_WEB_ENV=production
 NFE_WEB_CSRF_SECRET=<segredo aleatório com pelo menos 32 caracteres>
-NFE_ADMIN_USER_FILE=C:\ConsultaManifestacao\secrets\admin-user.txt
-NFE_ADMIN_PASSWORD_FILE=C:\ConsultaManifestacao\secrets\admin-password.txt
 NFE_ADMIN_SESSION_MINUTES=30
-NFE_DATABASE_PATH=C:\ConsultaManifestacao\dados\nfe_manifestacoes_seguro.db
-NFE_DATABASE_PASSWORD_FILE=C:\ConsultaManifestacao\secrets\db-password.txt
 NFE_CERT_STORE=LocalMachine
-NFE_CERT_THUMBPRINT=<thumbprint do certificado A1>
+NFE_CERT_THUMBPRINT=<thumbprint, se usar Windows Certificate Store>
+NFE_SEFAZ_COOLDOWN_MINUTES=120
 ```
 
-Os arquivos em `secrets` devem ter ACL restrita à conta que executa a aplicação. Rode `CONFIGURAR_ADMIN.cmd` para criar `admin-user.txt` e `admin-password.txt`. O arquivo `db-password.txt` contém somente a senha do SQLCipher.
+Os arquivos em `secrets` devem ter ACL restrita à conta que executa a aplicação. Rode `CONFIGURAR_ADMIN.cmd` para criar o login administrativo. O arquivo `db-password.txt` deve conter somente a senha do SQLCipher.
 
 O reverse proxy continua recomendado para HTTPS e publicação na rede interna, mas não precisa autenticar cada funcionário. A autenticação adicional existe apenas na aba **Atualizar**.
 
@@ -189,16 +201,11 @@ A TI ainda deve validar:
 
 O projeto inclui `ATUALIZAR_BANCO_MANHA.cmd` para execução pelo Agendador de Tarefas do Windows. O job usa o mesmo banco e o mesmo cooldown da interface Web.
 
-Antes de agendar, configure no servidor:
+Antes de agendar, configure o banco e o certificado pela área administrativa. O job lê diretamente `secrets\db-path.txt`, `secrets\db-password.txt`, `secrets\cert-path.txt` e `secrets\cert-password.txt`.
 
-```text
-NFE_CERT_STORE=LocalMachine
-NFE_CERT_THUMBPRINT=<thumbprint do certificado A1>
-NFE_DATABASE_PATH=C:\ConsultaManifestacao\dados\nfe_manifestacoes_seguro.db
-NFE_DATABASE_PASSWORD_FILE=C:\ConsultaManifestacao\secrets\db-password.txt
-```
+Se o certificado estiver no Windows Certificate Store em vez de PFX/P12, mantenha `NFE_CERT_STORE` e `NFE_CERT_THUMBPRINT` configurados.
 
-O arquivo de senha contém somente a senha do SQLCipher e não deve ser versionado. Restrinja a ACL da pasta `secrets` à conta do serviço.
+Os arquivos de senha não devem ser versionados. Restrinja a ACL da pasta `secrets` à conta do serviço.
 
 No Agendador de Tarefas, execute o BAT uma vez pela manhã, com uma conta que tenha leitura da chave privada do certificado. O retorno e eventuais erros são gravados em:
 
