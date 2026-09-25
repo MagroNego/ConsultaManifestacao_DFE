@@ -913,3 +913,55 @@ html[data-theme="dark"] .brand-logo-dark {
   line-height: 1.5;
   text-align: center;
 }
+
+
+.certificate-card {
+  margin-top: 16px;
+  padding: 20px;
+}
+
+.certificate-password-field {
+  margin-top: 14px;
+}
+
+.certificate-details {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  margin-top: 18px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--border);
+}
+
+.certificate-details > div {
+  min-width: 0;
+  padding: 12px;
+  background: var(--panel-soft);
+}
+
+.certificate-details span,
+.certificate-details strong {
+  display: block;
+}
+
+.certificate-details span {
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.certificate-details strong {
+  margin-top: 5px;
+  overflow-wrap: anywhere;
+  font-size: 11px;
+}
+
+@media (max-width: 760px) {
+  .certificate-details {
+    grid-template-columns: 1fr;
+  }
+}
