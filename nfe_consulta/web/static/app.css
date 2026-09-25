@@ -839,3 +839,68 @@ html[data-theme="dark"] .brand-logo-dark {
     width: 100%;
   }
 }
+
+
+.logout-form {
+  margin: 0;
+}
+
+.logout-button {
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--panel-soft);
+  color: var(--muted);
+  padding: 8px 11px;
+  font-size: 11px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.logout-button:hover {
+  color: var(--text);
+}
+
+.login-shell {
+  min-height: calc(100vh - 170px);
+  display: grid;
+  place-items: center;
+}
+
+.login-card {
+  width: min(100%, 430px);
+  padding: 28px;
+}
+
+.login-heading {
+  margin-bottom: 20px;
+}
+
+.login-heading h1 {
+  margin: 14px 0 6px;
+  font-size: 24px;
+}
+
+.login-heading p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.login-form {
+  display: grid;
+  gap: 14px;
+}
+
+.login-submit {
+  width: 100%;
+  margin-top: 4px;
+}
+
+.login-note {
+  margin: 18px 0 0;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.5;
+  text-align: center;
+}
