@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "nfe-consulta"
 version = "2.0.0"
-description = "Consulta corporativa de manifestacoes de NF-e"
+description = "Aplicacao corporativa para consulta e sincronizacao de manifestacoes de NF-e"
 readme = "README.md"
 requires-python = ">=3.11"
 authors = [{ name = "Luan" }]
