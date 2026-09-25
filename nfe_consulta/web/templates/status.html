@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Status · Consulta de Manifestação{% endblock %}
+{% block content %}
+<section class="page-heading">
+  <div>
+    <h1>Status</h1>
+    <p>Última gravação registrada no banco local.</p>
+  </div>
+  <span class="status-dot {{ 'ok' if status_web.database_ready else 'bad' }}">
+    {{ "Banco disponível" if status_web.database_ready else "Banco indisponível" }}
+  </span>
+</section>
+
+{% if error %}
+<div class="alert error">{{ error }}</div>
+{% endif %}
+
+<section class="card status-summary">
+  <div class="status-grid">
+    <div>
+      <span class="metric-label">Última gravação</span>
+      <strong class="metric-value">{{ status_web.updated_label }}</strong>
+    </div>
+    <div>
+      <span class="metric-label">ultNSU</span>
+      <strong class="metric-value mono">{{ status_web.ult_nsu or "—" }}</strong>
+    </div>
+    <div>
+      <span class="metric-label">maxNSU</span>
+      <strong class="metric-value mono">{{ status_web.max_nsu or "—" }}</strong>
+    </div>
+    <div>
+      <span class="metric-label">Estado</span>
+      <strong class="metric-value">
+        {% if not status_web.database_ready %}
+          Indisponível
+        {% elif not status_web.updated_at %}
+          Sem sincronização
+        {% elif status_web.complete %}
+          Sincronizado
+        {% else %}
+          Parcial
+        {% endif %}
+      </strong>
+    </div>
+  </div>
+
+  <div class="status-footer">
+    <span>Próxima sincronização permitida</span>
+    <strong>
+      {% if status_web.can_sync %}
+        Disponível
+      {% else %}
+        {{ status_web.available_label }}
+      {% endif %}
+    </strong>
+  </div>
+
+  {% if status_web.pause_reason %}
+  <div class="alert error compact">
+    {{ status_web.pause_reason }}
+  </div>
+  {% endif %}
+</section>
+{% endblock %}
