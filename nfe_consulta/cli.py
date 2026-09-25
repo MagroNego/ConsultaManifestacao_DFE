@@ -11,6 +11,7 @@ from pathlib import Path
 
 from nfe_consulta import __version__
 from nfe_consulta.config import CNPJ_PADRAO, UF_PADRAO, resolver_caminhos
+from nfe_consulta.certificado_config import carregar_config_certificado_arquivo
 from nfe_consulta.modelos import NfeConsultaErro
 from nfe_consulta.seguranca_banco import criptografado, migrar_banco
 from nfe_consulta.servico import (
@@ -157,6 +158,7 @@ def _proteger_banco(args: argparse.Namespace) -> None:
 
 def _executar_atualizacao(args: argparse.Namespace) -> None:
     senha = _senha_do_banco(args.banco)
+    cert_arquivo = carregar_config_certificado_arquivo()
     resumo = sincronizar_banco(
         ParametrosSincronizacao(
             banco=Path(args.banco),
@@ -165,8 +167,10 @@ def _executar_atualizacao(args: argparse.Namespace) -> None:
             max_lotes=args.max_lotes,
             senha_banco=senha,
             cert_indice=args.cert_indice,
-            cert_thumbprint=args.cert_thumbprint,
+            cert_thumbprint=None if cert_arquivo is not None else args.cert_thumbprint,
             cert_store=args.cert_store,
+            cert_arquivo=cert_arquivo.path if cert_arquivo is not None else None,
+            cert_senha_arquivo=cert_arquivo.password if cert_arquivo is not None else None,
             cooldown_minutos=args.cooldown_minutos,
         ),
         progresso_sincronizacao=lambda lote, ult, maximo, novos: print(
