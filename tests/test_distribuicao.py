@@ -1,5 +1,6 @@
 import base64
 import gzip
+import json
 
 import pytest
 
@@ -115,3 +116,34 @@ def test_parse_ignora_documento_que_nao_e_manifestacao():
     retorno = parse_retorno_distribuicao(xml)
     assert retorno.manifestacoes == ()
     assert retorno.documentos_ignorados == 1
+
+
+
+def test_envio_soap_passa_pfx_por_stdin(monkeypatch, tmp_path):
+    from types import SimpleNamespace
+    from nfe_consulta.distribuicao import _enviar_soap_windows
+
+    capturado = {}
+
+    def fake_run(*args, **kwargs):
+        capturado["payload"] = json.loads(kwargs["input"])
+        return SimpleNamespace(returncode=0, stdout="<resposta/>", stderr="")
+
+    monkeypatch.setattr("nfe_consulta.distribuicao.subprocess.run", fake_run)
+
+    arquivo = tmp_path / "certificado.pfx"
+    cert = CertificadoWindows(
+        "ABC",
+        "Empresa",
+        "ICP-Brasil",
+        "2030-01-01",
+        "16840128000101",
+        "Arquivo",
+        str(arquivo),
+        "Senha-PFX-123!",
+    )
+
+    assert _enviar_soap_windows("<soap/>", cert) == "<resposta/>"
+    assert capturado["payload"]["path"] == str(arquivo)
+    assert capturado["payload"]["password"] == "Senha-PFX-123!"
+    assert capturado["payload"]["store"] == "Arquivo"
