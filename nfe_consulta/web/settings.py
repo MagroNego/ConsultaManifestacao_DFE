@@ -55,6 +55,7 @@ class WebSettings:
     root_path: str
     forwarded_allow_ips: str
     audit_log: Path
+    sync_cooldown_minutes: int = 120
     max_upload_bytes: int = 2 * 1024 * 1024
     max_keys: int = 10_000
 
@@ -132,4 +133,5 @@ def get_settings() -> WebSettings:
             "NFE_WEB_FORWARDED_ALLOW_IPS", "127.0.0.1"
         ).strip(),
         audit_log=audit,
+        sync_cooldown_minutes=int(os.getenv("NFE_SEFAZ_COOLDOWN_MINUTES", "120")),
     )
