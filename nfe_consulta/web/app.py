@@ -24,7 +24,7 @@ from nfe_consulta.servico import (
     executar_consulta,
     sincronizar_banco,
 )
-from nfe_consulta.status import consultar_status
+from nfe_consulta.web.status_view import WebStatus, read_web_status
 from nfe_consulta.web.audit import AuditLog
 from nfe_consulta.web.auth import (
     WebUser,
@@ -74,11 +74,11 @@ def _render(
     )
 
 
-def _status_local(settings: WebSettings) -> str:
-    return consultar_status(
-        str(settings.database_path),
+def _status_web(settings: WebSettings) -> WebStatus:
+    return read_web_status(
+        settings.database_path,
         CNPJ_PADRAO,
-        senha=settings.database_password,
+        password=settings.database_password,
     )
 
 
@@ -287,32 +287,53 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                 error="Não foi possível gerar a planilha.",
             )
 
-    @app.get("/sefaz", response_class=HTMLResponse)
-    async def sefaz_page(
+    @app.get("/status", response_class=HTMLResponse)
+    async def status_page(
+        request: Request,
+        user: Annotated[WebUser, Depends(current_user)],
+    ):
+        try:
+            status_web = await run_in_threadpool(_status_web, settings)
+            erro = None
+        except Exception:
+            status_web = WebStatus(False, None, None, None, None, None, None, None)
+            erro = "Não foi possível abrir o banco configurado."
+
+        return _render(
+            request,
+            "status.html",
+            user,
+            status_web=status_web,
+            error=erro,
+        )
+
+    @app.get("/atualizar", response_class=HTMLResponse)
+    async def atualizar_page(
         request: Request,
         user: Annotated[WebUser, Depends(require_admin)],
         ok: str | None = None,
     ):
         try:
-            status_local = await run_in_threadpool(_status_local, settings)
+            status_web = await run_in_threadpool(_status_web, settings)
             erro = None
         except Exception:
-            status_local = "Status local indisponível."
+            status_web = WebStatus(False, None, None, None, None, None, None, None)
             erro = "Não foi possível abrir o banco configurado."
 
         return _render(
             request,
             "sefaz.html",
             user,
-            status_local=status_local,
+            status_web=status_web,
             success="Sincronização concluída." if ok == "1" else None,
             error=erro,
             certificate_store=settings.certificate_store,
             certificate_fixed=bool(settings.certificate_thumbprint),
+            cooldown_minutes=settings.sync_cooldown_minutes,
         )
 
-    @app.post("/sefaz/sincronizar")
-    async def sefaz_sincronizar(
+    @app.post("/atualizar/sincronizar")
+    async def atualizar_sincronizar(
         request: Request,
         user: Annotated[WebUser, Depends(require_admin)],
         csrf: str = Form(...),
@@ -322,16 +343,35 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
 
         if not 1 <= max_lotes <= 500:
             raise HTTPException(status_code=400, detail="Lotes devem estar entre 1 e 500.")
-        if not settings.database_path.is_file():
+
+        status_web = await run_in_threadpool(_status_web, settings)
+        if not status_web.database_ready:
             return _render(
                 request,
                 "sefaz.html",
                 user,
                 status_code=503,
-                status_local="Banco não encontrado.",
+                status_web=status_web,
                 error="Configure um banco existente antes de sincronizar.",
                 certificate_store=settings.certificate_store,
                 certificate_fixed=bool(settings.certificate_thumbprint),
+                cooldown_minutes=settings.sync_cooldown_minutes,
+            )
+
+        if not status_web.can_sync:
+            return _render(
+                request,
+                "sefaz.html",
+                user,
+                status_code=429,
+                status_web=status_web,
+                error=(
+                    "Sincronização bloqueada temporariamente. "
+                    f"Nova tentativa disponível em {status_web.available_label}."
+                ),
+                certificate_store=settings.certificate_store,
+                certificate_fixed=bool(settings.certificate_thumbprint),
+                cooldown_minutes=settings.sync_cooldown_minutes,
             )
 
         lock: threading.Lock = app.state.sync_lock
@@ -341,10 +381,11 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                 "sefaz.html",
                 user,
                 status_code=409,
-                status_local=await run_in_threadpool(_status_local, settings),
+                status_web=await run_in_threadpool(_status_web, settings),
                 error="Já existe uma sincronização em andamento.",
                 certificate_store=settings.certificate_store,
                 certificate_fixed=bool(settings.certificate_thumbprint),
+                cooldown_minutes=settings.sync_cooldown_minutes,
             )
 
         try:
@@ -358,6 +399,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                     senha_banco=settings.database_password,
                     cert_thumbprint=settings.certificate_thumbprint,
                     cert_store=settings.certificate_store,
+                    cooldown_minutos=settings.sync_cooldown_minutes,
                 ),
             )
             app.state.audit.write(
@@ -371,9 +413,10 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                 max_nsu=resumo.max_nsu,
                 completo=resumo.completo,
                 cache=resumo.cache,
+                cooldown_minutos=settings.sync_cooldown_minutes,
             )
             return RedirectResponse(
-                url=request.url_for("sefaz_page").include_query_params(ok="1"),
+                url=request.url_for("atualizar_page").include_query_params(ok="1"),
                 status_code=303,
             )
         except Exception as exc:
@@ -385,18 +428,19 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                 reason=type(exc).__name__,
             )
             try:
-                status_local = await run_in_threadpool(_status_local, settings)
+                status_web = await run_in_threadpool(_status_web, settings)
             except Exception:
-                status_local = "Status local indisponível."
+                status_web = WebStatus(False, None, None, None, None, None, None, None)
             return _render(
                 request,
                 "sefaz.html",
                 user,
                 status_code=400,
-                status_local=status_local,
+                status_web=status_web,
                 error=str(exc),
                 certificate_store=settings.certificate_store,
                 certificate_fixed=bool(settings.certificate_thumbprint),
+                cooldown_minutes=settings.sync_cooldown_minutes,
             )
         finally:
             lock.release()
