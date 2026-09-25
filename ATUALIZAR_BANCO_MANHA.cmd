@@ -27,8 +27,9 @@ if not exist "%NFE_DATABASE_PASSWORD_FILE%" (
     exit /b 3
 )
 
-if not defined NFE_CERT_THUMBPRINT (
-    echo [%date% %time%] ERRO: NFE_CERT_THUMBPRINT nao configurado. >> "%LOG_FILE%"
+if not defined NFE_CERT_THUMBPRINT if not defined NFE_CERT_PATH if not exist "%BASE_DIR%secrets\cert-path.txt" (
+    echo [%date% %time%] ERRO: certificado nao configurado. >> "%LOG_FILE%"
+    echo [%date% %time%] Configure o PFX/P12 na area Atualizar ou defina NFE_CERT_THUMBPRINT. >> "%LOG_FILE%"
     exit /b 4
 )
 
@@ -43,7 +44,11 @@ if not exist "%PYTHON_EXE%" (
 )
 
 echo [%date% %time%] Banco: %NFE_DATABASE_PATH% >> "%LOG_FILE%"
-echo [%date% %time%] Certificado: %NFE_CERT_STORE% / thumbprint configurado >> "%LOG_FILE%"
+if exist "%BASE_DIR%secrets\cert-path.txt" (
+    echo [%date% %time%] Certificado: arquivo PFX/P12 configurado pela area admin >> "%LOG_FILE%"
+) else (
+    echo [%date% %time%] Certificado: %NFE_CERT_STORE% / Windows Store >> "%LOG_FILE%"
+)
 
 "%PYTHON_EXE%" -m nfe_consulta.cli atualizar --banco "%NFE_DATABASE_PATH%" --max-lotes 50 >> "%LOG_FILE%" 2>&1
 set "RESULTADO=%ERRORLEVEL%"
