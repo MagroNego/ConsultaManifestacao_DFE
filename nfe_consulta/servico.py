@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Callable
 
 from nfe_consulta.banco import BancoManifestacoes
+from nfe_consulta.certificado_arquivo import carregar_certificado_arquivo
 from nfe_consulta.certificado_windows import (
     listar_certificados_cliente,
     selecionar_certificado,
@@ -43,6 +44,8 @@ class ParametrosConsulta:
     cert_indice: int | None = None
     cert_thumbprint: str | None = None
     cert_store: str | None = None
+    cert_arquivo: Path | None = None
+    cert_senha_arquivo: str | None = None
 
 
 @dataclass(frozen=True)
@@ -74,8 +77,18 @@ def resolver_certificado(
     indice: int | None = None,
     thumbprint: str | None = None,
     store: str | None = None,
+    arquivo: str | Path | None = None,
+    senha_arquivo: str | None = None,
 ) -> CertificadoWindows:
     """Seleciona o certificado do CNPJ sem interação de terminal."""
+    if arquivo:
+        certificado = carregar_certificado_arquivo(arquivo, senha_arquivo)
+        if not certificado.cnpj or certificado.cnpj[:8] != cnpj[:8]:
+            raise NfeErroCertificado(
+                "O certificado configurado não apresenta CNPJ compatível com a empresa."
+            )
+        return certificado
+
     certs = listar_certificados_cliente(store)
     if not certs:
         raise NfeErroCertificado("Nenhum certificado de cliente foi encontrado no Windows.")
@@ -147,6 +160,8 @@ def sincronizar_banco(
         parametros.cert_indice,
         parametros.cert_thumbprint,
         parametros.cert_store,
+        parametros.cert_arquivo,
+        parametros.cert_senha_arquivo,
     )
 
     banco = BancoManifestacoes(str(banco_path), senha=parametros.senha_banco)
@@ -216,6 +231,8 @@ def executar_consulta(
                 parametros.cert_indice,
                 parametros.cert_thumbprint,
                 parametros.cert_store,
+                parametros.cert_arquivo,
+                parametros.cert_senha_arquivo,
             )
             resumo = sincronizar(
                 banco,
