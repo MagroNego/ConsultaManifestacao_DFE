@@ -30,7 +30,7 @@ nfe-consulta-web = "nfe_consulta.web.app:main"
 include = ["nfe_consulta*"]
 
 [tool.setuptools.package-data]
-"nfe_consulta.web" = ["templates/*.html", "static/*.css", "static/*.js"]
+"nfe_consulta.web" = ["templates/*.html", "static/*.css", "static/*.js", "static/img/*.png"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
