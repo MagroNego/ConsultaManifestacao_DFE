@@ -28,21 +28,18 @@ O bloqueio:
 
 ## Interface Web
 
-Instalação:
+Instalação no Windows:
 
 ```powershell
-py -m pip install -e .
+INSTALAR.cmd
 ```
 
-Execução:
+O instalador cria `.venv`, instala a aplicação e prepara as pastas `dados`, `secrets` e `logs`.
+
+Depois:
 
 ```powershell
-nfe-consulta-web
-```
-
-ou:
-
-```powershell
+CONFIGURAR_ADMIN.cmd
 INICIAR_WEB.cmd
 ```
 
