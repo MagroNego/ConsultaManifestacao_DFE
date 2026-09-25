@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Excel · Consulta de Manifestação{% endblock %}
+{% block content %}
+<section class="page-heading">
+  <div>
+    <h1>Gerar Excel</h1>
+    <p>Selecione as chaves e baixe a planilha atualizada.</p>
+  </div>
+  <span class="status-dot {{ 'ok' if database_ready else 'bad' }}">
+    {{ "Banco disponível" if database_ready else "Banco indisponível" }}
+  </span>
+</section>
+
+{% if error %}
+<div class="alert error">{{ error }}</div>
+{% endif %}
+
+<section class="card upload-card">
+  <form action="{{ url_for('exportar_excel') }}" method="post" enctype="multipart/form-data" data-processing-form>
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+
+    <div class="upload-grid">
+      <label class="upload-box">
+        <span class="upload-icon">TXT</span>
+        <strong>Arquivos</strong>
+        <small>Selecione um ou vários .txt</small>
+        <input type="file" name="files" accept=".txt,text/plain" multiple data-file-input>
+      </label>
+
+      <label class="upload-box">
+        <span class="upload-icon">DIR</span>
+        <strong>Pasta</strong>
+        <small>Carrega os .txt da pasta escolhida</small>
+        <input type="file" name="folder_files" accept=".txt,text/plain" multiple webkitdirectory directory data-file-input>
+      </label>
+    </div>
+
+    <div class="selection" data-selection>Nenhum arquivo selecionado</div>
+
+    <div class="actions">
+      <button class="button primary" type="submit" {% if not database_ready %}disabled{% endif %}>
+        Gerar planilha
+      </button>
+    </div>
+  </form>
+</section>
+{% endblock %}
