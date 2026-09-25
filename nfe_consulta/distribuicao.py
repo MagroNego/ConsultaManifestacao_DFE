@@ -82,6 +82,7 @@ def _enviar_soap_windows(
             "url": endpoint,
             "soap": soap,
             "thumbprint": certificado.thumbprint,
+            "store": certificado.store,
             "action": SOAP_ACTION,
         }
     )
@@ -89,7 +90,8 @@ def _enviar_soap_windows(
 $ErrorActionPreference = "Stop"
 $null = Add-Type -AssemblyName System.Net.Http
 $payload = [Console]::In.ReadToEnd() | ConvertFrom-Json
-$cert = Get-Item ("Cert:\CurrentUser\My\" + $payload.thumbprint) -ErrorAction Stop
+$store = if ($payload.store -eq "LocalMachine") { "LocalMachine" } else { "CurrentUser" }
+$cert = Get-Item ("Cert:\" + $store + "\My\" + $payload.thumbprint) -ErrorAction Stop
 if (-not $cert.HasPrivateKey) { throw "Certificado sem chave privada" }
 
 $handler = $null
