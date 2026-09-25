@@ -35,29 +35,35 @@ def _literal(valor: str) -> str:
 
 
 def abrir_banco(caminho: str | Path, senha: str | None = None, *, somente_leitura: bool = False):
-    arquivo = Path(caminho).expanduser()
+    arquivo = Path(caminho).expanduser().resolve()
+
+    if not arquivo.is_file():
+        raise FileNotFoundError(f"Banco não encontrado: {arquivo}")
+
     if criptografado(arquivo):
         if senha is None:
             raise ValueError("Banco criptografado: informe a senha para abri-lo.")
+
         modulo = _cipher()
-        if somente_leitura:
-            from urllib.parse import quote
-            destino = "file:" + quote(str(arquivo.resolve()), safe="/:") + "?mode=ro"
-            conexao = modulo.connect(destino, uri=True)
-        else:
-            conexao = modulo.connect(str(arquivo))
+
+        # SQLCipher + URI file: no Windows pode falhar em caminhos com drive
+        # e barras invertidas. Abrimos pelo caminho nativo e usamos query_only
+        # para garantir que telas como Status não alterem o banco.
+        conexao = modulo.connect(str(arquivo))
         try:
             conexao.execute("PRAGMA key = " + _literal(senha))
             conexao.execute("SELECT count(*) FROM sqlite_master").fetchone()
+            if somente_leitura:
+                conexao.execute("PRAGMA query_only = ON")
         except modulo.DatabaseError as exc:
             conexao.close()
             raise ValueError("Senha incorreta ou banco criptografado inválido.") from exc
         return conexao
+
+    conexao = sqlite3.connect(str(arquivo))
     if somente_leitura:
-        from urllib.parse import quote
-        destino = "file:" + quote(str(arquivo.resolve()), safe="/:") + "?mode=ro"
-        return sqlite3.connect(destino, uri=True)
-    return sqlite3.connect(str(arquivo))
+        conexao.execute("PRAGMA query_only = ON")
+    return conexao
 
 
 def migrar_banco(origem: str | Path, destino: str | Path, senha: str) -> None:
