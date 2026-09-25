@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+{% block title %}Atualizar · Consulta de Manifestação{% endblock %}
+
+{% block content %}
+<section class="page-heading">
+  <div>
+    <h1>Atualizar</h1>
+    <p>Configura o servidor e sincroniza o banco com a SEFAZ.</p>
+  </div>
+  <span class="admin-badge">Administrador</span>
+</section>
+
+{% if success %}
+<div class="alert success">{{ success }}</div>
+{% endif %}
+{% if error %}
+<div class="alert error">{{ error }}</div>
+{% endif %}
+
+<div class="admin-grid">
+  <section class="card">
+    <div class="card-title">
+      <h2>Sincronização SEFAZ</h2>
+      <span class="muted">NFeDistribuicaoDFe</span>
+    </div>
+
+    <form action="{{ url_for('atualizar_sincronizar') }}" method="post" data-processing-form>
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+
+      <label class="field">
+        <span>Lotes máximos</span>
+        <input type="number" name="max_lotes" min="1" max="500" value="50">
+      </label>
+
+      <div class="actions">
+        <button class="button danger" type="submit" {% if not status_web.can_sync %}disabled{% endif %}>
+          Sincronizar com a SEFAZ
+        </button>
+      </div>
+    </form>
+
+    <div class="cooldown-note">
+      {% if status_web.can_sync %}
+        Disponível. Após iniciar, este botão fica bloqueado por {{ cooldown_minutes // 60 }} horas.
+      {% else %}
+        Nova tentativa disponível em <strong>{{ status_web.available_label }}</strong>.
+      {% endif %}
+    </div>
+
+    <div class="meta-row">
+      <span>Banco</span>
+      <strong>{{ database_web.name or "Não configurado" }}</strong>
+    </div>
+    <div class="meta-row">
+      <span>Certificado</span>
+      <strong>
+        {{ certificate_web.source }}
+        {% if certificate_web.name %} · {{ certificate_web.name }}
+        {% elif certificate_fixed %} · fixado por thumbprint
+        {% endif %}
+      </strong>
+    </div>
+  </section>
+
+  <section class="card status-card">
+    <div class="card-title">
+      <h2>Última gravação</h2>
+    </div>
+
+    <div class="status-list">
+      <div><span>Data</span><strong>{{ status_web.updated_label }}</strong></div>
+      <div><span>ultNSU</span><strong class="mono">{{ status_web.ult_nsu or "—" }}</strong></div>
+      <div><span>maxNSU</span><strong class="mono">{{ status_web.max_nsu or "—" }}</strong></div>
+      <div><span>Estado</span><strong>{{ "Completo" if status_web.complete else "Parcial" if status_web.updated_at else "Sem registro" }}</strong></div>
+    </div>
+  </section>
+</div>
+
+<section class="card certificate-card">
+  <div class="card-title">
+    <div>
+      <h2>Banco de dados</h2>
+      <span class="muted">SQLite / SQLCipher central</span>
+    </div>
+    {% if database_web.ready %}
+    <span class="status-dot ok">Disponível</span>
+    {% else %}
+    <span class="status-dot bad">Indisponível</span>
+    {% endif %}
+  </div>
+
+  <form action="{{ url_for('atualizar_banco_config') }}" method="post">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+
+    <label class="field">
+      <span>Caminho do banco no servidor</span>
+      <input
+        type="text"
+        name="database_path"
+        value="{{ database_web.path }}"
+        placeholder="Ex.: C:\ConsultaManifestacao\dados\nfe_manifestacoes_seguro.db"
+        autocomplete="off"
+        required
+      >
+    </label>
+
+    <div class="actions">
+      <button class="button primary" type="submit">
+        Validar e usar este banco
+      </button>
+    </div>
+  </form>
+
+  <div class="certificate-details">
+    <div>
+      <span>Arquivo</span>
+      <strong>{{ database_web.name or "—" }}</strong>
+    </div>
+    <div>
+      <span>Configuração</span>
+      <strong>{{ "Admin" if database_web.configured else "Padrão do servidor" }}</strong>
+    </div>
+    <div>
+      <span>Senha SQLCipher</span>
+      <strong>{{ "Configurada" if database_web.password_configured else "Não configurada" }}</strong>
+    </div>
+    <div>
+      <span>Estado</span>
+      <strong>{{ "Pronto" if database_web.ready else "Arquivo não encontrado" }}</strong>
+    </div>
+  </div>
+
+  <p class="cooldown-note">
+    O banco não é enviado pelo navegador. O servidor usa diretamente o arquivo no caminho informado.
+    Bancos criptografados usam a senha já protegida em <span class="mono">secrets\db-password.txt</span>.
+  </p>
+</section>
+
+<section class="card certificate-card">
+  <div class="card-title">
+    <div>
+      <h2>Certificado A1</h2>
+      <span class="muted">Configuração do servidor</span>
+    </div>
+    {% if certificate_web.ready %}
+    <span class="status-dot ok">Disponível</span>
+    {% else %}
+    <span class="status-dot bad">Indisponível</span>
+    {% endif %}
+  </div>
+
+  <form action="{{ url_for('atualizar_certificado') }}" method="post">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+
+    <label class="field">
+      <span>Caminho do certificado no servidor (.pfx ou .p12)</span>
+      <input
+        type="text"
+        name="certificate_path"
+        value="{{ certificate_web.path }}"
+        placeholder="Ex.: C:\TI\Certificados\Yorozu.pfx"
+        autocomplete="off"
+        required
+      >
+    </label>
+
+    <label class="field certificate-password-field">
+      <span>Senha do certificado</span>
+      <input
+        type="password"
+        name="certificate_password"
+        placeholder="{% if certificate_web.path %}Deixe em branco para manter a atual{% else %}Senha do A1{% endif %}"
+        autocomplete="new-password"
+      >
+    </label>
+
+    <div class="actions">
+      <button class="button primary" type="submit">
+        Validar e salvar certificado
+      </button>
+    </div>
+  </form>
+
+  <div class="certificate-details">
+    <div>
+      <span>Fonte</span>
+      <strong>{{ certificate_web.source }}</strong>
+    </div>
+    {% if certificate_web.name %}
+    <div>
+      <span>Arquivo</span>
+      <strong>{{ certificate_web.name }}</strong>
+    </div>
+    {% endif %}
+    {% if certificate_web.subject %}
+    <div>
+      <span>Titular</span>
+      <strong>{{ certificate_web.subject }}</strong>
+    </div>
+    {% endif %}
+    {% if certificate_web.valid_to %}
+    <div>
+      <span>Validade</span>
+      <strong>{{ certificate_web.valid_to }}</strong>
+    </div>
+    {% endif %}
+  </div>
+
+  {% if certificate_web.error %}
+  <div class="alert error compact">{{ certificate_web.error }}</div>
+  {% endif %}
+
+  <p class="cooldown-note">
+    O PFX permanece na pasta informada. A aplicação salva apenas o caminho e a senha em arquivos locais protegidos.
+    A conta que executa o serviço precisa ter permissão de leitura na pasta do certificado.
+  </p>
+</section>
+{% endblock %}

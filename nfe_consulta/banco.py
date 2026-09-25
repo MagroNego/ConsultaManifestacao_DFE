@@ -64,6 +64,12 @@ class BancoManifestacoes:
                 ate_utc TEXT NOT NULL,
                 motivo TEXT NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS controle_sincronizacao (
+                cnpj TEXT PRIMARY KEY,
+                ultima_tentativa_em TEXT NOT NULL,
+                proxima_tentativa_em TEXT NOT NULL
+            );
             """
         )
         self.conexao.commit()
@@ -94,6 +100,59 @@ class BancoManifestacoes:
                 "ON CONFLICT(cnpj) DO UPDATE SET ate_utc=excluded.ate_utc, motivo=excluded.motivo",
                 (cnpj, ate, motivo),
             )
+
+    def obter_janela_sincronizacao(
+        self,
+        cnpj: str,
+    ) -> tuple[datetime | None, datetime | None]:
+        linha = self.conexao.execute(
+            "SELECT ultima_tentativa_em, proxima_tentativa_em "
+            "FROM controle_sincronizacao WHERE cnpj = ?",
+            (cnpj,),
+        ).fetchone()
+        if not linha:
+            return None, None
+        return datetime.fromisoformat(linha[0]), datetime.fromisoformat(linha[1])
+
+    def bloqueio_sincronizacao(
+        self,
+        cnpj: str,
+        agora: datetime | None = None,
+    ) -> str | None:
+        _, proxima = self.obter_janela_sincronizacao(cnpj)
+        agora = agora or datetime.now(timezone.utc)
+        if proxima and proxima > agora:
+            return (
+                "Sincronização temporariamente bloqueada. "
+                f"Nova tentativa permitida após {proxima.isoformat(timespec='minutes')}."
+            )
+        return None
+
+    def registrar_tentativa_sincronizacao(
+        self,
+        cnpj: str,
+        cooldown_minutos: int,
+        agora: datetime | None = None,
+    ) -> datetime:
+        if cooldown_minutos < 1:
+            raise ValueError("cooldown_minutos deve ser maior que zero.")
+        agora = agora or datetime.now(timezone.utc)
+        proxima = agora + timedelta(minutes=cooldown_minutos)
+        with self.conexao:
+            self.conexao.execute(
+                "INSERT INTO controle_sincronizacao("
+                "cnpj, ultima_tentativa_em, proxima_tentativa_em"
+                ") VALUES (?, ?, ?) "
+                "ON CONFLICT(cnpj) DO UPDATE SET "
+                "ultima_tentativa_em=excluded.ultima_tentativa_em, "
+                "proxima_tentativa_em=excluded.proxima_tentativa_em",
+                (
+                    cnpj,
+                    agora.isoformat(timespec="seconds"),
+                    proxima.isoformat(timespec="seconds"),
+                ),
+            )
+        return proxima
 
     def sincronizacao_recente_e_completa(self, cnpj: str) -> bool:
         linha = self.conexao.execute(

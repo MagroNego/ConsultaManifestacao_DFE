@@ -36,3 +36,10 @@ __pycache__/
 venv/
 build/
 dist/
+
+
+# Segredos e logs locais do servidor.
+/secrets/*
+!/secrets/.gitkeep
+/logs/*
+!/logs/.gitkeep

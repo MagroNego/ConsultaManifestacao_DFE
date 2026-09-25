@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Consulta de Manifestação{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', path='/app.css') }}">
+  <script src="{{ url_for('static', path='/app.js') }}" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <a class="brand-logo-link" href="{{ url_for('excel_page') }}" aria-label="Yorozu">
+        <img class="brand-logo brand-logo-light" src="{{ url_for('static', path='/img/yorozu-light.png') }}" alt="Yorozu">
+        <img class="brand-logo brand-logo-dark" src="{{ url_for('static', path='/img/yorozu-dark.png') }}" alt="Yorozu">
+      </a>
+      <div class="brand-copy">
+        <strong>Consulta de Manifestação</strong>
+        <small>NF-e · v{{ version }}</small>
+      </div>
+    </div>
+
+    {% if user %}
+    <nav class="tabs" aria-label="Navegação principal">
+      <a href="{{ url_for('excel_page') }}" class="{% if request.url.path == '/' or request.url.path.startswith('/consulta') %}active{% endif %}">Excel</a>
+      <a href="{{ url_for('status_page') }}" class="{% if request.url.path.startswith('/status') %}active{% endif %}">Status</a>
+      <a href="{{ url_for('atualizar_page') if user.is_admin else url_for('admin_login_page') }}" class="{% if request.url.path.startswith('/atualizar') or request.url.path.startswith('/admin/login') %}active{% endif %}">Atualizar</a>
+    </nav>
+
+    <div class="account">
+      <button class="theme-toggle" type="button" data-theme-toggle aria-label="Alternar tema">
+        <span data-theme-icon>◐</span>
+      </button>
+      {% if user.is_admin %}
+      <div class="user-chip">
+        <strong>Administrador</strong>
+        <small>Sessão ativa</small>
+      </div>
+      <form action="{{ url_for('admin_logout') }}" method="post" class="logout-form">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button type="submit" class="logout-button">Sair</button>
+      </form>
+      {% endif %}
+    </div>
+    {% endif %}
+  </header>
+
+  <main class="page">
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

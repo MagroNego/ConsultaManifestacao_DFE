@@ -1,0 +1,64 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    name: Publicar pacote
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Preparar versão
+        id: version
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          grep -q "version = \"$VERSION\"" pyproject.toml
+          grep -q "__version__ = \"$VERSION\"" nfe_consulta/__init__.py
+
+      - name: Montar pacote de instalação
+        shell: bash
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          PACKAGE="ConsultaManifestacao_DFE-v$VERSION"
+
+          mkdir -p "dist/$PACKAGE"
+
+          rsync -a ./ "dist/$PACKAGE/" \
+            --exclude=".git/" \
+            --exclude=".github/" \
+            --exclude="tests/" \
+            --exclude="dist/" \
+            --exclude=".pytest_cache/" \
+            --exclude="__pycache__/" \
+            --exclude="*.pyc" \
+            --exclude="dados/*" \
+            --exclude="secrets/*" \
+            --exclude="logs/*"
+
+          mkdir -p "dist/$PACKAGE/dados" "dist/$PACKAGE/secrets" "dist/$PACKAGE/logs"
+
+          cd dist
+          zip -r "$PACKAGE.zip" "$PACKAGE"
+
+      - name: Publicar release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          PACKAGE="ConsultaManifestacao_DFE-v$VERSION.zip"
+
+          gh release create "${GITHUB_REF_NAME}" \
+            "dist/$PACKAGE#$PACKAGE" \
+            --title "Consulta de Manifestação NF-e v$VERSION" \
+            --generate-notes

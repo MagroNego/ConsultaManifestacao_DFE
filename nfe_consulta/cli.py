@@ -1,32 +1,30 @@
-"""Interface de linha de comando da Consulta de Manifestação v1."""
+"""Interface de linha de comando da Consulta de Manifestação v2."""
 
 from __future__ import annotations
 
 import argparse
+import os
 import sqlite3
 import sys
-from getpass import getpass
 from pathlib import Path
 
 from nfe_consulta import __version__
-from nfe_consulta.config import (
-    CNPJ_PADRAO,
-    UF_PADRAO,
-    resolver_caminhos,
-)
+from nfe_consulta.config import CNPJ_PADRAO, UF_PADRAO, resolver_caminhos
+from nfe_consulta.certificado_config import carregar_config_certificado_arquivo
 from nfe_consulta.modelos import NfeConsultaErro
 from nfe_consulta.seguranca_banco import criptografado, migrar_banco
-from nfe_consulta.servico import ParametrosConsulta, executar_consulta
+from nfe_consulta.servico import (
+    ParametrosConsulta,
+    ParametrosSincronizacao,
+    executar_consulta,
+    sincronizar_banco,
+)
 from nfe_consulta.status import consultar_status
 
 
-def _ler_senha(pergunta: str) -> str:
-    if sys.stdin.isatty():
-        return getpass(pergunta)
-    senha = sys.stdin.readline().rstrip("\r\n")
-    if not senha:
-        raise ValueError("Senha não recebida.")
-    return senha
+COOLDOWN_SEFAZ_MINUTOS = 120
+RAIZ_PROJETO = Path(__file__).resolve().parents[1]
+DATABASE_PASSWORD_FILE = RAIZ_PROJETO / "secrets" / "db-password.txt"
 
 
 def _progresso(atual: int, total: int) -> None:
@@ -51,18 +49,28 @@ def _criar_parser() -> argparse.ArgumentParser:
 
     atualizar = comandos.add_parser(
         "atualizar",
-        help="Sincronizar com a SEFAZ e gerar Excel",
+        help="Sincronizar o banco local com a SEFAZ",
     )
     atualizar.add_argument(
-        "chaves",
-        nargs="?",
-        default=str(caminhos.chaves),
-        help="TXT com as chaves",
+        "--banco",
+        default=os.getenv("NFE_DATABASE_PATH", str(caminhos.banco)),
     )
-    atualizar.add_argument("--banco", default=str(caminhos.banco))
-    atualizar.add_argument("--saida", default=str(caminhos.saida))
     atualizar.add_argument("--max-lotes", type=int, default=50)
     atualizar.add_argument("--cert-indice", type=int)
+    atualizar.add_argument(
+        "--cert-store",
+        choices=("CurrentUser", "LocalMachine"),
+        default=os.getenv("NFE_CERT_STORE", "CurrentUser"),
+    )
+    atualizar.add_argument(
+        "--cert-thumbprint",
+        default=os.getenv("NFE_CERT_THUMBPRINT") or None,
+    )
+    atualizar.add_argument(
+        "--cooldown-minutos",
+        type=int,
+        default=int(os.getenv("NFE_SEFAZ_COOLDOWN_MINUTES", str(COOLDOWN_SEFAZ_MINUTOS))),
+    )
 
     excel = comandos.add_parser(
         "excel",
@@ -74,14 +82,20 @@ def _criar_parser() -> argparse.ArgumentParser:
         default=str(caminhos.chaves),
         help="TXT com as chaves",
     )
-    excel.add_argument("--banco", default=str(caminhos.banco))
+    excel.add_argument(
+        "--banco",
+        default=os.getenv("NFE_DATABASE_PATH", str(caminhos.banco)),
+    )
     excel.add_argument("--saida", default=str(caminhos.saida))
 
     status = comandos.add_parser(
         "status",
-        help="Mostrar o estado local da sincronização",
+        help="Mostrar o estado da última gravação local",
     )
-    status.add_argument("--banco", default=str(caminhos.banco))
+    status.add_argument(
+        "--banco",
+        default=os.getenv("NFE_DATABASE_PATH", str(caminhos.banco)),
+    )
 
     proteger = comandos.add_parser(
         "proteger-banco",
@@ -100,7 +114,19 @@ def _abrir_gui() -> None:
 
 
 def _senha_do_banco(caminho: str | Path) -> str | None:
-    return _ler_senha("Senha do banco: ") if criptografado(caminho) else None
+    if not criptografado(caminho):
+        return None
+
+    arquivo = DATABASE_PASSWORD_FILE
+    if not arquivo.is_file():
+        raise ValueError(
+            f"Banco criptografado: configure a senha em {arquivo}."
+        )
+
+    senha = arquivo.read_text(encoding="utf-8").rstrip("\r\n")
+    if not senha:
+        raise ValueError(f"Arquivo de senha do banco está vazio: {arquivo}")
+    return senha
 
 
 def _executar_status(args: argparse.Namespace) -> None:
@@ -109,39 +135,62 @@ def _executar_status(args: argparse.Namespace) -> None:
 
 
 def _proteger_banco(args: argparse.Namespace) -> None:
-    senha = _ler_senha("Nova senha do banco protegido: ")
-    confirmacao = _ler_senha("Repita a senha: ")
-    if senha != confirmacao:
-        raise ValueError("As senhas não coincidem.")
+    arquivo = DATABASE_PASSWORD_FILE
+    if not arquivo.is_file():
+        raise ValueError(
+            f"Configure a nova senha do banco em {arquivo} antes de proteger o arquivo."
+        )
+
+    senha = arquivo.read_text(encoding="utf-8").rstrip("\r\n")
+    if not senha:
+        raise ValueError(f"Arquivo de senha do banco está vazio: {arquivo}")
+    if len(senha) < 12:
+        raise ValueError("A senha do banco em secrets deve ter pelo menos 12 caracteres.")
+
     migrar_banco(args.origem, args.destino, senha)
     print(f"Banco protegido criado: {args.destino}")
 
 
-def _executar_consulta(args: argparse.Namespace) -> None:
-    sincronizar = args.comando == "atualizar"
+def _executar_atualizacao(args: argparse.Namespace) -> None:
     senha = _senha_do_banco(args.banco)
-
-    parametros = ParametrosConsulta(
-        chaves=Path(args.chaves),
-        banco=Path(args.banco),
-        saida=Path(args.saida),
-        cnpj=CNPJ_PADRAO,
-        uf=UF_PADRAO,
-        sincronizar_sefaz=sincronizar,
-        max_lotes=args.max_lotes if sincronizar else 50,
-        senha_banco=senha,
-        cert_indice=args.cert_indice if sincronizar else None,
+    cert_arquivo = carregar_config_certificado_arquivo()
+    resumo = sincronizar_banco(
+        ParametrosSincronizacao(
+            banco=Path(args.banco),
+            cnpj=CNPJ_PADRAO,
+            uf=UF_PADRAO,
+            max_lotes=args.max_lotes,
+            senha_banco=senha,
+            cert_indice=args.cert_indice,
+            cert_thumbprint=None if cert_arquivo is not None else args.cert_thumbprint,
+            cert_store=args.cert_store,
+            cert_arquivo=cert_arquivo.path if cert_arquivo is not None else None,
+            cert_senha_arquivo=cert_arquivo.password if cert_arquivo is not None else None,
+            cooldown_minutos=args.cooldown_minutos,
+        ),
+        progresso_sincronizacao=lambda lote, ult, maximo, novos: print(
+            f"SEFAZ {lote}: NSU {ult}/{maximo} | +{novos} evento(s)",
+            flush=True,
+        ),
+    )
+    print(
+        f"Sincronização concluída | lotes: {resumo.lotes} | "
+        f"eventos novos: {resumo.eventos_novos} | "
+        f"NSU {resumo.ult_nsu}/{resumo.max_nsu}"
     )
 
+
+def _executar_excel(args: argparse.Namespace) -> None:
+    senha = _senha_do_banco(args.banco)
     resultado = executar_consulta(
-        parametros,
-        progresso_sincronizacao=(
-            lambda lote, ult, maximo, novos: print(
-                f"SEFAZ {lote}: NSU {ult}/{maximo} | +{novos} evento(s)",
-                flush=True,
-            )
-            if sincronizar
-            else None
+        ParametrosConsulta(
+            chaves=Path(args.chaves),
+            banco=Path(args.banco),
+            saida=Path(args.saida),
+            cnpj=CNPJ_PADRAO,
+            uf=UF_PADRAO,
+            sincronizar_sefaz=False,
+            senha_banco=senha,
         ),
         progresso_lote=_progresso,
     )
@@ -171,8 +220,10 @@ def main(argv: list[str] | None = None) -> None:
             _executar_status(args)
         elif args.comando == "proteger-banco":
             _proteger_banco(args)
-        elif args.comando in {"atualizar", "excel"}:
-            _executar_consulta(args)
+        elif args.comando == "atualizar":
+            _executar_atualizacao(args)
+        elif args.comando == "excel":
+            _executar_excel(args)
         else:
             parser.print_help()
     except (OSError, ValueError, RuntimeError, sqlite3.DatabaseError, NfeConsultaErro) as exc:

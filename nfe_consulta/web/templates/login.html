@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Login administrador · Consulta de Manifestação{% endblock %}
+{% block content %}
+<section class="login-shell">
+  <div class="card login-card">
+    <div class="login-heading">
+      <span class="admin-badge">Administrador</span>
+      <h1>Acessar Atualizar</h1>
+      <p>Use o login administrativo para sincronizar o banco com a SEFAZ.</p>
+    </div>
+
+    {% if error %}
+    <div class="alert error">{{ error }}</div>
+    {% endif %}
+
+    {% if not admin_configured %}
+    <div class="alert error">
+      O login administrativo ainda não foi configurado no servidor.
+    </div>
+    {% endif %}
+
+    <form action="{{ url_for('admin_login') }}" method="post" class="login-form">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+
+      <label class="field">
+        <span>Usuário</span>
+        <input
+          type="text"
+          name="username"
+          value="{{ admin_username }}"
+          autocomplete="username"
+          required
+          autofocus
+        >
+      </label>
+
+      <label class="field">
+        <span>Senha</span>
+        <input
+          type="password"
+          name="password"
+          autocomplete="current-password"
+          required
+        >
+      </label>
+
+      <button class="button danger login-submit" type="submit" {% if not admin_configured %}disabled{% endif %}>
+        Entrar
+      </button>
+    </form>
+
+    <p class="login-note">
+      A sessão administrativa expira após {{ request.app.state.settings.admin_session_minutes }} minutos de inatividade.
+    </p>
+  </div>
+</section>
+{% endblock %}
