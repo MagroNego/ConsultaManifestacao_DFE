@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -22,50 +21,34 @@ class ConfigCertificadoArquivo:
 def _path_file(caminho: str | Path | None = None) -> Path:
     if caminho is not None:
         return Path(caminho).expanduser()
-    return Path(
-        os.getenv(
-            "NFE_CERT_PATH_FILE",
-            str(RAIZ_PROJETO / "secrets" / "cert-path.txt"),
-        )
-    ).expanduser()
+    return RAIZ_PROJETO / "secrets" / "cert-path.txt"
 
 
 def _password_file(caminho: str | Path | None = None) -> Path:
     if caminho is not None:
         return Path(caminho).expanduser()
-    return Path(
-        os.getenv(
-            "NFE_CERT_PASSWORD_FILE",
-            str(RAIZ_PROJETO / "secrets" / "cert-password.txt"),
-        )
-    ).expanduser()
+    return RAIZ_PROJETO / "secrets" / "cert-password.txt"
 
 
 def carregar_config_certificado_arquivo(
     path_file: str | Path | None = None,
     password_file: str | Path | None = None,
 ) -> ConfigCertificadoArquivo | None:
-    caminho_direto = os.getenv("NFE_CERT_PATH", "").strip()
     arquivo_caminho = _path_file(path_file)
-
-    if caminho_direto:
-        caminho = Path(caminho_direto).expanduser()
-    elif arquivo_caminho.is_file():
-        valor = arquivo_caminho.read_text(encoding="utf-8").strip()
-        if not valor:
-            return None
-        caminho = Path(valor).expanduser()
-    else:
+    if not arquivo_caminho.is_file():
         return None
 
-    senha_direta = os.getenv("NFE_CERT_PASSWORD")
+    valor = arquivo_caminho.read_text(encoding="utf-8").strip()
+    if not valor:
+        return None
+    caminho = Path(valor).expanduser()
+
     arquivo_senha = _password_file(password_file)
-    if senha_direta is not None:
-        senha = senha_direta
-    elif arquivo_senha.is_file():
-        senha = arquivo_senha.read_text(encoding="utf-8").rstrip("\r\n")
-    else:
-        senha = ""
+    senha = (
+        arquivo_senha.read_text(encoding="utf-8").rstrip("\r\n")
+        if arquivo_senha.is_file()
+        else ""
+    )
 
     return ConfigCertificadoArquivo(
         path=caminho.resolve(),
