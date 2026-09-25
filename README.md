@@ -8,7 +8,8 @@ A v2 mantém o núcleo Python da v1, mas adiciona uma interface Web para uso na 
 
 A aplicação possui três ações distintas:
 
-- **Excel**: usa somente o banco local. O usuário envia um ou vários TXT, ou seleciona uma pasta contendo TXT, e recebe a planilha.
+- **Excel**: usa somente o banco local. O usuário seleciona um `CHAVES.txt` e recebe a planilha.
+- **Consulta rápida**: busca pelo número da NF diretamente no banco local e mostra os eventos encontrados, sem acessar a SEFAZ.
 - **Status**: lê o estado da última gravação no banco, incluindo `ultNSU`, `maxNSU` e disponibilidade da próxima sincronização.
 - **Atualizar**: sincroniza somente o banco com a SEFAZ. Não recebe TXT e não gera Excel.
 
