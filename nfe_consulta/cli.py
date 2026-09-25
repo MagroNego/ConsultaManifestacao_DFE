@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sqlite3
 import sys
 from getpass import getpass
@@ -57,9 +58,26 @@ def _criar_parser() -> argparse.ArgumentParser:
         "atualizar",
         help="Sincronizar o banco local com a SEFAZ",
     )
-    atualizar.add_argument("--banco", default=str(caminhos.banco))
+    atualizar.add_argument(
+        "--banco",
+        default=os.getenv("NFE_DATABASE_PATH", str(caminhos.banco)),
+    )
     atualizar.add_argument("--max-lotes", type=int, default=50)
     atualizar.add_argument("--cert-indice", type=int)
+    atualizar.add_argument(
+        "--cert-store",
+        choices=("CurrentUser", "LocalMachine"),
+        default=os.getenv("NFE_CERT_STORE", "CurrentUser"),
+    )
+    atualizar.add_argument(
+        "--cert-thumbprint",
+        default=os.getenv("NFE_CERT_THUMBPRINT") or None,
+    )
+    atualizar.add_argument(
+        "--cooldown-minutos",
+        type=int,
+        default=int(os.getenv("NFE_SEFAZ_COOLDOWN_MINUTES", str(COOLDOWN_SEFAZ_MINUTOS))),
+    )
 
     excel = comandos.add_parser(
         "excel",
@@ -71,14 +89,20 @@ def _criar_parser() -> argparse.ArgumentParser:
         default=str(caminhos.chaves),
         help="TXT com as chaves",
     )
-    excel.add_argument("--banco", default=str(caminhos.banco))
+    excel.add_argument(
+        "--banco",
+        default=os.getenv("NFE_DATABASE_PATH", str(caminhos.banco)),
+    )
     excel.add_argument("--saida", default=str(caminhos.saida))
 
     status = comandos.add_parser(
         "status",
         help="Mostrar o estado da última gravação local",
     )
-    status.add_argument("--banco", default=str(caminhos.banco))
+    status.add_argument(
+        "--banco",
+        default=os.getenv("NFE_DATABASE_PATH", str(caminhos.banco)),
+    )
 
     proteger = comandos.add_parser(
         "proteger-banco",
@@ -97,7 +121,24 @@ def _abrir_gui() -> None:
 
 
 def _senha_do_banco(caminho: str | Path) -> str | None:
-    return _ler_senha("Senha do banco: ") if criptografado(caminho) else None
+    if not criptografado(caminho):
+        return None
+
+    arquivo_senha = os.getenv("NFE_DATABASE_PASSWORD_FILE", "").strip()
+    if arquivo_senha:
+        arquivo = Path(arquivo_senha).expanduser()
+        if not arquivo.is_file():
+            raise ValueError(f"Arquivo de senha do banco não encontrado: {arquivo}")
+        senha = arquivo.read_text(encoding="utf-8").strip()
+        if not senha:
+            raise ValueError("Arquivo de senha do banco está vazio.")
+        return senha
+
+    senha_ambiente = os.getenv("NFE_DATABASE_PASSWORD")
+    if senha_ambiente:
+        return senha_ambiente
+
+    return _ler_senha("Senha do banco: ")
 
 
 def _executar_status(args: argparse.Namespace) -> None:
@@ -124,7 +165,9 @@ def _executar_atualizacao(args: argparse.Namespace) -> None:
             max_lotes=args.max_lotes,
             senha_banco=senha,
             cert_indice=args.cert_indice,
-            cooldown_minutos=COOLDOWN_SEFAZ_MINUTOS,
+            cert_thumbprint=args.cert_thumbprint,
+            cert_store=args.cert_store,
+            cooldown_minutos=args.cooldown_minutos,
         ),
         progresso_sincronizacao=lambda lote, ult, maximo, novos: print(
             f"SEFAZ {lote}: NSU {ult}/{maximo} | +{novos} evento(s)",
