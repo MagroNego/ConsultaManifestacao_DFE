@@ -46,7 +46,7 @@ ou:
 INICIAR_WEB.cmd
 ```
 
-Em produção, a aplicação deve ficar atrás de um reverse proxy corporativo com HTTPS e autenticação. Consulte `SERVIDOR_WEB.md`.
+Em produção, a aplicação deve ficar atrás de um reverse proxy corporativo para HTTPS e publicação na rede interna. Consulte `SERVIDOR_WEB.md`.
 
 ## CLI
 
@@ -111,7 +111,6 @@ A v2 inclui:
 
 - autorização no backend;
 - proteção CSRF;
-- segredo compartilhado com o proxy;
 - headers HTTP de segurança;
 - limite de upload;
 - sanitização e validação das chaves existentes;
