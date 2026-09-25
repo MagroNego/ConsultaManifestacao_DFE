@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 
 
@@ -58,6 +58,8 @@ class CertificadoWindows:
     valid_to: str
     cnpj: Optional[str] = None
     store: str = "CurrentUser"
+    file_path: Optional[str] = None
+    file_password: Optional[str] = field(default=None, repr=False, compare=False)
 
 
 @dataclass(frozen=True)
