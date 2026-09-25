@@ -71,6 +71,31 @@ O reverse proxy continua recomendado para HTTPS e publicação na rede interna, 
 
 ## Certificado no Windows Server
 
+### Arquivo PFX/P12 protegido
+
+O cenário preferido desta versão é manter o A1 na pasta restrita definida pela TI e configurar o caminho pela aba **Atualizar**.
+
+Exemplo:
+
+```text
+C:\TI\Certificados\Yorozu\certificado.pfx
+```
+
+O arquivo permanece nesse local. A aplicação salva apenas:
+
+```text
+secrets\cert-path.txt
+secrets\cert-password.txt
+```
+
+A conta do serviço e a conta usada pelo job agendado precisam ter leitura no PFX. Restrinja também a ACL da pasta `secrets`.
+
+O job matinal usa automaticamente a mesma configuração feita na área administrativa.
+
+### Windows Certificate Store
+
+
+
 Para serviço corporativo é recomendado:
 
 ```text
