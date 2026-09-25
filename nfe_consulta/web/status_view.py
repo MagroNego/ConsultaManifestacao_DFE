@@ -30,6 +30,10 @@ class WebStatus:
         return bool(self.next_attempt and self.next_attempt > datetime.now(timezone.utc))
 
     @property
+    def pause_active(self) -> bool:
+        return bool(self.pause_until and self.pause_until > datetime.now(timezone.utc))
+
+    @property
     def available_at(self) -> datetime | None:
         candidatos = [
             value for value in (self.next_attempt, self.pause_until)
