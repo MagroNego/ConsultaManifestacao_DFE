@@ -59,6 +59,7 @@ def test_usuario_comum_tem_excel_e_status_mas_nao_atualizar(tmp_path):
 
 def test_admin_ve_as_tres_acoes(tmp_path):
     cfg = settings_web(tmp_path, admin=True)
+    criar_banco(cfg.database_path)
     app = create_app(cfg)
 
     with TestClient(app) as client:
