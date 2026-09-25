@@ -17,6 +17,7 @@ from nfe_consulta.lote import ler_chaves, processar_lote
 from nfe_consulta.modelos import (
     CertificadoWindows,
     NfeErroCertificado,
+    NfeLimiteConsultaErro,
     ResultadoConsulta,
 )
 from nfe_consulta.seguranca_banco import criptografado
@@ -42,6 +43,7 @@ class ParametrosConsulta:
     cert_indice: int | None = None
     cert_thumbprint: str | None = None
     cert_store: str | None = None
+    cooldown_minutos: int = 0
 
 
 @dataclass(frozen=True)
@@ -149,6 +151,15 @@ def sincronizar_banco(
 
     banco = BancoManifestacoes(str(banco_path), senha=parametros.senha_banco)
     try:
+        if parametros.cooldown_minutos:
+            bloqueio = banco.bloqueio_sincronizacao(cnpj)
+            if bloqueio:
+                raise NfeLimiteConsultaErro(bloqueio)
+            banco.registrar_tentativa_sincronizacao(
+                cnpj,
+                parametros.cooldown_minutos,
+            )
+
         return sincronizar(
             banco,
             cnpj,
