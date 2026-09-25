@@ -575,20 +575,21 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                 senha = existente.password
 
         try:
-            config = await run_in_threadpool(
-                salvar_config_certificado_arquivo,
-                caminho,
-                senha,
-            )
             certificado = await run_in_threadpool(
                 carregar_certificado_arquivo,
-                config.path,
-                config.password,
+                caminho,
+                senha,
             )
             if not certificado.cnpj or certificado.cnpj[:8] != CNPJ_PADRAO[:8]:
                 raise ValueError(
                     "O certificado não apresenta CNPJ compatível com a empresa."
                 )
+
+            config = await run_in_threadpool(
+                salvar_config_certificado_arquivo,
+                caminho,
+                senha,
+            )
 
             app.state.audit.write(
                 request,
