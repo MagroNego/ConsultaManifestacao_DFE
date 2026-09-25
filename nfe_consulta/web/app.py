@@ -18,6 +18,11 @@ from starlette.concurrency import run_in_threadpool
 
 from nfe_consulta import __version__
 from nfe_consulta.config import CNPJ_PADRAO, NOME_PLANILHA, UF_PADRAO
+from nfe_consulta.certificado_arquivo import carregar_certificado_arquivo
+from nfe_consulta.certificado_config import (
+    carregar_config_certificado_arquivo,
+    salvar_config_certificado_arquivo,
+)
 from nfe_consulta.modelos import NfeConsumoIndevidoErro, NfeLimiteConsultaErro
 from nfe_consulta.servico import (
     ParametrosConsulta,
@@ -97,6 +102,42 @@ def _status_web(settings: WebSettings) -> WebStatus:
         CNPJ_PADRAO,
         password=settings.database_password,
     )
+
+
+def _certificado_web(settings: WebSettings) -> dict:
+    config = carregar_config_certificado_arquivo()
+    if config is not None:
+        try:
+            certificado = carregar_certificado_arquivo(config.path, config.password)
+            return {
+                "source": "Arquivo PFX/P12",
+                "path": str(config.path),
+                "name": config.path.name,
+                "subject": certificado.subject,
+                "valid_to": certificado.valid_to,
+                "ready": True,
+                "error": None,
+            }
+        except Exception as exc:
+            return {
+                "source": "Arquivo PFX/P12",
+                "path": str(config.path),
+                "name": config.path.name,
+                "subject": None,
+                "valid_to": None,
+                "ready": False,
+                "error": str(exc),
+            }
+
+    return {
+        "source": settings.certificate_store,
+        "path": "",
+        "name": "",
+        "subject": None,
+        "valid_to": None,
+        "ready": True,
+        "error": None,
+    }
 
 
 def create_app(settings: WebSettings | None = None) -> FastAPI:
@@ -478,6 +519,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         request: Request,
         user: Annotated[WebUser, Depends(require_admin)],
         ok: str | None = None,
+        cert_ok: str | None = None,
     ):
         try:
             status_web = await run_in_threadpool(_status_web, settings)
@@ -491,12 +533,99 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             "sefaz.html",
             user,
             status_web=status_web,
-            success="Sincronização concluída." if ok == "1" else None,
+            success=(
+                "Sincronização concluída." if ok == "1"
+                else "Certificado validado e configurado." if cert_ok == "1"
+                else None
+            ),
             error=erro,
             certificate_store=settings.certificate_store,
             certificate_fixed=bool(settings.certificate_thumbprint),
+            certificate_web=_certificado_web(settings),
             cooldown_minutes=settings.sync_cooldown_minutes,
         )
+
+    @app.post("/atualizar/certificado")
+    async def atualizar_certificado(
+        request: Request,
+        user: Annotated[WebUser, Depends(require_admin)],
+        csrf: str = Form(...),
+        certificate_path: str = Form(...),
+        certificate_password: str = Form(""),
+    ):
+        validate_csrf(csrf, user, settings)
+
+        caminho = certificate_path.strip()
+        if not caminho:
+            return RedirectResponse(
+                url=request.url_for("atualizar_page"),
+                status_code=303,
+            )
+
+        existente = carregar_config_certificado_arquivo()
+        senha = certificate_password
+        if not senha and existente is not None:
+            try:
+                mesmo_arquivo = (
+                    Path(caminho).expanduser().resolve() == existente.path.resolve()
+                )
+            except OSError:
+                mesmo_arquivo = False
+            if mesmo_arquivo:
+                senha = existente.password
+
+        try:
+            config = await run_in_threadpool(
+                salvar_config_certificado_arquivo,
+                caminho,
+                senha,
+            )
+            certificado = await run_in_threadpool(
+                carregar_certificado_arquivo,
+                config.path,
+                config.password,
+            )
+            if not certificado.cnpj or certificado.cnpj[:8] != CNPJ_PADRAO[:8]:
+                raise ValueError(
+                    "O certificado não apresenta CNPJ compatível com a empresa."
+                )
+
+            app.state.audit.write(
+                request,
+                user,
+                "certificate_config",
+                "ok",
+                arquivo=config.path.name,
+            )
+            return RedirectResponse(
+                url=request.url_for("atualizar_page").include_query_params(cert_ok="1"),
+                status_code=303,
+            )
+        except Exception as exc:
+            app.state.audit.write(
+                request,
+                user,
+                "certificate_config",
+                "erro",
+                reason=type(exc).__name__,
+            )
+            try:
+                status_web = await run_in_threadpool(_status_web, settings)
+            except Exception:
+                status_web = WebStatus(False, None, None, None, None, None, None, None)
+
+            return _render(
+                request,
+                "sefaz.html",
+                user,
+                status_code=400,
+                status_web=status_web,
+                error=str(exc),
+                certificate_store=settings.certificate_store,
+                certificate_fixed=bool(settings.certificate_thumbprint),
+                certificate_web=_certificado_web(settings),
+                cooldown_minutes=settings.sync_cooldown_minutes,
+            )
 
     @app.post("/atualizar/sincronizar")
     async def atualizar_sincronizar(
@@ -521,6 +650,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                 error="Configure um banco existente antes de sincronizar.",
                 certificate_store=settings.certificate_store,
                 certificate_fixed=bool(settings.certificate_thumbprint),
+                certificate_web=_certificado_web(settings),
                 cooldown_minutes=settings.sync_cooldown_minutes,
             )
 
@@ -537,6 +667,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                 ),
                 certificate_store=settings.certificate_store,
                 certificate_fixed=bool(settings.certificate_thumbprint),
+                certificate_web=_certificado_web(settings),
                 cooldown_minutes=settings.sync_cooldown_minutes,
             )
 
@@ -551,10 +682,12 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                 error="Já existe uma sincronização em andamento.",
                 certificate_store=settings.certificate_store,
                 certificate_fixed=bool(settings.certificate_thumbprint),
+                certificate_web=_certificado_web(settings),
                 cooldown_minutes=settings.sync_cooldown_minutes,
             )
 
         try:
+            cert_arquivo = carregar_config_certificado_arquivo()
             resumo = await run_in_threadpool(
                 sincronizar_banco,
                 ParametrosSincronizacao(
@@ -563,8 +696,14 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                     uf=UF_PADRAO,
                     max_lotes=max_lotes,
                     senha_banco=settings.database_password,
-                    cert_thumbprint=settings.certificate_thumbprint,
+                    cert_thumbprint=(
+                        None if cert_arquivo is not None else settings.certificate_thumbprint
+                    ),
                     cert_store=settings.certificate_store,
+                    cert_arquivo=cert_arquivo.path if cert_arquivo is not None else None,
+                    cert_senha_arquivo=(
+                        cert_arquivo.password if cert_arquivo is not None else None
+                    ),
                     cooldown_minutos=settings.sync_cooldown_minutes,
                 ),
             )
@@ -611,6 +750,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                 error=str(exc),
                 certificate_store=settings.certificate_store,
                 certificate_fixed=bool(settings.certificate_thumbprint),
+                certificate_web=_certificado_web(settings),
                 cooldown_minutes=settings.sync_cooldown_minutes,
             )
         finally:
