@@ -13,7 +13,6 @@ if not defined NFE_DATABASE_PATH if exist "%BASE_DIR%secrets\db-path.txt" (
     set /p "NFE_DATABASE_PATH="<"%BASE_DIR%secrets\db-path.txt"
 )
 if not defined NFE_DATABASE_PATH set "NFE_DATABASE_PATH=%BASE_DIR%dados\nfe_manifestacoes_seguro.db"
-if not defined NFE_DATABASE_PASSWORD_FILE set "NFE_DATABASE_PASSWORD_FILE=%BASE_DIR%secrets\db-password.txt"
 if not defined NFE_CERT_STORE set "NFE_CERT_STORE=LocalMachine"
 if not defined NFE_SEFAZ_COOLDOWN_MINUTES set "NFE_SEFAZ_COOLDOWN_MINUTES=120"
 
@@ -25,12 +24,12 @@ if not exist "%NFE_DATABASE_PATH%" (
     exit /b 2
 )
 
-if not exist "%NFE_DATABASE_PASSWORD_FILE%" (
-    echo [%date% %time%] ERRO: arquivo de senha nao encontrado: %NFE_DATABASE_PASSWORD_FILE% >> "%LOG_FILE%"
+if not exist "%BASE_DIR%secrets\db-password.txt" (
+    echo [%date% %time%] ERRO: arquivo de senha nao encontrado: %BASE_DIR%secrets\db-password.txt >> "%LOG_FILE%"
     exit /b 3
 )
 
-if not defined NFE_CERT_THUMBPRINT if not defined NFE_CERT_PATH if not exist "%BASE_DIR%secrets\cert-path.txt" (
+if not defined NFE_CERT_THUMBPRINT if not exist "%BASE_DIR%secrets\cert-path.txt" (
     echo [%date% %time%] ERRO: certificado nao configurado. >> "%LOG_FILE%"
     echo [%date% %time%] Configure o PFX/P12 na area Atualizar ou defina NFE_CERT_THUMBPRINT. >> "%LOG_FILE%"
     exit /b 4
