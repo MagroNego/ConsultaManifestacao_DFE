@@ -566,9 +566,9 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             )
 
         existente = carregar_config_certificado_arquivo(
-        settings.certificate_path_file,
-        settings.certificate_password_file,
-    )
+            settings.certificate_path_file,
+            settings.certificate_password_file,
+        )
         senha = certificate_password
         if not senha and existente is not None:
             try:
@@ -697,9 +697,9 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
 
         try:
             cert_arquivo = carregar_config_certificado_arquivo(
-        settings.certificate_path_file,
-        settings.certificate_password_file,
-    )
+                settings.certificate_path_file,
+                settings.certificate_password_file,
+            )
             resumo = await run_in_threadpool(
                 sincronizar_banco,
                 ParametrosSincronizacao(
