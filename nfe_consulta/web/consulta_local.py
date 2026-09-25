@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 
 from nfe_consulta.seguranca_banco import abrir_banco
@@ -18,6 +19,15 @@ class EventoNota:
     data: str
     protocolo: str
     nsu: str
+
+    @property
+    def data_label(self) -> str:
+        valor = self.data.strip()
+        try:
+            instante = datetime.fromisoformat(valor.replace("Z", "+00:00"))
+        except ValueError:
+            return valor
+        return instante.astimezone().strftime("%d/%m/%Y %H:%M:%S")
 
 
 def consultar_numero_nota(
