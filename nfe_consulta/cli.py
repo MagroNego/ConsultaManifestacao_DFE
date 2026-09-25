@@ -1,4 +1,4 @@
-"""Interface de linha de comando da Consulta de Manifestação v1."""
+"""Interface de linha de comando da Consulta de Manifestação v2."""
 
 from __future__ import annotations
 
@@ -9,15 +9,19 @@ from getpass import getpass
 from pathlib import Path
 
 from nfe_consulta import __version__
-from nfe_consulta.config import (
-    CNPJ_PADRAO,
-    UF_PADRAO,
-    resolver_caminhos,
-)
+from nfe_consulta.config import CNPJ_PADRAO, UF_PADRAO, resolver_caminhos
 from nfe_consulta.modelos import NfeConsultaErro
 from nfe_consulta.seguranca_banco import criptografado, migrar_banco
-from nfe_consulta.servico import ParametrosConsulta, executar_consulta
+from nfe_consulta.servico import (
+    ParametrosConsulta,
+    ParametrosSincronizacao,
+    executar_consulta,
+    sincronizar_banco,
+)
 from nfe_consulta.status import consultar_status
+
+
+COOLDOWN_SEFAZ_MINUTOS = 120
 
 
 def _ler_senha(pergunta: str) -> str:
@@ -51,16 +55,9 @@ def _criar_parser() -> argparse.ArgumentParser:
 
     atualizar = comandos.add_parser(
         "atualizar",
-        help="Sincronizar com a SEFAZ e gerar Excel",
-    )
-    atualizar.add_argument(
-        "chaves",
-        nargs="?",
-        default=str(caminhos.chaves),
-        help="TXT com as chaves",
+        help="Sincronizar o banco local com a SEFAZ",
     )
     atualizar.add_argument("--banco", default=str(caminhos.banco))
-    atualizar.add_argument("--saida", default=str(caminhos.saida))
     atualizar.add_argument("--max-lotes", type=int, default=50)
     atualizar.add_argument("--cert-indice", type=int)
 
@@ -79,7 +76,7 @@ def _criar_parser() -> argparse.ArgumentParser:
 
     status = comandos.add_parser(
         "status",
-        help="Mostrar o estado local da sincronização",
+        help="Mostrar o estado da última gravação local",
     )
     status.add_argument("--banco", default=str(caminhos.banco))
 
@@ -117,31 +114,41 @@ def _proteger_banco(args: argparse.Namespace) -> None:
     print(f"Banco protegido criado: {args.destino}")
 
 
-def _executar_consulta(args: argparse.Namespace) -> None:
-    sincronizar = args.comando == "atualizar"
+def _executar_atualizacao(args: argparse.Namespace) -> None:
     senha = _senha_do_banco(args.banco)
-
-    parametros = ParametrosConsulta(
-        chaves=Path(args.chaves),
-        banco=Path(args.banco),
-        saida=Path(args.saida),
-        cnpj=CNPJ_PADRAO,
-        uf=UF_PADRAO,
-        sincronizar_sefaz=sincronizar,
-        max_lotes=args.max_lotes if sincronizar else 50,
-        senha_banco=senha,
-        cert_indice=args.cert_indice if sincronizar else None,
+    resumo = sincronizar_banco(
+        ParametrosSincronizacao(
+            banco=Path(args.banco),
+            cnpj=CNPJ_PADRAO,
+            uf=UF_PADRAO,
+            max_lotes=args.max_lotes,
+            senha_banco=senha,
+            cert_indice=args.cert_indice,
+            cooldown_minutos=COOLDOWN_SEFAZ_MINUTOS,
+        ),
+        progresso_sincronizacao=lambda lote, ult, maximo, novos: print(
+            f"SEFAZ {lote}: NSU {ult}/{maximo} | +{novos} evento(s)",
+            flush=True,
+        ),
+    )
+    print(
+        f"Sincronização concluída | lotes: {resumo.lotes} | "
+        f"eventos novos: {resumo.eventos_novos} | "
+        f"NSU {resumo.ult_nsu}/{resumo.max_nsu}"
     )
 
+
+def _executar_excel(args: argparse.Namespace) -> None:
+    senha = _senha_do_banco(args.banco)
     resultado = executar_consulta(
-        parametros,
-        progresso_sincronizacao=(
-            lambda lote, ult, maximo, novos: print(
-                f"SEFAZ {lote}: NSU {ult}/{maximo} | +{novos} evento(s)",
-                flush=True,
-            )
-            if sincronizar
-            else None
+        ParametrosConsulta(
+            chaves=Path(args.chaves),
+            banco=Path(args.banco),
+            saida=Path(args.saida),
+            cnpj=CNPJ_PADRAO,
+            uf=UF_PADRAO,
+            sincronizar_sefaz=False,
+            senha_banco=senha,
         ),
         progresso_lote=_progresso,
     )
@@ -171,8 +178,10 @@ def main(argv: list[str] | None = None) -> None:
             _executar_status(args)
         elif args.comando == "proteger-banco":
             _proteger_banco(args)
-        elif args.comando in {"atualizar", "excel"}:
-            _executar_consulta(args)
+        elif args.comando == "atualizar":
+            _executar_atualizacao(args)
+        elif args.comando == "excel":
+            _executar_excel(args)
         else:
             parser.print_help()
     except (OSError, ValueError, RuntimeError, sqlite3.DatabaseError, NfeConsultaErro) as exc:
