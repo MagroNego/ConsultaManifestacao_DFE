@@ -43,7 +43,6 @@ class ParametrosConsulta:
     cert_indice: int | None = None
     cert_thumbprint: str | None = None
     cert_store: str | None = None
-    cooldown_minutos: int = 0
 
 
 @dataclass(frozen=True)
@@ -128,6 +127,7 @@ class ParametrosSincronizacao:
     cert_indice: int | None = None
     cert_thumbprint: str | None = None
     cert_store: str | None = None
+    cooldown_minutos: int = 0
 
 
 def sincronizar_banco(
