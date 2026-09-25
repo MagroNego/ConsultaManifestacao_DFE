@@ -1,99 +1,156 @@
-# Consulta de Manifestação — v1.0
+# Consulta de Manifestação — v2.0 Web
 
-Aplicativo Windows para consultar eventos de manifestação de NF-e pelo **NFeDistribuicaoDFe**, manter o histórico em SQLite/SQLCipher e gerar uma planilha Excel.
+Aplicação corporativa para consultar o histórico local de manifestações de NF-e, gerar Excel e sincronizar o banco com o **NFeDistribuicaoDFe**.
 
-## Interface gráfica
+A v2 mantém o núcleo Python da v1, mas adiciona uma interface Web para uso na rede interna da empresa.
 
-Depois da instalação:
+## Fluxos separados
 
-```powershell
-nfe-consulta gui
-```
+A aplicação possui três ações distintas:
 
-Ou dê duplo clique em `ABRIR_CONSULTA.cmd`.
+- **Excel**: usa somente o banco local. O usuário envia um ou vários TXT, ou seleciona uma pasta contendo TXT, e recebe a planilha.
+- **Status**: lê o estado da última gravação no banco, incluindo `ultNSU`, `maxNSU` e disponibilidade da próxima sincronização.
+- **Atualizar**: sincroniza somente o banco com a SEFAZ. Não recebe TXT e não gera Excel.
 
-A tela v1 usa o mesmo núcleo da CLI. A interface não abre outro processo do terminal para executar a consulta.
+A área **Atualizar** é restrita a administradores. Excel e Status podem ser usados por usuários comuns.
 
-## CLI
+## Cooldown SEFAZ
 
-Os comandos principais são:
+Após uma tentativa válida de sincronização, a aplicação grava um bloqueio padrão de **120 minutos** no próprio banco.
 
-```powershell
-nfe-consulta atualizar
-nfe-consulta excel
-nfe-consulta status
-nfe-consulta gui
-```
+O bloqueio:
 
-- `atualizar`: sincroniza o histórico com a SEFAZ e gera o Excel.
-- `excel`: gera o Excel usando somente o banco local.
-- `status`: mostra o estado da última sincronização gravada no banco.
-- `gui`: abre a interface gráfica.
+- é validado no backend;
+- sobrevive a reinícios do serviço;
+- também é aplicado pela CLI da v2;
+- não substitui o tratamento específico da rejeição 656.
 
-Os caminhos padrão são resolvidos nas pastas `entrada`, `dados` e `saidas`. Também é possível informar os arquivos explicitamente:
+## Interface Web
 
-```powershell
-nfe-consulta atualizar entrada\CHAVES.txt `
-  --banco dados\nfe_manifestacoes_seguro.db `
-  --saida saidas\Consulta_Manifestacao_YAB.xlsx `
-  --max-lotes 50
-```
-
-Consulta local:
-
-```powershell
-nfe-consulta excel entrada\CHAVES.txt `
-  --banco dados\nfe_manifestacoes_seguro.db `
-  --saida saidas\Consulta_Manifestacao_YAB.xlsx
-```
-
-## Instalação
-
-Requisitos:
-
-- Windows 10/11.
-- Python 3.11 ou mais recente.
-- Certificado A1 da empresa instalado no repositório do usuário do Windows.
-- Acesso ao Ambiente Nacional da NF-e.
-
-Na pasta do projeto:
+Instalação:
 
 ```powershell
 py -m pip install -e .
-nfe-consulta --version
 ```
 
-Ou execute `INSTALAR.cmd`.
-
-## Estrutura
-
-```text
-entrada/     CHAVES.txt
-dados/       banco SQLite ou SQLCipher
-saidas/      planilhas geradas
-nfe_consulta/
-  servico.py       fluxo compartilhado pela GUI e CLI
-  distribuicao.py  comunicação NFeDistribuicaoDFe
-  banco.py         persistência e controle de NSU
-  gui.py           interface
-  cli.py           terminal
-```
-
-## Controle de consumo
-
-O cursor NSU é persistido no banco. Quando a SEFAZ retorna rejeição **656 — Consumo Indevido**, o aplicativo grava uma pausa preventiva antes de permitir nova sincronização. Uma sincronização completa recente também é reaproveitada para evitar consultas desnecessárias.
-
-O histórico disponível depende do que o Ambiente Nacional ainda disponibiliza para distribuição. A ausência de evento no banco local não prova que nunca houve manifestação.
-
-## Banco protegido
-
-Para criar uma cópia SQLCipher:
+Execução:
 
 ```powershell
-nfe-consulta proteger-banco dados\nfe_manifestacoes.db dados\nfe_manifestacoes_seguro.db
+nfe-consulta-web
 ```
 
-O banco de origem é preservado.
+ou:
+
+```powershell
+INICIAR_WEB.cmd
+```
+
+Em produção, a aplicação deve ficar atrás de um reverse proxy corporativo com HTTPS e autenticação. Consulte `SERVIDOR_WEB.md`.
+
+## CLI
+
+```powershell
+nfe-consulta atualizar --banco dados\nfe_manifestacoes_seguro.db
+nfe-consulta excel entrada\CHAVES.txt --banco dados\nfe_manifestacoes_seguro.db --saida saidas\Consulta_Manifestacao_YAB.xlsx
+nfe-consulta status --banco dados\nfe_manifestacoes_seguro.db
+```
+
+- `atualizar`: somente SEFAZ → banco.
+- `excel`: somente banco + TXT → XLSX.
+- `status`: somente leitura do banco.
+
+## Autorização Web
+
+O backend trabalha com dois perfis:
+
+### Usuário
+
+- Excel
+- Status
+
+### Administrador
+
+- Excel
+- Status
+- Atualizar SEFAZ
+
+Ocultar o botão não é o controle de segurança. A rota de atualização também exige permissão de administrador no backend.
+
+## Autenticação corporativa
+
+Em produção a aplicação espera identidade fornecida por um proxy confiável.
+
+Headers padrão:
+
+```text
+X-NFE-User
+X-NFE-Name
+X-NFE-Proxy-Secret
+```
+
+A aplicação rejeita requisições sem o segredo compartilhado com o proxy.
+
+## Tema
+
+A interface possui modo claro e escuro. A preferência é salva localmente no navegador.
+
+## Certificado
+
+A v2 aceita certificado Windows em:
+
+```text
+Cert:\CurrentUser\My
+Cert:\LocalMachine\My
+```
+
+Para servidor corporativo, `LocalMachine` é o cenário recomendado, com a conta do serviço autorizada a ler a chave privada.
+
+O certificado pode ser fixado por thumbprint.
+
+## Banco
+
+SQLite/SQLCipher continua suportado na primeira versão Web.
+
+Enquanto SQLite for utilizado:
+
+- execute somente **1 worker**;
+- mantenha um único arquivo de banco ativo;
+- faça backup regular.
+
+Caso a aplicação evolua para múltiplas instâncias, alta disponibilidade ou concorrência maior, a persistência deve ser migrada para SQL Server ou PostgreSQL.
+
+## Segurança
+
+A v2 inclui:
+
+- autorização no backend;
+- proteção CSRF;
+- segredo compartilhado com o proxy;
+- headers HTTP de segurança;
+- limite de upload;
+- sanitização e validação das chaves existentes;
+- log de auditoria sem registrar as chaves de acesso;
+- cooldown persistente para SEFAZ;
+- SQLCipher opcional.
+
+## Estrutura principal
+
+```text
+nfe_consulta/
+  servico.py
+  banco.py
+  distribuicao.py
+  certificado_windows.py
+  web/
+    app.py
+    auth.py
+    settings.py
+    status_view.py
+    uploads.py
+    audit.py
+    templates/
+    static/
+```
 
 ## Testes
 
@@ -102,4 +159,6 @@ py -m pip install -e ".[dev]"
 py -m pytest -q
 ```
 
-Os testes automatizados não fazem consulta real à SEFAZ.
+A CI da branch `web/v2.0` executa a suíte em Windows e Linux.
+
+Os testes automatizados não fazem consulta real à SEFAZ nem usam certificado real.
