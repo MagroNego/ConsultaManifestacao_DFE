@@ -9,6 +9,9 @@ if not exist "%BASE_DIR%logs" mkdir "%BASE_DIR%logs"
 
 set "LOG_FILE=%BASE_DIR%logs\atualizacao_agendada.log"
 
+if not defined NFE_DATABASE_PATH if exist "%BASE_DIR%secrets\db-path.txt" (
+    set /p "NFE_DATABASE_PATH="<"%BASE_DIR%secrets\db-path.txt"
+)
 if not defined NFE_DATABASE_PATH set "NFE_DATABASE_PATH=%BASE_DIR%dados\nfe_manifestacoes_seguro.db"
 if not defined NFE_DATABASE_PASSWORD_FILE set "NFE_DATABASE_PASSWORD_FILE=%BASE_DIR%secrets\db-password.txt"
 if not defined NFE_CERT_STORE set "NFE_CERT_STORE=LocalMachine"
