@@ -74,6 +74,16 @@ def _render(
     )
 
 
+
+def _database_error_message(
+    exc: Exception,
+    settings: WebSettings,
+    user: WebUser,
+) -> str:
+    if settings.environment == "development" and user.is_admin:
+        return f"{type(exc).__name__}: {exc}"
+    return "Não foi possível abrir o banco configurado."
+
 def _status_web(settings: WebSettings) -> WebStatus:
     return read_web_status(
         settings.database_path,
@@ -295,9 +305,9 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         try:
             status_web = await run_in_threadpool(_status_web, settings)
             erro = None
-        except Exception:
+        except Exception as exc:
             status_web = WebStatus(False, None, None, None, None, None, None, None)
-            erro = "Não foi possível abrir o banco configurado."
+            erro = _database_error_message(exc, settings, user)
 
         return _render(
             request,
@@ -316,9 +326,9 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         try:
             status_web = await run_in_threadpool(_status_web, settings)
             erro = None
-        except Exception:
+        except Exception as exc:
             status_web = WebStatus(False, None, None, None, None, None, None, None)
-            erro = "Não foi possível abrir o banco configurado."
+            erro = _database_error_message(exc, settings, user)
 
         return _render(
             request,
