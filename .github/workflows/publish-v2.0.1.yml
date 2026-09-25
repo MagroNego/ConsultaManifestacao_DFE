@@ -1,0 +1,83 @@
+name: Publicar v2.0.1
+
+on:
+  push:
+    branches:
+      - web/v2.0
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    if: "${{ github.event.head_commit.message == 'publish: v2.0.1' }}"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Obter versão validada
+        uses: actions/checkout@v4
+        with:
+          ref: 3582de54c4989b8979a742f6e2511401c566578a
+          fetch-depth: 0
+
+      - name: Validar versão
+        shell: bash
+        run: |
+          grep -q 'version = "2.0.1"' pyproject.toml
+          grep -q '__version__ = "2.0.1"' nfe_consulta/__init__.py
+
+      - name: Montar pacote
+        shell: bash
+        run: |
+          PACKAGE="ConsultaManifestacao_DFE-v2.0.1"
+          mkdir -p "dist/$PACKAGE"
+          rsync -a ./ "dist/$PACKAGE/" \
+            --exclude='.git/' \
+            --exclude='.github/' \
+            --exclude='tests/' \
+            --exclude='dist/' \
+            --exclude='.pytest_cache/' \
+            --exclude='__pycache__/' \
+            --exclude='*.pyc' \
+            --exclude='dados/*' \
+            --exclude='secrets/*' \
+            --exclude='logs/*'
+          mkdir -p "dist/$PACKAGE/dados" "dist/$PACKAGE/secrets" "dist/$PACKAGE/logs"
+          (
+            cd dist
+            zip -r "$PACKAGE.zip" "$PACKAGE"
+          )
+
+      - name: Criar notas
+        shell: bash
+        run: |
+          cat > release-notes.md <<'EOF'
+          ## Consulta de Manifestação NF-e v2.0.1
+
+          Patch de configuração e segurança da versão Web.
+
+          ### Alterações
+          - senhas de runtime centralizadas exclusivamente na pasta `secrets`;
+          - remoção de fallback de senha por variáveis de ambiente;
+          - banco SQLCipher passa a exigir `secrets\db-password.txt`;
+          - certificado A1 usa `secrets\cert-path.txt` e `secrets\cert-password.txt`;
+          - credenciais administrativas usam `secrets\admin-user.txt` e `secrets\admin-password.txt`;
+          - comando de proteção do banco também utiliza a senha definida em `secrets`;
+          - scripts de inicialização e atualização agendada alinhados ao mesmo modelo de configuração;
+          - documentação e workflows reorganizados;
+          - novos testes garantindo que variáveis de ambiente de senha sejam ignoradas.
+
+          ### Compatibilidade
+          Mantém as funcionalidades da v2.0.0 e não inclui banco, senhas ou certificado no pacote.
+          EOF
+
+      - name: Publicar release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh release create v2.0.1 \
+            "dist/ConsultaManifestacao_DFE-v2.0.1.zip#ConsultaManifestacao_DFE-v2.0.1.zip" \
+            --target 3582de54c4989b8979a742f6e2511401c566578a \
+            --title "Consulta de Manifestação NF-e v2.0.1" \
+            --notes-file release-notes.md
