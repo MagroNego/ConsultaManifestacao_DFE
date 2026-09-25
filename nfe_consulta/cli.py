@@ -6,7 +6,6 @@ import argparse
 import os
 import sqlite3
 import sys
-from getpass import getpass
 from pathlib import Path
 
 from nfe_consulta import __version__
@@ -26,15 +25,6 @@ from nfe_consulta.status import consultar_status
 COOLDOWN_SEFAZ_MINUTOS = 120
 RAIZ_PROJETO = Path(__file__).resolve().parents[1]
 DATABASE_PASSWORD_FILE = RAIZ_PROJETO / "secrets" / "db-password.txt"
-
-
-def _ler_senha(pergunta: str) -> str:
-    if sys.stdin.isatty():
-        return getpass(pergunta)
-    senha = sys.stdin.readline().rstrip("\r\n")
-    if not senha:
-        raise ValueError("Senha não recebida.")
-    return senha
 
 
 def _progresso(atual: int, total: int) -> None:
@@ -145,10 +135,18 @@ def _executar_status(args: argparse.Namespace) -> None:
 
 
 def _proteger_banco(args: argparse.Namespace) -> None:
-    senha = _ler_senha("Nova senha do banco protegido: ")
-    confirmacao = _ler_senha("Repita a senha: ")
-    if senha != confirmacao:
-        raise ValueError("As senhas não coincidem.")
+    arquivo = DATABASE_PASSWORD_FILE
+    if not arquivo.is_file():
+        raise ValueError(
+            f"Configure a nova senha do banco em {arquivo} antes de proteger o arquivo."
+        )
+
+    senha = arquivo.read_text(encoding="utf-8").rstrip("\r\n")
+    if not senha:
+        raise ValueError(f"Arquivo de senha do banco está vazio: {arquivo}")
+    if len(senha) < 12:
+        raise ValueError("A senha do banco em secrets deve ter pelo menos 12 caracteres.")
+
     migrar_banco(args.origem, args.destino, senha)
     print(f"Banco protegido criado: {args.destino}")
 
