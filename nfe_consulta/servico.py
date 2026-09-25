@@ -140,6 +140,8 @@ class ParametrosSincronizacao:
     cert_indice: int | None = None
     cert_thumbprint: str | None = None
     cert_store: str | None = None
+    cert_arquivo: Path | None = None
+    cert_senha_arquivo: str | None = None
     cooldown_minutos: int = 0
 
 
