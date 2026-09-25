@@ -72,3 +72,33 @@ def test_cli_atualizar_usa_configuracao_do_servidor(monkeypatch):
     assert args.cert_store == "LocalMachine"
     assert args.cert_thumbprint == "ABC123"
     assert args.cooldown_minutos == 120
+
+
+
+def test_proteger_banco_usa_senha_do_secrets(tmp_path, monkeypatch):
+    arquivo = tmp_path / "secrets" / "db-password.txt"
+    arquivo.parent.mkdir()
+    arquivo.write_text("Senha-Nova-Banco-123!\n", encoding="utf-8")
+
+    chamadas = []
+    monkeypatch.setattr(cli, "DATABASE_PASSWORD_FILE", arquivo)
+    monkeypatch.setattr(
+        cli,
+        "migrar_banco",
+        lambda origem, destino, senha: chamadas.append((origem, destino, senha)),
+    )
+
+    args = type("Args", (), {
+        "origem": str(tmp_path / "origem.db"),
+        "destino": str(tmp_path / "destino.db"),
+    })()
+
+    cli._proteger_banco(args)
+
+    assert chamadas == [
+        (
+            str(tmp_path / "origem.db"),
+            str(tmp_path / "destino.db"),
+            "Senha-Nova-Banco-123!",
+        )
+    ]
