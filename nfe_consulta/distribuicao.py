@@ -83,6 +83,8 @@ def _enviar_soap_windows(
             "soap": soap,
             "thumbprint": certificado.thumbprint,
             "store": certificado.store,
+            "path": certificado.file_path,
+            "password": certificado.file_password,
             "action": SOAP_ACTION,
         }
     )
@@ -90,8 +92,20 @@ def _enviar_soap_windows(
 $ErrorActionPreference = "Stop"
 $null = Add-Type -AssemblyName System.Net.Http
 $payload = [Console]::In.ReadToEnd() | ConvertFrom-Json
-$store = if ($payload.store -eq "LocalMachine") { "LocalMachine" } else { "CurrentUser" }
-$cert = Get-Item ("Cert:\" + $store + "\My\" + $payload.thumbprint) -ErrorAction Stop
+$cert = $null
+$certFromFile = $false
+if ($payload.path) {
+    $flags = [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::EphemeralKeySet
+    $cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2(
+        $payload.path,
+        $payload.password,
+        $flags
+    )
+    $certFromFile = $true
+} else {
+    $store = if ($payload.store -eq "LocalMachine") { "LocalMachine" } else { "CurrentUser" }
+    $cert = Get-Item ("Cert:\" + $store + "\My\" + $payload.thumbprint) -ErrorAction Stop
+}
 if (-not $cert.HasPrivateKey) { throw "Certificado sem chave privada" }
 
 $handler = $null
@@ -120,6 +134,7 @@ try {
 } finally {
     if ($client) { $client.Dispose() }
     if ($handler) { $handler.Dispose() }
+    if ($certFromFile -and $cert) { $cert.Dispose() }
 }
 '''
     try:
