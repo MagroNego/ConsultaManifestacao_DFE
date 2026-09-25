@@ -1,10 +1,10 @@
 {% extends "base.html" %}
-{% block title %}SEFAZ · Consulta de Manifestação{% endblock %}
+{% block title %}Atualizar · Consulta de Manifestação{% endblock %}
 {% block content %}
 <section class="page-heading">
   <div>
-    <h1>SEFAZ</h1>
-    <p>Sincronização do histórico de manifestações.</p>
+    <h1>Atualizar</h1>
+    <p>Sincroniza o banco local com a SEFAZ.</p>
   </div>
   <span class="admin-badge">Administrador</span>
 </section>
@@ -19,11 +19,11 @@
 <div class="admin-grid">
   <section class="card">
     <div class="card-title">
-      <h2>Sincronização</h2>
+      <h2>Sincronização SEFAZ</h2>
       <span class="muted">NFeDistribuicaoDFe</span>
     </div>
 
-    <form action="{{ url_for('sefaz_sincronizar') }}" method="post" data-processing-form>
+    <form action="{{ url_for('atualizar_sincronizar') }}" method="post" data-processing-form>
       <input type="hidden" name="csrf" value="{{ csrf }}">
 
       <label class="field">
@@ -32,9 +32,19 @@
       </label>
 
       <div class="actions">
-        <button class="button danger" type="submit">Sincronizar SEFAZ</button>
+        <button class="button danger" type="submit" {% if not status_web.can_sync %}disabled{% endif %}>
+          Sincronizar com a SEFAZ
+        </button>
       </div>
     </form>
+
+    <div class="cooldown-note">
+      {% if status_web.can_sync %}
+        Disponível. Após iniciar, este botão fica bloqueado por {{ cooldown_minutes // 60 }} horas.
+      {% else %}
+        Nova tentativa disponível em <strong>{{ status_web.available_label }}</strong>.
+      {% endif %}
+    </div>
 
     <div class="meta-row">
       <span>Certificado</span>
@@ -44,9 +54,15 @@
 
   <section class="card status-card">
     <div class="card-title">
-      <h2>Estado do banco</h2>
+      <h2>Última gravação</h2>
     </div>
-    <pre>{{ status_local }}</pre>
+
+    <div class="status-list">
+      <div><span>Data</span><strong>{{ status_web.updated_label }}</strong></div>
+      <div><span>ultNSU</span><strong class="mono">{{ status_web.ult_nsu or "—" }}</strong></div>
+      <div><span>maxNSU</span><strong class="mono">{{ status_web.max_nsu or "—" }}</strong></div>
+      <div><span>Estado</span><strong>{{ "Completo" if status_web.complete else "Parcial" if status_web.updated_at else "Sem registro" }}</strong></div>
+    </div>
   </section>
 </div>
 {% endblock %}
