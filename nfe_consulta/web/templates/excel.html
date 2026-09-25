@@ -3,8 +3,8 @@
 {% block content %}
 <section class="page-heading">
   <div>
-    <h1>Gerar Excel</h1>
-    <p>Selecione as chaves e baixe a planilha atualizada.</p>
+    <h1>Excel</h1>
+    <p>Gere a planilha usando somente o histórico salvo no banco.</p>
   </div>
   <span class="status-dot {{ 'ok' if database_ready else 'bad' }}">
     {{ "Banco disponível" if database_ready else "Banco indisponível" }}
@@ -19,29 +19,93 @@
   <form action="{{ url_for('exportar_excel') }}" method="post" enctype="multipart/form-data" data-processing-form>
     <input type="hidden" name="csrf" value="{{ csrf }}">
 
-    <div class="upload-grid">
-      <label class="upload-box">
-        <span class="upload-icon">TXT</span>
-        <strong>Arquivos</strong>
-        <small>Selecione um ou vários .txt</small>
-        <input type="file" name="files" accept=".txt,text/plain" multiple data-file-input>
-      </label>
-
-      <label class="upload-box">
-        <span class="upload-icon">DIR</span>
-        <strong>Pasta</strong>
-        <small>Carrega os .txt da pasta escolhida</small>
-        <input type="file" name="folder_files" accept=".txt,text/plain" multiple webkitdirectory directory data-file-input>
-      </label>
-    </div>
+    <label class="upload-box upload-box-single">
+      <span class="upload-icon">TXT</span>
+      <strong>CHAVES.txt</strong>
+      <small>Selecione o arquivo com as chaves de acesso</small>
+      <input type="file" name="files" accept=".txt,text/plain" required data-file-input>
+    </label>
 
     <div class="selection" data-selection>Nenhum arquivo selecionado</div>
 
     <div class="actions">
       <button class="button primary" type="submit" {% if not database_ready %}disabled{% endif %}>
-        Gerar planilha
+        Gerar Excel
       </button>
     </div>
   </form>
+</section>
+
+<section class="card quick-query-card">
+  <div class="card-title query-title">
+    <div>
+      <h2>Consulta rápida</h2>
+      <span class="muted">Somente banco local</span>
+    </div>
+  </div>
+
+  <form class="query-form" action="{{ url_for('consulta_rapida') }}" method="get">
+    <label class="field query-field">
+      <span>Número da NF</span>
+      <input
+        type="number"
+        name="numero"
+        min="1"
+        max="999999999"
+        step="1"
+        value="{{ consulta_numero or '' }}"
+        placeholder="Ex.: 91779"
+        required
+      >
+    </label>
+    <button class="button primary query-button" type="submit" {% if not database_ready %}disabled{% endif %}>
+      Consultar
+    </button>
+  </form>
+
+  {% if consulta_error %}
+  <div class="alert error compact">{{ consulta_error }}</div>
+  {% endif %}
+
+  {% if consulta_numero and not consulta_error %}
+    {% if consulta_eventos %}
+    <div class="query-summary">
+      <strong>NF {{ consulta_numero }}</strong>
+      <span>{{ consulta_eventos|length }} evento{{ '' if consulta_eventos|length == 1 else 's' }}</span>
+    </div>
+
+    <div class="table-wrap">
+      <table class="query-table">
+        <thead>
+          <tr>
+            <th>NF</th>
+            <th>Série</th>
+            <th>Evento</th>
+            <th>Data</th>
+            <th>Protocolo</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for evento in consulta_eventos %}
+          <tr>
+            <td>{{ evento.numero }}</td>
+            <td>{{ evento.serie }}</td>
+            <td>
+              <strong>{{ evento.descricao }}</strong>
+              <small>{{ evento.codigo }}</small>
+            </td>
+            <td>{{ evento.data_label }}</td>
+            <td class="mono">{{ evento.protocolo or "—" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="empty-result">
+      Nenhum evento encontrado para a NF {{ consulta_numero }} no banco local.
+    </div>
+    {% endif %}
+  {% endif %}
 </section>
 {% endblock %}
