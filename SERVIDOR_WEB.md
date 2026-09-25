@@ -207,3 +207,20 @@ logs\atualizacao_agendada.log
 ```
 
 O job falha sem chamar a SEFAZ se banco, arquivo de senha, thumbprint ou Python não estiverem configurados.
+
+
+## Banco central configurado pela área administrativa
+
+Na aba **Atualizar**, o administrador informa o caminho do banco SQLite/SQLCipher existente no servidor. A aplicação valida o arquivo antes de ativá-lo e persiste somente o caminho em:
+
+```text
+secrets\db-path.txt
+```
+
+A senha permanece em:
+
+```text
+secrets\db-password.txt
+```
+
+O mesmo caminho é utilizado pelas telas Web e por `ATUALIZAR_BANCO_MANHA.cmd`. A conta do serviço e a conta do job precisam ter leitura e escrita no banco. Para SQLite/SQLCipher, mantenha o arquivo em disco local do servidor sempre que possível.
