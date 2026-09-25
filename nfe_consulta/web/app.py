@@ -17,6 +17,7 @@ from starlette.background import BackgroundTask
 from starlette.concurrency import run_in_threadpool
 
 from nfe_consulta import __version__
+from nfe_consulta.banco_config import carregar_caminho_banco, salvar_caminho_banco
 from nfe_consulta.config import CNPJ_PADRAO, NOME_PLANILHA, UF_PADRAO
 from nfe_consulta.certificado_arquivo import carregar_certificado_arquivo
 from nfe_consulta.certificado_config import (
@@ -96,9 +97,30 @@ def _database_error_message(
         return f"{type(exc).__name__}: {exc}"
     return "Não foi possível abrir o banco configurado."
 
+def _database_path(settings: WebSettings) -> Path:
+    return carregar_caminho_banco(
+        settings.database_path,
+        path_file=settings.database_path_file,
+    )
+
+
+def _database_web(settings: WebSettings) -> dict:
+    caminho = _database_path(settings)
+    return {
+        "path": str(caminho),
+        "name": caminho.name,
+        "ready": caminho.is_file(),
+        "configured": bool(
+            settings.database_path_file
+            and settings.database_path_file.is_file()
+        ),
+        "password_configured": bool(settings.database_password),
+    }
+
+
 def _status_web(settings: WebSettings) -> WebStatus:
     return read_web_status(
-        settings.database_path,
+        _database_path(settings),
         CNPJ_PADRAO,
         password=settings.database_password,
     )
@@ -223,7 +245,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         return {
             "status": "ok",
             "version": __version__,
-            "database": settings.database_path.is_file(),
+            "database": _database_path(settings).is_file(),
         }
 
     @app.get("/admin/login", response_class=HTMLResponse)
@@ -332,7 +354,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             request,
             "excel.html",
             user,
-            database_ready=settings.database_path.is_file(),
+            database_ready=_database_path(settings).is_file(),
             consulta_numero="",
             consulta_eventos=(),
         )
@@ -350,13 +372,13 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         if numero_limpo:
             if not numero_limpo.isdigit():
                 erro_consulta = "Informe somente o número da NF."
-            elif not settings.database_path.is_file():
+            elif not _database_path(settings).is_file():
                 erro_consulta = "Banco de manifestações indisponível no servidor."
             else:
                 try:
                     eventos = await run_in_threadpool(
                         consultar_numero_nota,
-                        settings.database_path,
+                        _database_path(settings),
                         CNPJ_PADRAO,
                         int(numero_limpo),
                         password=settings.database_password,
@@ -377,7 +399,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             request,
             "excel.html",
             user,
-            database_ready=settings.database_path.is_file(),
+            database_ready=_database_path(settings).is_file(),
             consulta_numero=numero_limpo,
             consulta_eventos=eventos,
             consulta_error=erro_consulta,
@@ -392,7 +414,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
     ):
         validate_csrf(csrf, user, settings)
 
-        if not settings.database_path.is_file():
+        if not _database_path(settings).is_file():
             app.state.audit.write(
                 request,
                 user,
@@ -424,7 +446,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                 executar_consulta,
                 ParametrosConsulta(
                     chaves=chaves,
-                    banco=settings.database_path,
+                    banco=_database_path(settings),
                     saida=saida,
                     cnpj=CNPJ_PADRAO,
                     uf=UF_PADRAO,
@@ -523,6 +545,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         user: Annotated[WebUser, Depends(require_admin)],
         ok: str | None = None,
         cert_ok: str | None = None,
+        db_ok: str | None = None,
     ):
         try:
             status_web = await run_in_threadpool(_status_web, settings)
@@ -539,14 +562,77 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             success=(
                 "Sincronização concluída." if ok == "1"
                 else "Certificado validado e configurado." if cert_ok == "1"
+                else "Banco validado e configurado." if db_ok == "1"
                 else None
             ),
             error=erro,
             certificate_store=settings.certificate_store,
             certificate_fixed=bool(settings.certificate_thumbprint),
             certificate_web=_certificado_web(settings),
+            database_web=_database_web(settings),
             cooldown_minutes=settings.sync_cooldown_minutes,
         )
+
+    @app.post("/atualizar/banco")
+    async def atualizar_banco_config(
+        request: Request,
+        user: Annotated[WebUser, Depends(require_admin)],
+        csrf: str = Form(...),
+        database_path: str = Form(...),
+    ):
+        validate_csrf(csrf, user, settings)
+
+        caminho = database_path.strip()
+        if not caminho:
+            return RedirectResponse(
+                url=request.url_for("atualizar_page"),
+                status_code=303,
+            )
+
+        try:
+            banco = await run_in_threadpool(
+                salvar_caminho_banco,
+                caminho,
+                settings.database_password,
+                path_file=settings.database_path_file,
+            )
+            app.state.audit.write(
+                request,
+                user,
+                "database_config",
+                "ok",
+                arquivo=banco.name,
+            )
+            return RedirectResponse(
+                url=request.url_for("atualizar_page").include_query_params(db_ok="1"),
+                status_code=303,
+            )
+        except Exception as exc:
+            app.state.audit.write(
+                request,
+                user,
+                "database_config",
+                "erro",
+                reason=type(exc).__name__,
+            )
+            try:
+                status_web = await run_in_threadpool(_status_web, settings)
+            except Exception:
+                status_web = WebStatus(False, None, None, None, None, None, None, None)
+
+            return _render(
+                request,
+                "sefaz.html",
+                user,
+                status_code=400,
+                status_web=status_web,
+                error=str(exc),
+                certificate_store=settings.certificate_store,
+                certificate_fixed=bool(settings.certificate_thumbprint),
+                certificate_web=_certificado_web(settings),
+                database_web=_database_web(settings),
+                cooldown_minutes=settings.sync_cooldown_minutes,
+            )
 
     @app.post("/atualizar/certificado")
     async def atualizar_certificado(
@@ -633,6 +719,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                 certificate_store=settings.certificate_store,
                 certificate_fixed=bool(settings.certificate_thumbprint),
                 certificate_web=_certificado_web(settings),
+                database_web=_database_web(settings),
                 cooldown_minutes=settings.sync_cooldown_minutes,
             )
 
@@ -660,6 +747,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                 certificate_store=settings.certificate_store,
                 certificate_fixed=bool(settings.certificate_thumbprint),
                 certificate_web=_certificado_web(settings),
+                database_web=_database_web(settings),
                 cooldown_minutes=settings.sync_cooldown_minutes,
             )
 
@@ -677,6 +765,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                 certificate_store=settings.certificate_store,
                 certificate_fixed=bool(settings.certificate_thumbprint),
                 certificate_web=_certificado_web(settings),
+                database_web=_database_web(settings),
                 cooldown_minutes=settings.sync_cooldown_minutes,
             )
 
@@ -692,6 +781,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                 certificate_store=settings.certificate_store,
                 certificate_fixed=bool(settings.certificate_thumbprint),
                 certificate_web=_certificado_web(settings),
+                database_web=_database_web(settings),
                 cooldown_minutes=settings.sync_cooldown_minutes,
             )
 
@@ -703,7 +793,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             resumo = await run_in_threadpool(
                 sincronizar_banco,
                 ParametrosSincronizacao(
-                    banco=settings.database_path,
+                    banco=_database_path(settings),
                     cnpj=CNPJ_PADRAO,
                     uf=UF_PADRAO,
                     max_lotes=max_lotes,
@@ -763,6 +853,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                 certificate_store=settings.certificate_store,
                 certificate_fixed=bool(settings.certificate_thumbprint),
                 certificate_web=_certificado_web(settings),
+                database_web=_database_web(settings),
                 cooldown_minutes=settings.sync_cooldown_minutes,
             )
         finally:
