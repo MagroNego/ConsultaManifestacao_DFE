@@ -97,6 +97,7 @@ class WebSettings:
     admin_cookie_name: str = "nfe_admin_session"
     certificate_path_file: Path | None = None
     certificate_password_file: Path | None = None
+    database_path_file: Path | None = None
 
     @property
     def production(self) -> bool:
@@ -197,6 +198,12 @@ def get_settings() -> WebSettings:
             os.getenv(
                 "NFE_CERT_PASSWORD_FILE",
                 str(RAIZ_PROJETO / "secrets" / "cert-password.txt"),
+            )
+        ).expanduser(),
+        database_path_file=Path(
+            os.getenv(
+                "NFE_DATABASE_PATH_FILE",
+                str(RAIZ_PROJETO / "secrets" / "db-path.txt"),
             )
         ).expanduser(),
     )
