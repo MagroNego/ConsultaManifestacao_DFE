@@ -94,6 +94,35 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
     app.state.sync_lock = threading.Lock()
     app.state.audit = AuditLog(settings.audit_log)
 
+    @app.middleware("http")
+    async def security_headers(request: Request, call_next):
+        response = await call_next(request)
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("Referrer-Policy", "no-referrer")
+        response.headers.setdefault(
+            "Permissions-Policy",
+            "camera=(), microphone=(), geolocation=()",
+        )
+        response.headers.setdefault(
+            "Content-Security-Policy",
+            "default-src 'self'; "
+            "style-src 'self'; "
+            "script-src 'self'; "
+            "img-src 'self' data:; "
+            "frame-ancestors 'none'; "
+            "base-uri 'self'; "
+            "form-action 'self'",
+        )
+        if settings.production:
+            response.headers.setdefault(
+                "Strict-Transport-Security",
+                "max-age=31536000; includeSubDomains",
+            )
+        if response.headers.get("content-type", "").startswith("text/html"):
+            response.headers.setdefault("Cache-Control", "no-store")
+        return response
+
     app.mount(
         "/static",
         StaticFiles(directory=str(BASE_DIR / "static")),
