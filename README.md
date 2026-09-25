@@ -13,7 +13,7 @@ A aplicação possui três ações distintas:
 - **Status**: lê o estado da última gravação no banco, incluindo `ultNSU`, `maxNSU` e disponibilidade da próxima sincronização.
 - **Atualizar**: sincroniza somente o banco com a SEFAZ. Não recebe TXT e não gera Excel.
 
-A área **Atualizar** é restrita a administradores. Excel e Status podem ser usados por usuários comuns.
+A área **Atualizar** é protegida por um único login administrativo. Excel, Consulta rápida e Status não exigem login adicional.
 
 ## Cooldown SEFAZ
 
@@ -60,36 +60,21 @@ nfe-consulta status --banco dados\nfe_manifestacoes_seguro.db
 - `excel`: somente banco + TXT → XLSX.
 - `status`: somente leitura do banco.
 
-## Autorização Web
+## Acesso administrativo
 
-O backend trabalha com dois perfis:
+Somente a área **Atualizar** exige login. O usuário interno acessa normalmente Excel, Consulta rápida e Status.
 
-### Usuário
-
-- Excel
-- Status
-
-### Administrador
-
-- Excel
-- Status
-- Atualizar SEFAZ
-
-Ocultar o botão não é o controle de segurança. A rota de atualização também exige permissão de administrador no backend.
-
-## Autenticação corporativa
-
-Em produção a aplicação espera identidade fornecida por um proxy confiável.
-
-Headers padrão:
+O login administrativo usa:
 
 ```text
-X-NFE-User
-X-NFE-Name
-X-NFE-Proxy-Secret
+NFE_ADMIN_USER=admin
+NFE_ADMIN_PASSWORD_FILE=C:\ConsultaManifestacao\secrets\admin-password.txt
+NFE_ADMIN_SESSION_MINUTES=30
 ```
 
-A aplicação rejeita requisições sem o segredo compartilhado com o proxy.
+A senha não deve ser gravada no código nem enviada ao GitHub. Em produção, use o arquivo de senha com ACL restrita no Windows.
+
+A sessão usa cookie assinado, `HttpOnly`, `SameSite=Strict` e expira após o período configurado de inatividade. Alterar o HTML ou chamar diretamente a rota de sincronização não libera acesso sem sessão administrativa válida.
 
 ## Tema
 
