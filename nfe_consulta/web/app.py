@@ -65,6 +65,7 @@ def _render(
     status_code: int = 200,
     **extra,
 ):
+    extra.setdefault("http_status", status_code)
     return TEMPLATES.TemplateResponse(
         request=request,
         name=template,
