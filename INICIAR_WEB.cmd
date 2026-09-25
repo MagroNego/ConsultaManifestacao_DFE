@@ -17,4 +17,9 @@ if not defined NFE_ADMIN_USER_FILE if exist "%~dp0secrets\admin-user.txt" (
 if not defined NFE_ADMIN_USER if not defined NFE_ADMIN_USER_FILE set "NFE_ADMIN_USER=admin"
 if not defined NFE_ADMIN_SESSION_MINUTES set "NFE_ADMIN_SESSION_MINUTES=30"
 
-py -m nfe_consulta.web.app
+set "PYTHON_EXE=%~dp0.venv\Scripts\python.exe"
+if not exist "%PYTHON_EXE%" (
+    set "PYTHON_EXE=py"
+)
+
+"%PYTHON_EXE%" -m nfe_consulta.web.app
