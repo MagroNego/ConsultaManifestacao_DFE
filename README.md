@@ -13,7 +13,7 @@ A versão Web foi projetada para uso em rede interna, com separação entre oper
 | Persistência | SQLite / SQLCipher |
 | Certificado | A1 PFX/P12 ou Windows Certificate Store |
 | Plataforma alvo | Windows / Windows Server |
-| Versão atual | 2.0.0 |
+| Versão atual | 2.0.1 |
 
 ## Funcionalidades
 
@@ -190,7 +190,7 @@ Os testes automatizados não acessam a SEFAZ real e não utilizam certificado de
 
 ## Releases
 
-A versão estável atual é **v2.0.0**.
+A versão estável atual é **v2.0.1**.
 
 Os pacotes de instalação são publicados em **GitHub Releases**. Para implantação, utilize o arquivo `ConsultaManifestacao_DFE-vX.Y.Z.zip`, e não os pacotes automáticos de source code gerados pelo GitHub.
 
@@ -199,3 +199,4 @@ Os pacotes de instalação são publicados em **GitHub Releases**. Para implanta
 - **v0.9.4**: versão legada preservada na branch `main`;
 - **v1.0**: refatoração da arquitetura desktop e CLI;
 - **v2.0.0**: interface Web corporativa, administração centralizada e publicação para rede interna.
+- **v2.0.1**: centralização de segredos de runtime e ajustes de configuração/implantação.
