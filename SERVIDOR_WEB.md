@@ -8,7 +8,7 @@ A v2 foi desenhada para rodar dentro da rede da empresa com **um único processo
 Usuário
   ↓ HTTPS
 IIS / reverse proxy corporativo
-  ↓ headers de identidade + segredo interno
+  ↓
 Consulta de Manifestação (FastAPI)
   ↓
 SQLite/SQLCipher + certificado Windows + SEFAZ
@@ -25,11 +25,11 @@ Pode acessar:
 - **Excel**: envia um `CHAVES.txt` e recebe a planilha.
 - **Status**: consulta a última gravação do banco e o estado do NSU.
 
-Não pode acessar **Atualizar**. O backend devolve HTTP 403 mesmo se a pessoa tentar abrir a URL manualmente.
+Ao abrir **Atualizar**, o sistema solicita o login administrativo.
 
 ### Administrador
 
-Além de Excel e Status, pode usar:
+Após autenticar com o único login administrativo, pode usar:
 
 - **Atualizar**: sincroniza o banco com `NFeDistribuicaoDFe`.
 
@@ -55,47 +55,19 @@ py -m pytest -q
 
 ```text
 NFE_WEB_ENV=production
-NFE_WEB_AUTH_MODE=proxy
-NFE_WEB_PROXY_SECRET=<segredo aleatório com pelo menos 24 caracteres>
 NFE_WEB_CSRF_SECRET=<segredo aleatório com pelo menos 32 caracteres>
-NFE_WEB_ADMIN_USERS=admin1@empresa.local,admin2@empresa.local
+NFE_ADMIN_USER=admin
+NFE_ADMIN_PASSWORD_FILE=C:\ConsultaManifestacao\secrets\admin-password.txt
+NFE_ADMIN_SESSION_MINUTES=30
 NFE_DATABASE_PATH=C:\ConsultaManifestacao\dados\nfe_manifestacoes_seguro.db
+NFE_DATABASE_PASSWORD_FILE=C:\ConsultaManifestacao\secrets\db-password.txt
 NFE_CERT_STORE=LocalMachine
 NFE_CERT_THUMBPRINT=<thumbprint do certificado A1>
 ```
 
-Para banco SQLCipher, prefira apontar a senha por arquivo com ACL restrita:
+Os arquivos em `secrets` devem ter ACL restrita à conta que executa a aplicação. O arquivo `admin-password.txt` contém somente a senha do login administrativo; o arquivo `db-password.txt` contém somente a senha do SQLCipher.
 
-```text
-NFE_DATABASE_PASSWORD_FILE=C:\ConsultaManifestacao\secrets\db-password.txt
-```
-
-## Headers enviados pelo proxy
-
-Por padrão a aplicação espera:
-
-```text
-X-NFE-User
-X-NFE-Name
-X-NFE-Proxy-Secret
-```
-
-O reverse proxy deve:
-
-1. autenticar o usuário pela solução corporativa;
-2. remover qualquer header `X-NFE-*` recebido do cliente;
-3. inserir novamente os headers acima com dados confiáveis;
-4. preencher `X-NFE-Proxy-Secret` com o mesmo segredo configurado no servidor da aplicação.
-
-Sem o segredo correto, a aplicação rejeita a requisição.
-
-Os nomes podem ser alterados com:
-
-```text
-NFE_WEB_USER_HEADER
-NFE_WEB_NAME_HEADER
-NFE_WEB_PROXY_SECRET_HEADER
-```
+O reverse proxy continua recomendado para HTTPS e publicação na rede interna, mas não precisa autenticar cada funcionário. A autenticação adicional existe apenas na aba **Atualizar**.
 
 ## Certificado no Windows Server
 
