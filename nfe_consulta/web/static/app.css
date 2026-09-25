@@ -95,17 +95,44 @@ input {
   min-width: 0;
 }
 
-.brand-mark {
-  width: 38px;
+.brand-logo-link {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  text-decoration: none;
+}
+
+.brand-logo {
+  display: block;
+  width: 82px;
   height: 38px;
-  display: grid;
-  place-items: center;
-  border-radius: 10px;
-  background: var(--primary);
-  color: var(--panel);
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: .04em;
+  object-fit: contain;
+}
+
+.brand-logo-dark {
+  display: none;
+}
+
+html[data-theme="dark"] .brand-logo-light {
+  display: none;
+}
+
+html[data-theme="dark"] .brand-logo-dark {
+  display: block;
+}
+
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme]) .brand-logo-light {
+    display: none;
+  }
+
+  html:not([data-theme]) .brand-logo-dark {
+    display: block;
+  }
+}
+
+.brand-copy {
+  min-width: 0;
 }
 
 .brand strong,
