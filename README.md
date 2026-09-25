@@ -67,12 +67,12 @@ Somente a área **Atualizar** exige login. O usuário interno acessa normalmente
 O login administrativo usa:
 
 ```text
-NFE_ADMIN_USER=admin
+NFE_ADMIN_USER_FILE=C:\ConsultaManifestacao\secrets\admin-user.txt
 NFE_ADMIN_PASSWORD_FILE=C:\ConsultaManifestacao\secrets\admin-password.txt
 NFE_ADMIN_SESSION_MINUTES=30
 ```
 
-A senha não deve ser gravada no código nem enviada ao GitHub. Em produção, use o arquivo de senha com ACL restrita no Windows.
+O projeto inclui `CONFIGURAR_ADMIN.cmd`, que grava o usuário e a senha em `secrets\admin-user.txt` e `secrets\admin-password.txt`. Esses arquivos não são versionados. A senha não deve ser gravada no código nem enviada ao GitHub. Em produção, use ACL restrita no Windows.
 
 A sessão usa cookie assinado, `HttpOnly`, `SameSite=Strict` e expira após o período configurado de inatividade. Alterar o HTML ou chamar diretamente a rota de sincronização não libera acesso sem sessão administrativa válida.
 
