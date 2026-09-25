@@ -10,8 +10,11 @@
 <body>
   <header class="topbar">
     <div class="brand">
-      <span class="brand-mark">DF</span>
-      <div>
+      <a class="brand-logo-link" href="{{ url_for('excel_page') }}" aria-label="Yorozu">
+        <img class="brand-logo brand-logo-light" src="{{ url_for('static', path='/img/yorozu-light.png') }}" alt="Yorozu">
+        <img class="brand-logo brand-logo-dark" src="{{ url_for('static', path='/img/yorozu-dark.png') }}" alt="Yorozu">
+      </a>
+      <div class="brand-copy">
         <strong>Consulta de Manifestação</strong>
         <small>NF-e · v{{ version }}</small>
       </div>
