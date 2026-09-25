@@ -61,3 +61,37 @@ def test_servidor_pode_fixar_thumbprint_e_store(monkeypatch):
 def test_store_invalido_e_recusado():
     with pytest.raises(NfeErroCertificado, match="CurrentUser ou LocalMachine"):
         normalizar_store("QualquerCoisa")
+
+
+
+def test_resolver_certificado_aceita_pfx_sem_consultar_store(tmp_path, monkeypatch):
+    arquivo = tmp_path / "empresa.pfx"
+    arquivo.write_bytes(b"fake")
+    empresa = CertificadoWindows(
+        "ABC",
+        "Empresa 16840128000101",
+        "ICP-Brasil",
+        "2030-01-01",
+        CNPJ,
+        "Arquivo",
+        str(arquivo),
+    )
+
+    monkeypatch.setattr(
+        "nfe_consulta.servico.carregar_certificado_arquivo",
+        lambda caminho, senha: empresa,
+    )
+    monkeypatch.setattr(
+        "nfe_consulta.servico.listar_certificados_cliente",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("Windows Store não deve ser consultado")
+        ),
+    )
+
+    escolhido = resolver_certificado(
+        CNPJ,
+        arquivo=arquivo,
+        senha_arquivo="senha",
+    )
+
+    assert escolhido == empresa
