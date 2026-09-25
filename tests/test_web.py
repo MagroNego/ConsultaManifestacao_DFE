@@ -39,6 +39,8 @@ def settings_web(tmp_path, *, admin=False, auth_mode="dev", admin_users=frozense
         admin_password="Senha-Admin-123!",
         admin_session_minutes=30,
         admin_cookie_name="nfe_admin_session",
+        certificate_path_file=tmp_path / "secrets" / "cert-path.txt",
+        certificate_password_file=tmp_path / "secrets" / "cert-password.txt",
     )
 
 
@@ -327,3 +329,117 @@ def test_cabecalho_usa_logos_yorozu_por_tema(tmp_path):
     assert logo_escura.status_code == 200
     assert logo_clara.headers["content-type"] == "image/png"
     assert logo_escura.headers["content-type"] == "image/png"
+
+
+
+def test_admin_configura_certificado_por_caminho_no_servidor(tmp_path, monkeypatch):
+    cfg = settings_web(tmp_path)
+    criar_banco(cfg.database_path)
+    app = create_app(cfg)
+
+    cert_path = tmp_path / "TI" / "Yorozu.pfx"
+    cert_path.parent.mkdir(parents=True)
+    cert_path.write_bytes(b"certificado-sintetico")
+
+    cert = SimpleNamespace(
+        thumbprint="ABC",
+        subject="CN=YOROZU:16840128000101",
+        issuer="ICP-Brasil",
+        valid_to="2027-07-10",
+        cnpj="16840128000101",
+    )
+
+    monkeypatch.setattr(
+        "nfe_consulta.web.app.carregar_certificado_arquivo",
+        lambda *_args, **_kwargs: cert,
+    )
+    monkeypatch.setattr(
+        "nfe_consulta.certificado_config.carregar_certificado_arquivo",
+        lambda *_args, **_kwargs: cert,
+    )
+
+    with TestClient(app) as client:
+        login = client.post(
+            "/admin/login",
+            data={
+                "csrf": csrf_token(PUBLIC_USER, cfg),
+                "username": cfg.admin_username,
+                "password": cfg.admin_password,
+            },
+            follow_redirects=False,
+        )
+        assert login.status_code == 303
+
+        admin = WebUser(cfg.admin_username, "Administrador", True)
+        resposta = client.post(
+            "/atualizar/certificado",
+            data={
+                "csrf": csrf_token(admin, cfg),
+                "certificate_path": str(cert_path),
+                "certificate_password": "Senha-PFX-123!",
+            },
+            follow_redirects=False,
+        )
+
+    assert resposta.status_code == 303
+    assert "cert_ok=1" in resposta.headers["location"]
+    assert cfg.certificate_path_file.read_text(encoding="utf-8") == str(cert_path.resolve())
+    assert cfg.certificate_password_file.read_text(encoding="utf-8") == "Senha-PFX-123!"
+    assert not (cfg.certificate_path_file.parent / cert_path.name).exists()
+
+
+def test_sincronizacao_web_usa_certificado_configurado_em_arquivo(tmp_path, monkeypatch):
+    cfg = settings_web(tmp_path)
+    criar_banco(cfg.database_path)
+
+    cert_path = tmp_path / "TI" / "Yorozu.pfx"
+    cert_path.parent.mkdir(parents=True)
+    cert_path.write_bytes(b"certificado-sintetico")
+    cfg.certificate_path_file.parent.mkdir(parents=True, exist_ok=True)
+    cfg.certificate_path_file.write_text(str(cert_path), encoding="utf-8")
+    cfg.certificate_password_file.write_text("Senha-PFX-123!", encoding="utf-8")
+
+    app = create_app(cfg)
+    chamadas = []
+
+    def fake_sync(parametros):
+        chamadas.append(parametros)
+        return SimpleNamespace(
+            lotes=1,
+            eventos_novos=0,
+            ult_nsu="10".zfill(15),
+            max_nsu="10".zfill(15),
+            completo=True,
+            cache=False,
+        )
+
+    monkeypatch.setattr("nfe_consulta.web.app.sincronizar_banco", fake_sync)
+    monkeypatch.setattr(
+        "nfe_consulta.web.app.carregar_certificado_arquivo",
+        lambda *_args, **_kwargs: SimpleNamespace(
+            subject="CN=YOROZU",
+            valid_to="2027-07-10",
+        ),
+    )
+
+    with TestClient(app) as client:
+        client.post(
+            "/admin/login",
+            data={
+                "csrf": csrf_token(PUBLIC_USER, cfg),
+                "username": cfg.admin_username,
+                "password": cfg.admin_password,
+            },
+            follow_redirects=False,
+        )
+        admin = WebUser(cfg.admin_username, "Administrador", True)
+        resposta = client.post(
+            "/atualizar/sincronizar",
+            data={"csrf": csrf_token(admin, cfg), "max_lotes": "5"},
+            follow_redirects=False,
+        )
+
+    assert resposta.status_code == 303
+    assert chamadas[0].cert_arquivo == cert_path.resolve()
+    assert chamadas[0].cert_senha_arquivo == "Senha-PFX-123!"
+    assert chamadas[0].cert_thumbprint is None
