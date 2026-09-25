@@ -46,7 +46,7 @@ nfe-consulta status
 nfe-consulta gui
 ```
 
-A sintaxe longa da 0.9.4 permanece somente para compatibilidade interna durante a transição.
+A v1 usa somente os subcomandos curtos. A sintaxe longa permanece preservada na v0.9.4, que continua intacta na branch `main` até aprovação da nova versão.
 
 ## Dados armazenados
 
