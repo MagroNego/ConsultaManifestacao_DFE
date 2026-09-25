@@ -57,6 +57,7 @@ class CertificadoWindows:
     issuer: str
     valid_to: str
     cnpj: Optional[str] = None
+    store: str = "CurrentUser"
 
 
 @dataclass(frozen=True)
