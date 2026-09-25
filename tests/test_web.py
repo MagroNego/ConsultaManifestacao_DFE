@@ -272,3 +272,23 @@ def test_consulta_rapida_nao_aceita_expressao_sql(tmp_path):
 
     assert resposta.status_code == 200
     assert "Informe somente o número da NF." in resposta.text
+
+
+
+def test_cabecalho_usa_logos_yorozu_por_tema(tmp_path):
+    cfg = settings_web(tmp_path)
+    criar_banco(cfg.database_path)
+    app = create_app(cfg)
+
+    with TestClient(app) as client:
+        resposta = client.get("/")
+        logo_clara = client.get("/static/img/yorozu-light.png")
+        logo_escura = client.get("/static/img/yorozu-dark.png")
+
+    assert resposta.status_code == 200
+    assert "/static/img/yorozu-light.png" in resposta.text
+    assert "/static/img/yorozu-dark.png" in resposta.text
+    assert logo_clara.status_code == 200
+    assert logo_escura.status_code == 200
+    assert logo_clara.headers["content-type"] == "image/png"
+    assert logo_escura.headers["content-type"] == "image/png"
