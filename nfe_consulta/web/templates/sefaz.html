@@ -1,5 +1,87 @@
 {% extends "base.html" %}
-{% block title %}Atualizar · Consulta de Manifestação{% endblock %}
+{% block title %}Atualizar · Consulta de Manifestação
+
+<section class="card certificate-card">
+  <div class="card-title">
+    <div>
+      <h2>Certificado A1</h2>
+      <span class="muted">Configuração do servidor</span>
+    </div>
+    {% if certificate_web.ready %}
+    <span class="status-dot ok">Disponível</span>
+    {% else %}
+    <span class="status-dot bad">Indisponível</span>
+    {% endif %}
+  </div>
+
+  <form action="{{ url_for('atualizar_certificado') }}" method="post">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+
+    <label class="field">
+      <span>Caminho do certificado no servidor (.pfx ou .p12)</span>
+      <input
+        type="text"
+        name="certificate_path"
+        value="{{ certificate_web.path }}"
+        placeholder="Ex.: C:\TI\Certificados\Yorozu.pfx"
+        autocomplete="off"
+        required
+      >
+    </label>
+
+    <label class="field certificate-password-field">
+      <span>Senha do certificado</span>
+      <input
+        type="password"
+        name="certificate_password"
+        placeholder="{% if certificate_web.path %}Deixe em branco para manter a atual{% else %}Senha do A1{% endif %}"
+        autocomplete="new-password"
+      >
+    </label>
+
+    <div class="actions">
+      <button class="button primary" type="submit">
+        Validar e salvar certificado
+      </button>
+    </div>
+  </form>
+
+  <div class="certificate-details">
+    <div>
+      <span>Fonte</span>
+      <strong>{{ certificate_web.source }}</strong>
+    </div>
+    {% if certificate_web.name %}
+    <div>
+      <span>Arquivo</span>
+      <strong>{{ certificate_web.name }}</strong>
+    </div>
+    {% endif %}
+    {% if certificate_web.subject %}
+    <div>
+      <span>Titular</span>
+      <strong>{{ certificate_web.subject }}</strong>
+    </div>
+    {% endif %}
+    {% if certificate_web.valid_to %}
+    <div>
+      <span>Validade</span>
+      <strong>{{ certificate_web.valid_to }}</strong>
+    </div>
+    {% endif %}
+  </div>
+
+  {% if certificate_web.error %}
+  <div class="alert error compact">{{ certificate_web.error }}</div>
+  {% endif %}
+
+  <p class="cooldown-note">
+    O arquivo permanece na pasta informada. A aplicação salva somente o caminho e a senha em arquivos locais protegidos.
+    A conta que executa o serviço precisa ter permissão de leitura na pasta do certificado.
+  </p>
+</section>
+
+{% endblock %}
 {% block content %}
 <section class="page-heading">
   <div>
