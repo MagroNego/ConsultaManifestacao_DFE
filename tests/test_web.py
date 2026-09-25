@@ -3,6 +3,7 @@ from types import SimpleNamespace
 from fastapi.testclient import TestClient
 
 from nfe_consulta.banco import BancoManifestacoes
+from nfe_consulta.modelos import Manifestacao, RetornoDistribuicao
 from nfe_consulta.web.app import create_app
 from nfe_consulta.web.auth import WebUser, csrf_token
 from nfe_consulta.web.settings import WebSettings
@@ -202,3 +203,72 @@ def test_headers_de_seguranca_e_healthcheck(tmp_path):
     assert home.headers["x-frame-options"] == "DENY"
     assert home.headers["x-content-type-options"] == "nosniff"
     assert "default-src 'self'" in home.headers["content-security-policy"]
+
+
+
+def test_tela_excel_tem_um_unico_txt_e_sem_selecao_de_pasta(tmp_path):
+    cfg = settings_web(tmp_path)
+    criar_banco(cfg.database_path)
+    app = create_app(cfg)
+
+    with TestClient(app) as client:
+        resposta = client.get("/")
+
+    assert resposta.status_code == 200
+    assert "CHAVES.txt" in resposta.text
+    assert "webkitdirectory" not in resposta.text
+    assert ">Pasta<" not in resposta.text
+    assert "Consulta rápida" in resposta.text
+
+
+def test_consulta_rapida_por_numero_mostra_eventos_do_banco(tmp_path, monkeypatch):
+    cfg = settings_web(tmp_path)
+    banco = BancoManifestacoes(str(cfg.database_path))
+    evento = Manifestacao(
+        codigo="210210",
+        descricao="Ciência da Operação",
+        data="2026-09-25T08:00:00-03:00",
+        protocolo="135260000000001",
+        nsu="563664",
+        schema="procEventoNFe_v1.00.xsd",
+    )
+    banco.salvar_retorno(
+        "16840128000101",
+        RetornoDistribuicao(
+            status_codigo=138,
+            status_motivo="Documento localizado",
+            ult_nsu="563664".zfill(15),
+            max_nsu="563664".zfill(15),
+            manifestacoes=((CHAVE, evento),),
+        ),
+    )
+    banco.fechar()
+
+    monkeypatch.setattr(
+        "nfe_consulta.web.app.sincronizar_banco",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("Consulta rápida não deve acessar a SEFAZ")
+        ),
+    )
+
+    app = create_app(cfg)
+    with TestClient(app) as client:
+        resposta = client.get("/consulta", params={"numero": "91779"})
+
+    assert resposta.status_code == 200
+    assert "NF 91779" in resposta.text
+    assert "Ciência da Operação" in resposta.text
+    assert "135260000000001" in resposta.text
+    assert ">1<" in resposta.text
+
+
+def test_consulta_rapida_nao_aceita_expressao_sql(tmp_path):
+    cfg = settings_web(tmp_path)
+    criar_banco(cfg.database_path)
+    app = create_app(cfg)
+
+    with TestClient(app) as client:
+        resposta = client.get("/consulta", params={"numero": "91779 OR 1=1"})
+
+    assert resposta.status_code == 200
+    assert "Informe somente o número da NF." in resposta.text
