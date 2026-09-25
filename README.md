@@ -102,10 +102,19 @@ Cert:\LocalMachine\My
 
 SQLite/SQLCipher continua suportado na primeira versão Web.
 
+O administrador pode apontar o banco central diretamente pela aba **Atualizar**. O caminho validado é salvo em:
+
+```text
+secrets\db-path.txt
+```
+
+A senha SQLCipher continua separada em `secrets\db-password.txt`. Excel, Consulta rápida, Status, atualização manual e o job matinal passam a usar o mesmo banco selecionado.
+
 Enquanto SQLite for utilizado:
 
 - execute somente **1 worker**;
 - mantenha um único arquivo de banco ativo;
+- prefira disco local do servidor em vez de compartilhamento de rede;
 - faça backup regular.
 
 Caso a aplicação evolua para múltiplas instâncias, alta disponibilidade ou concorrência maior, a persistência deve ser migrada para SQL Server ou PostgreSQL.
