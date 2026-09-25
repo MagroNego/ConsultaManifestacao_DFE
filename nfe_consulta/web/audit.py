@@ -1,0 +1,49 @@
+"""Log de auditoria sem conteúdo fiscal sensível."""
+
+from __future__ import annotations
+
+import json
+import logging
+from logging.handlers import RotatingFileHandler
+from pathlib import Path
+
+from fastapi import Request
+
+from nfe_consulta.web.auth import WebUser
+
+
+class AuditLog:
+    def __init__(self, caminho: Path) -> None:
+        caminho.parent.mkdir(parents=True, exist_ok=True)
+        self._logger = logging.getLogger(f"nfe.web.audit.{id(self)}")
+        self._logger.setLevel(logging.INFO)
+        self._logger.propagate = False
+
+        handler = RotatingFileHandler(
+            caminho,
+            maxBytes=5 * 1024 * 1024,
+            backupCount=5,
+            encoding="utf-8",
+        )
+        handler.setFormatter(logging.Formatter("%(asctime)s %(message)s"))
+        self._logger.addHandler(handler)
+
+    def write(
+        self,
+        request: Request,
+        user: WebUser,
+        action: str,
+        result: str,
+        **details,
+    ) -> None:
+        payload = {
+            "user": user.username,
+            "admin": user.is_admin,
+            "action": action,
+            "result": result,
+            "client": request.client.host if request.client else None,
+            **details,
+        }
+        self._logger.info(
+            json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+        )
