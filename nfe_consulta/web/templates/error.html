@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Acesso · Consulta de Manifestação{% endblock %}
+{% block content %}
+<section class="center-card card">
+  <span class="error-code">{{ status_code }}</span>
+  <h1>{{ title }}</h1>
+  <p>{{ message }}</p>
+  {% if user %}
+  <a class="button primary link-button" href="{{ url_for('excel_page') }}">Voltar</a>
+  {% endif %}
+</section>
+{% endblock %}
