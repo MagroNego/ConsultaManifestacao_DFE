@@ -19,7 +19,9 @@ class ConfigCertificadoArquivo:
     password: str
 
 
-def _path_file() -> Path:
+def _path_file(caminho: str | Path | None = None) -> Path:
+    if caminho is not None:
+        return Path(caminho).expanduser()
     return Path(
         os.getenv(
             "NFE_CERT_PATH_FILE",
@@ -28,7 +30,9 @@ def _path_file() -> Path:
     ).expanduser()
 
 
-def _password_file() -> Path:
+def _password_file(caminho: str | Path | None = None) -> Path:
+    if caminho is not None:
+        return Path(caminho).expanduser()
     return Path(
         os.getenv(
             "NFE_CERT_PASSWORD_FILE",
@@ -37,9 +41,12 @@ def _password_file() -> Path:
     ).expanduser()
 
 
-def carregar_config_certificado_arquivo() -> ConfigCertificadoArquivo | None:
+def carregar_config_certificado_arquivo(
+    path_file: str | Path | None = None,
+    password_file: str | Path | None = None,
+) -> ConfigCertificadoArquivo | None:
     caminho_direto = os.getenv("NFE_CERT_PATH", "").strip()
-    arquivo_caminho = _path_file()
+    arquivo_caminho = _path_file(path_file)
 
     if caminho_direto:
         caminho = Path(caminho_direto).expanduser()
@@ -52,7 +59,7 @@ def carregar_config_certificado_arquivo() -> ConfigCertificadoArquivo | None:
         return None
 
     senha_direta = os.getenv("NFE_CERT_PASSWORD")
-    arquivo_senha = _password_file()
+    arquivo_senha = _password_file(password_file)
     if senha_direta is not None:
         senha = senha_direta
     elif arquivo_senha.is_file():
@@ -69,14 +76,17 @@ def carregar_config_certificado_arquivo() -> ConfigCertificadoArquivo | None:
 def salvar_config_certificado_arquivo(
     caminho: str | Path,
     senha: str,
+    *,
+    path_file: str | Path | None = None,
+    password_file: str | Path | None = None,
 ) -> ConfigCertificadoArquivo:
     arquivo = Path(caminho).expanduser().resolve()
 
     # Valida antes de persistir qualquer segredo.
     carregar_certificado_arquivo(arquivo, senha)
 
-    arquivo_caminho = _path_file()
-    arquivo_senha = _password_file()
+    arquivo_caminho = _path_file(path_file)
+    arquivo_senha = _password_file(password_file)
     arquivo_caminho.parent.mkdir(parents=True, exist_ok=True)
     arquivo_senha.parent.mkdir(parents=True, exist_ok=True)
 
