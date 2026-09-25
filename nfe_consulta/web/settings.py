@@ -53,6 +53,7 @@ class WebSettings:
     bind_host: str
     bind_port: int
     root_path: str
+    forwarded_allow_ips: str
     audit_log: Path
     max_upload_bytes: int = 2 * 1024 * 1024
     max_keys: int = 10_000
@@ -127,5 +128,8 @@ def get_settings() -> WebSettings:
         bind_host=os.getenv("NFE_WEB_HOST", "127.0.0.1").strip(),
         bind_port=int(os.getenv("NFE_WEB_PORT", "8080")),
         root_path=os.getenv("NFE_WEB_ROOT_PATH", "").strip(),
+        forwarded_allow_ips=os.getenv(
+            "NFE_WEB_FORWARDED_ALLOW_IPS", "127.0.0.1"
+        ).strip(),
         audit_log=audit,
     )
