@@ -3,7 +3,7 @@ from types import SimpleNamespace
 import pytest
 
 from nfe_consulta.banco import BancoManifestacoes
-from nfe_consulta.cli import main
+from nfe_consulta.cli import COOLDOWN_SEFAZ_MINUTOS, main
 from nfe_consulta.config import CNPJ_PADRAO
 
 
@@ -39,40 +39,35 @@ def test_cli_excel_usa_somente_banco_local(tmp_path, monkeypatch):
     assert saida.is_file()
 
 
-def test_cli_atualizar_monta_execucao_remota(tmp_path, monkeypatch):
-    chaves = tmp_path / "CHAVES.txt"
-    chaves.write_text(CHAVE + "\n", encoding="utf-8")
+def test_cli_atualizar_somente_sincroniza_banco(tmp_path, monkeypatch):
     banco = tmp_path / "historico.db"
-    saida = tmp_path / "resultado.xlsx"
-
     capturado = {}
 
-    def fake_executar(parametros, **kwargs):
+    def fake_sync(parametros, **kwargs):
         capturado["parametros"] = parametros
         return SimpleNamespace(
-            total=1,
-            com_evento=0,
-            com_erro=0,
-            saida=saida,
+            lotes=1,
+            eventos_novos=2,
+            ult_nsu="10".zfill(15),
+            max_nsu="10".zfill(15),
         )
 
-    monkeypatch.setattr("nfe_consulta.cli.executar_consulta", fake_executar)
+    monkeypatch.setattr("nfe_consulta.cli.sincronizar_banco", fake_sync)
 
     main([
         "atualizar",
-        str(chaves),
         "--banco",
         str(banco),
-        "--saida",
-        str(saida),
         "--max-lotes",
         "25",
     ])
 
     parametros = capturado["parametros"]
     assert parametros.cnpj == CNPJ_PADRAO
-    assert parametros.sincronizar_sefaz
     assert parametros.max_lotes == 25
+    assert parametros.cooldown_minutos == COOLDOWN_SEFAZ_MINUTOS
+    assert not hasattr(parametros, "chaves")
+    assert not hasattr(parametros, "saida")
 
 
 def test_cli_excel_recusa_banco_ausente(tmp_path):
