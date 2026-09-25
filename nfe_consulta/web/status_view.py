@@ -97,7 +97,7 @@ def read_web_status(
                 "FROM estado_distribuicao WHERE cnpj = ?",
                 (cnpj,),
             ).fetchone()
-        except sqlite3.OperationalError as exc:
+        except Exception as exc:
             if "no such table" not in str(exc).lower():
                 raise
             estado = None
@@ -108,7 +108,7 @@ def read_web_status(
                 "FROM controle_sincronizacao WHERE cnpj = ?",
                 (cnpj,),
             ).fetchone()
-        except sqlite3.OperationalError as exc:
+        except Exception as exc:
             if "no such table" not in str(exc).lower():
                 raise
             controle = None
@@ -118,7 +118,7 @@ def read_web_status(
                 "SELECT ate_utc, motivo FROM pausa_distribuicao WHERE cnpj = ?",
                 (cnpj,),
             ).fetchone()
-        except sqlite3.OperationalError as exc:
+        except Exception as exc:
             if "no such table" not in str(exc).lower():
                 raise
             pausa = None
