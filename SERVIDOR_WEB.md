@@ -22,7 +22,7 @@ Não exponha o Uvicorn diretamente aos usuários em produção. O padrão do apl
 
 Pode acessar:
 
-- **Excel**: envia um ou vários TXT, ou seleciona uma pasta contendo TXT, e recebe a planilha.
+- **Excel**: envia um `CHAVES.txt` e recebe a planilha.
 - **Status**: consulta a última gravação do banco e o estado do NSU.
 
 Não pode acessar **Atualizar**. O backend devolve HTTP 403 mesmo se a pessoa tentar abrir a URL manualmente.
@@ -186,3 +186,27 @@ A TI ainda deve validar:
 - teste integrado controlado com SEFAZ;
 - restauração de backup;
 - rotação dos segredos do proxy e CSRF.
+
+
+## Atualização automática
+
+O projeto inclui `ATUALIZAR_BANCO_MANHA.cmd` para execução pelo Agendador de Tarefas do Windows. O job usa o mesmo banco e o mesmo cooldown da interface Web.
+
+Antes de agendar, configure no servidor:
+
+```text
+NFE_CERT_STORE=LocalMachine
+NFE_CERT_THUMBPRINT=<thumbprint do certificado A1>
+NFE_DATABASE_PATH=C:\ConsultaManifestacao\dados\nfe_manifestacoes_seguro.db
+NFE_DATABASE_PASSWORD_FILE=C:\ConsultaManifestacao\secrets\db-password.txt
+```
+
+O arquivo de senha contém somente a senha do SQLCipher e não deve ser versionado. Restrinja a ACL da pasta `secrets` à conta do serviço.
+
+No Agendador de Tarefas, execute o BAT uma vez pela manhã, com uma conta que tenha leitura da chave privada do certificado. O retorno e eventuais erros são gravados em:
+
+```text
+logs\atualizacao_agendada.log
+```
+
+O job falha sem chamar a SEFAZ se banco, arquivo de senha, thumbprint ou Python não estiverem configurados.
