@@ -24,6 +24,8 @@ from nfe_consulta.status import consultar_status
 
 
 COOLDOWN_SEFAZ_MINUTOS = 120
+RAIZ_PROJETO = Path(__file__).resolve().parents[1]
+DATABASE_PASSWORD_FILE = RAIZ_PROJETO / "secrets" / "db-password.txt"
 
 
 def _ler_senha(pergunta: str) -> str:
@@ -125,21 +127,16 @@ def _senha_do_banco(caminho: str | Path) -> str | None:
     if not criptografado(caminho):
         return None
 
-    arquivo_senha = os.getenv("NFE_DATABASE_PASSWORD_FILE", "").strip()
-    if arquivo_senha:
-        arquivo = Path(arquivo_senha).expanduser()
-        if not arquivo.is_file():
-            raise ValueError(f"Arquivo de senha do banco não encontrado: {arquivo}")
-        senha = arquivo.read_text(encoding="utf-8").strip()
-        if not senha:
-            raise ValueError("Arquivo de senha do banco está vazio.")
-        return senha
+    arquivo = DATABASE_PASSWORD_FILE
+    if not arquivo.is_file():
+        raise ValueError(
+            f"Banco criptografado: configure a senha em {arquivo}."
+        )
 
-    senha_ambiente = os.getenv("NFE_DATABASE_PASSWORD")
-    if senha_ambiente:
-        return senha_ambiente
-
-    return _ler_senha("Senha do banco: ")
+    senha = arquivo.read_text(encoding="utf-8").rstrip("\r\n")
+    if not senha:
+        raise ValueError(f"Arquivo de senha do banco está vazio: {arquivo}")
+    return senha
 
 
 def _executar_status(args: argparse.Namespace) -> None:
