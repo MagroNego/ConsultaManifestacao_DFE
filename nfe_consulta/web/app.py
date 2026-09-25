@@ -105,7 +105,10 @@ def _status_web(settings: WebSettings) -> WebStatus:
 
 
 def _certificado_web(settings: WebSettings) -> dict:
-    config = carregar_config_certificado_arquivo()
+    config = carregar_config_certificado_arquivo(
+        settings.certificate_path_file,
+        settings.certificate_password_file,
+    )
     if config is not None:
         try:
             certificado = carregar_certificado_arquivo(config.path, config.password)
@@ -562,7 +565,10 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                 status_code=303,
             )
 
-        existente = carregar_config_certificado_arquivo()
+        existente = carregar_config_certificado_arquivo(
+        settings.certificate_path_file,
+        settings.certificate_password_file,
+    )
         senha = certificate_password
         if not senha and existente is not None:
             try:
@@ -589,6 +595,8 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                 salvar_config_certificado_arquivo,
                 caminho,
                 senha,
+                path_file=settings.certificate_path_file,
+                password_file=settings.certificate_password_file,
             )
 
             app.state.audit.write(
@@ -688,7 +696,10 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             )
 
         try:
-            cert_arquivo = carregar_config_certificado_arquivo()
+            cert_arquivo = carregar_config_certificado_arquivo(
+        settings.certificate_path_file,
+        settings.certificate_password_file,
+    )
             resumo = await run_in_threadpool(
                 sincronizar_banco,
                 ParametrosSincronizacao(
