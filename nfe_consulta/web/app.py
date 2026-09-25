@@ -18,6 +18,7 @@ from starlette.concurrency import run_in_threadpool
 
 from nfe_consulta import __version__
 from nfe_consulta.config import CNPJ_PADRAO, NOME_PLANILHA, UF_PADRAO
+from nfe_consulta.modelos import NfeConsumoIndevidoErro, NfeLimiteConsultaErro
 from nfe_consulta.servico import (
     ParametrosConsulta,
     ParametrosSincronizacao,
@@ -441,11 +442,16 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                 status_web = await run_in_threadpool(_status_web, settings)
             except Exception:
                 status_web = WebStatus(False, None, None, None, None, None, None, None)
+            http_status = (
+                429
+                if isinstance(exc, (NfeConsumoIndevidoErro, NfeLimiteConsultaErro))
+                else 400
+            )
             return _render(
                 request,
                 "sefaz.html",
                 user,
-                status_code=400,
+                status_code=http_status,
                 status_web=status_web,
                 error=str(exc),
                 certificate_store=settings.certificate_store,
