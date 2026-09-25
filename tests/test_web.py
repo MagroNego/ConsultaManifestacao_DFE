@@ -33,6 +33,7 @@ def settings_web(tmp_path, *, admin=False, auth_mode="dev", admin_users=frozense
         root_path="",
         forwarded_allow_ips="127.0.0.1",
         audit_log=tmp_path / "logs" / "web_audit.log",
+        sync_cooldown_minutes=120,
     )
 
 
@@ -42,29 +43,34 @@ def criar_banco(caminho):
     banco.fechar()
 
 
-def test_usuario_comum_nao_ve_nem_acessa_sefaz(tmp_path):
+def test_usuario_comum_tem_excel_e_status_mas_nao_atualizar(tmp_path):
     cfg = settings_web(tmp_path, admin=False)
     app = create_app(cfg)
 
     with TestClient(app) as client:
         home = client.get("/")
         assert home.status_code == 200
-        assert 'href="http://testserver/sefaz"' not in home.text
-        bloqueado = client.get("/sefaz")
-        assert bloqueado.status_code == 403
+        assert ">Excel<" in home.text
+        assert ">Status<" in home.text
+        assert ">Atualizar<" not in home.text
+        assert client.get("/status").status_code == 200
+        assert client.get("/atualizar").status_code == 403
 
 
-def test_admin_ve_area_sefaz(tmp_path):
+def test_admin_ve_as_tres_acoes(tmp_path):
     cfg = settings_web(tmp_path, admin=True)
     app = create_app(cfg)
 
     with TestClient(app) as client:
         home = client.get("/")
         assert home.status_code == 200
-        assert "SEFAZ" in home.text
-        pagina = client.get("/sefaz")
+        assert ">Excel<" in home.text
+        assert ">Status<" in home.text
+        assert ">Atualizar<" in home.text
+        pagina = client.get("/atualizar")
         assert pagina.status_code == 200
-        assert "Sincronizar SEFAZ" in pagina.text
+        assert "Sincronizar com a SEFAZ" in pagina.text
+        assert "2 horas" in pagina.text
 
 
 def test_proxy_exige_segredo_e_aplica_allowlist_admin(tmp_path):
@@ -83,14 +89,15 @@ def test_proxy_exige_segredo_e_aplica_allowlist_admin(tmp_path):
             "X-NFE-User": "comum@empresa.local",
         }
         assert client.get("/", headers=comum).status_code == 200
-        assert client.get("/sefaz", headers=comum).status_code == 403
+        assert client.get("/status", headers=comum).status_code == 200
+        assert client.get("/atualizar", headers=comum).status_code == 403
 
         admin = {
             "X-NFE-Proxy-Secret": cfg.proxy_secret,
             "X-NFE-User": "ADMIN@empresa.local",
             "X-NFE-Name": "Administrador",
         }
-        assert client.get("/sefaz", headers=admin).status_code == 200
+        assert client.get("/atualizar", headers=admin).status_code == 200
 
 
 def test_excel_web_gera_xlsx_com_banco_local(tmp_path):
@@ -134,7 +141,7 @@ def test_excel_web_bloqueia_csrf_invalido(tmp_path):
     assert resposta.status_code == 403
 
 
-def test_admin_pode_disparar_sincronizacao(tmp_path, monkeypatch):
+def test_admin_pode_disparar_atualizacao_sefaz(tmp_path, monkeypatch):
     cfg = settings_web(tmp_path, admin=True)
     criar_banco(cfg.database_path)
     app = create_app(cfg)
@@ -158,13 +165,27 @@ def test_admin_pode_disparar_sincronizacao(tmp_path, monkeypatch):
 
     with TestClient(app) as client:
         resposta = client.post(
-            "/sefaz/sincronizar",
+            "/atualizar/sincronizar",
             data={"csrf": token, "max_lotes": "25"},
             follow_redirects=False,
         )
 
     assert resposta.status_code == 303
     assert chamadas[0].max_lotes == 25
+    assert chamadas[0].cooldown_minutos == 120
+
+
+def test_status_mostra_ultima_gravacao_sem_chamar_sefaz(tmp_path):
+    cfg = settings_web(tmp_path)
+    criar_banco(cfg.database_path)
+    app = create_app(cfg)
+
+    with TestClient(app) as client:
+        resposta = client.get("/status")
+
+    assert resposta.status_code == 200
+    assert "Última gravação" in resposta.text
+    assert "Sem sincronização" in resposta.text
 
 
 def test_headers_de_seguranca_e_healthcheck(tmp_path):
