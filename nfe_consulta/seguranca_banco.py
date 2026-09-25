@@ -37,7 +37,7 @@ def _literal(valor: str) -> str:
 def abrir_banco(caminho: str | Path, senha: str | None = None, *, somente_leitura: bool = False):
     arquivo = Path(caminho).expanduser().resolve()
 
-    if not arquivo.is_file():
+    if somente_leitura and not arquivo.is_file():
         raise FileNotFoundError(f"Banco não encontrado: {arquivo}")
 
     if criptografado(arquivo):
