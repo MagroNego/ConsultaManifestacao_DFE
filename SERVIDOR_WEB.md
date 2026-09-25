@@ -56,7 +56,7 @@ py -m pytest -q
 ```text
 NFE_WEB_ENV=production
 NFE_WEB_CSRF_SECRET=<segredo aleatório com pelo menos 32 caracteres>
-NFE_ADMIN_USER=admin
+NFE_ADMIN_USER_FILE=C:\ConsultaManifestacao\secrets\admin-user.txt
 NFE_ADMIN_PASSWORD_FILE=C:\ConsultaManifestacao\secrets\admin-password.txt
 NFE_ADMIN_SESSION_MINUTES=30
 NFE_DATABASE_PATH=C:\ConsultaManifestacao\dados\nfe_manifestacoes_seguro.db
@@ -65,7 +65,7 @@ NFE_CERT_STORE=LocalMachine
 NFE_CERT_THUMBPRINT=<thumbprint do certificado A1>
 ```
 
-Os arquivos em `secrets` devem ter ACL restrita à conta que executa a aplicação. O arquivo `admin-password.txt` contém somente a senha do login administrativo; o arquivo `db-password.txt` contém somente a senha do SQLCipher.
+Os arquivos em `secrets` devem ter ACL restrita à conta que executa a aplicação. Rode `CONFIGURAR_ADMIN.cmd` para criar `admin-user.txt` e `admin-password.txt`. O arquivo `db-password.txt` contém somente a senha do SQLCipher.
 
 O reverse proxy continua recomendado para HTTPS e publicação na rede interna, mas não precisa autenticar cada funcionário. A autenticação adicional existe apenas na aba **Atualizar**.
 
