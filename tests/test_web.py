@@ -452,6 +452,7 @@ def test_admin_configura_banco_por_caminho_e_aplicacao_passa_a_usar(tmp_path):
     criar_banco(cfg.database_path)
 
     banco_novo = tmp_path / "TI" / "dados" / "central.db"
+    banco_novo.parent.mkdir(parents=True, exist_ok=True)
     banco = BancoManifestacoes(str(banco_novo))
     evento = Manifestacao(
         codigo="210210",
