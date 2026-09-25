@@ -18,19 +18,35 @@ def _lista(valor: str | None) -> frozenset[str]:
     return frozenset(item.strip().casefold() for item in valor.split(",") if item.strip())
 
 
-def _senha_banco() -> str | None:
-    arquivo = os.getenv("NFE_DATABASE_PASSWORD_FILE", "").strip()
+def _ler_segredo(arquivo_env: str, valor_env: str, *, rotulo: str) -> str | None:
+    arquivo = os.getenv(arquivo_env, "").strip()
     if arquivo:
         caminho = Path(arquivo).expanduser()
         if not caminho.is_file():
-            raise RuntimeError(f"Arquivo de senha do banco não encontrado: {caminho}")
-        senha = caminho.read_text(encoding="utf-8").strip()
-        if not senha:
-            raise RuntimeError("Arquivo de senha do banco está vazio.")
-        return senha
+            raise RuntimeError(f"Arquivo de {rotulo} não encontrado: {caminho}")
+        valor = caminho.read_text(encoding="utf-8").strip()
+        if not valor:
+            raise RuntimeError(f"Arquivo de {rotulo} está vazio.")
+        return valor
 
-    senha = os.getenv("NFE_DATABASE_PASSWORD")
-    return senha if senha else None
+    valor = os.getenv(valor_env)
+    return valor if valor else None
+
+
+def _senha_banco() -> str | None:
+    return _ler_segredo(
+        "NFE_DATABASE_PASSWORD_FILE",
+        "NFE_DATABASE_PASSWORD",
+        rotulo="senha do banco",
+    )
+
+
+def _senha_admin() -> str | None:
+    return _ler_segredo(
+        "NFE_ADMIN_PASSWORD_FILE",
+        "NFE_ADMIN_PASSWORD",
+        rotulo="senha do administrador",
+    )
 
 
 @dataclass(frozen=True)
@@ -58,6 +74,10 @@ class WebSettings:
     sync_cooldown_minutes: int = 120
     max_upload_bytes: int = 2 * 1024 * 1024
     max_keys: int = 10_000
+    admin_username: str = "admin"
+    admin_password: str | None = None
+    admin_session_minutes: int = 30
+    admin_cookie_name: str = "nfe_admin_session"
 
     @property
     def production(self) -> bool:
@@ -70,16 +90,11 @@ def get_settings() -> WebSettings:
     if ambiente not in {"development", "production"}:
         raise RuntimeError("NFE_WEB_ENV deve ser development ou production.")
 
-    modo_padrao = "proxy" if ambiente == "production" else "dev"
+    modo_padrao = "dev"
     auth_mode = os.getenv("NFE_WEB_AUTH_MODE", modo_padrao).strip().lower()
     if auth_mode not in {"proxy", "dev"}:
         raise RuntimeError("NFE_WEB_AUTH_MODE deve ser proxy ou dev.")
-    if ambiente == "production" and auth_mode != "proxy":
-        raise RuntimeError("Modo dev de autenticação é proibido em produção.")
-
     proxy_secret = os.getenv("NFE_WEB_PROXY_SECRET")
-    if ambiente == "production" and (not proxy_secret or len(proxy_secret) < 24):
-        raise RuntimeError("Defina NFE_WEB_PROXY_SECRET com pelo menos 24 caracteres.")
 
     csrf_secret = os.getenv("NFE_WEB_CSRF_SECRET")
     if ambiente == "production":
@@ -87,6 +102,21 @@ def get_settings() -> WebSettings:
             raise RuntimeError("Defina NFE_WEB_CSRF_SECRET com pelo menos 32 caracteres.")
     elif not csrf_secret:
         csrf_secret = secrets.token_urlsafe(32)
+
+    admin_password = _senha_admin()
+    admin_username = os.getenv("NFE_ADMIN_USER", "admin").strip()
+    if not admin_username:
+        raise RuntimeError("NFE_ADMIN_USER não pode ficar vazio.")
+    if admin_password and len(admin_password) < 12:
+        raise RuntimeError("A senha do administrador deve ter pelo menos 12 caracteres.")
+    if ambiente == "production" and not admin_password:
+        raise RuntimeError(
+            "Defina NFE_ADMIN_PASSWORD_FILE para proteger a área Atualizar."
+        )
+
+    admin_session_minutes = int(os.getenv("NFE_ADMIN_SESSION_MINUTES", "30"))
+    if not 5 <= admin_session_minutes <= 480:
+        raise RuntimeError("NFE_ADMIN_SESSION_MINUTES deve estar entre 5 e 480.")
 
     cert_store = os.getenv("NFE_CERT_STORE", "CurrentUser").strip()
     if cert_store not in {"CurrentUser", "LocalMachine"}:
@@ -134,4 +164,10 @@ def get_settings() -> WebSettings:
         ).strip(),
         audit_log=audit,
         sync_cooldown_minutes=int(os.getenv("NFE_SEFAZ_COOLDOWN_MINUTES", "120")),
+        admin_username=admin_username,
+        admin_password=admin_password,
+        admin_session_minutes=admin_session_minutes,
+        admin_cookie_name=os.getenv(
+            "NFE_ADMIN_COOKIE_NAME", "nfe_admin_session"
+        ).strip() or "nfe_admin_session",
     )
