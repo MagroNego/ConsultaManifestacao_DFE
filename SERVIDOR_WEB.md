@@ -149,7 +149,7 @@ Retorna somente estado básico, versão e disponibilidade do arquivo de banco.
 
 A TI ainda deve validar:
 
-- HTTPS e autenticação no reverse proxy;
+- HTTPS e publicação interna no reverse proxy;
 - ACL da pasta de dados e de secrets;
 - permissão da chave privada do A1;
 - backup do banco;
@@ -157,7 +157,7 @@ A TI ainda deve validar:
 - proxy/firewall corporativo;
 - teste integrado controlado com SEFAZ;
 - restauração de backup;
-- rotação dos segredos do proxy e CSRF.
+- rotação da senha administrativa e do segredo CSRF.
 
 
 ## Atualização automática
