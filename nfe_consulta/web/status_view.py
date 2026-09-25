@@ -30,13 +30,19 @@ class WebStatus:
         return bool(self.next_attempt and self.next_attempt > datetime.now(timezone.utc))
 
     @property
+    def available_at(self) -> datetime | None:
+        candidatos = [
+            value for value in (self.next_attempt, self.pause_until)
+            if value is not None
+        ]
+        return max(candidatos) if candidatos else None
+
+    @property
     def can_sync(self) -> bool:
         agora = datetime.now(timezone.utc)
-        if self.next_attempt and self.next_attempt > agora:
-            return False
-        if self.pause_until and self.pause_until > agora:
-            return False
-        return self.database_ready
+        return self.database_ready and (
+            self.available_at is None or self.available_at <= agora
+        )
 
     def local_time(self, value: datetime | None) -> str:
         if value is None:
@@ -54,6 +60,10 @@ class WebStatus:
     @property
     def pause_until_label(self) -> str:
         return self.local_time(self.pause_until)
+
+    @property
+    def available_label(self) -> str:
+        return self.local_time(self.available_at)
 
 
 def _utc_sqlite(value: str | None) -> datetime | None:
