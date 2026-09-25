@@ -10,6 +10,13 @@ from pathlib import Path
 
 
 RAIZ_PROJETO = Path(__file__).resolve().parents[2]
+SECRETS_DIR = RAIZ_PROJETO / "secrets"
+DATABASE_PASSWORD_FILE = SECRETS_DIR / "db-password.txt"
+ADMIN_USER_FILE = SECRETS_DIR / "admin-user.txt"
+ADMIN_PASSWORD_FILE = SECRETS_DIR / "admin-password.txt"
+CERT_PATH_FILE = SECRETS_DIR / "cert-path.txt"
+CERT_PASSWORD_FILE = SECRETS_DIR / "cert-password.txt"
+DATABASE_PATH_FILE = SECRETS_DIR / "db-path.txt"
 
 
 def _lista(valor: str | None) -> frozenset[str]:
@@ -18,46 +25,30 @@ def _lista(valor: str | None) -> frozenset[str]:
     return frozenset(item.strip().casefold() for item in valor.split(",") if item.strip())
 
 
-def _ler_segredo(arquivo_env: str, valor_env: str, *, rotulo: str) -> str | None:
-    arquivo = os.getenv(arquivo_env, "").strip()
-    if arquivo:
-        caminho = Path(arquivo).expanduser()
-        if not caminho.is_file():
-            raise RuntimeError(f"Arquivo de {rotulo} não encontrado: {caminho}")
-        valor = caminho.read_text(encoding="utf-8").strip()
-        if not valor:
-            raise RuntimeError(f"Arquivo de {rotulo} está vazio.")
-        return valor
+def _ler_segredo(caminho: Path, *, rotulo: str) -> str | None:
+    """Lê segredos somente da pasta secrets da instalação."""
+    if not caminho.is_file():
+        return None
 
-    valor = os.getenv(valor_env)
-    return valor if valor else None
+    valor = caminho.read_text(encoding="utf-8").rstrip("\r\n")
+    if not valor:
+        raise RuntimeError(f"Arquivo de {rotulo} está vazio: {caminho}")
+    return valor
 
 
 def _senha_banco() -> str | None:
-    return _ler_segredo(
-        "NFE_DATABASE_PASSWORD_FILE",
-        "NFE_DATABASE_PASSWORD",
-        rotulo="senha do banco",
-    )
+    return _ler_segredo(DATABASE_PASSWORD_FILE, rotulo="senha do banco")
 
 
 def _senha_admin() -> str | None:
-    return _ler_segredo(
-        "NFE_ADMIN_PASSWORD_FILE",
-        "NFE_ADMIN_PASSWORD",
-        rotulo="senha do administrador",
-    )
+    return _ler_segredo(ADMIN_PASSWORD_FILE, rotulo="senha do administrador")
 
 
 def _usuario_admin() -> str:
-    arquivo = os.getenv("NFE_ADMIN_USER_FILE", "").strip()
-    if arquivo:
-        caminho = Path(arquivo).expanduser()
-        if not caminho.is_file():
-            raise RuntimeError(f"Arquivo de usuário administrador não encontrado: {caminho}")
-        usuario = caminho.read_text(encoding="utf-8").strip()
+    if ADMIN_USER_FILE.is_file():
+        usuario = ADMIN_USER_FILE.read_text(encoding="utf-8").strip()
     else:
-        usuario = os.getenv("NFE_ADMIN_USER", "admin").strip()
+        usuario = "admin"
 
     if not usuario:
         raise RuntimeError("Usuário administrador não pode ficar vazio.")
@@ -129,7 +120,7 @@ def get_settings() -> WebSettings:
         raise RuntimeError("A senha do administrador deve ter pelo menos 12 caracteres.")
     if ambiente == "production" and not admin_password:
         raise RuntimeError(
-            "Defina NFE_ADMIN_PASSWORD_FILE para proteger a área Atualizar."
+            f"Configure {ADMIN_PASSWORD_FILE} para proteger a área Atualizar."
         )
 
     admin_session_minutes = int(os.getenv("NFE_ADMIN_SESSION_MINUTES", "30"))
@@ -188,22 +179,7 @@ def get_settings() -> WebSettings:
         admin_cookie_name=os.getenv(
             "NFE_ADMIN_COOKIE_NAME", "nfe_admin_session"
         ).strip() or "nfe_admin_session",
-        certificate_path_file=Path(
-            os.getenv(
-                "NFE_CERT_PATH_FILE",
-                str(RAIZ_PROJETO / "secrets" / "cert-path.txt"),
-            )
-        ).expanduser(),
-        certificate_password_file=Path(
-            os.getenv(
-                "NFE_CERT_PASSWORD_FILE",
-                str(RAIZ_PROJETO / "secrets" / "cert-password.txt"),
-            )
-        ).expanduser(),
-        database_path_file=Path(
-            os.getenv(
-                "NFE_DATABASE_PATH_FILE",
-                str(RAIZ_PROJETO / "secrets" / "db-path.txt"),
-            )
-        ).expanduser(),
+        certificate_path_file=CERT_PATH_FILE,
+        certificate_password_file=CERT_PASSWORD_FILE,
+        database_path_file=DATABASE_PATH_FILE,
     )
