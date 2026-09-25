@@ -33,15 +33,31 @@ def test_help_v1_mostra_cli_curta():
 
 
 
-def test_cli_ler_senha_de_arquivo_para_job(tmp_path, monkeypatch):
-    arquivo = tmp_path / "db-password.txt"
+def test_cli_ler_senha_somente_do_secrets(tmp_path, monkeypatch):
+    arquivo = tmp_path / "secrets" / "db-password.txt"
+    arquivo.parent.mkdir()
     arquivo.write_text("senha-segura-do-banco\n", encoding="utf-8")
 
-    monkeypatch.setenv("NFE_DATABASE_PASSWORD_FILE", str(arquivo))
-    monkeypatch.delenv("NFE_DATABASE_PASSWORD", raising=False)
+    monkeypatch.setattr(cli, "DATABASE_PASSWORD_FILE", arquivo)
+    monkeypatch.setenv("NFE_DATABASE_PASSWORD", "senha-que-deve-ser-ignorada")
+    monkeypatch.setenv("NFE_DATABASE_PASSWORD_FILE", str(tmp_path / "outro.txt"))
     monkeypatch.setattr(cli, "criptografado", lambda _caminho: True)
 
     assert cli._senha_do_banco(tmp_path / "banco.db") == "senha-segura-do-banco"
+
+
+def test_cli_banco_criptografado_exige_senha_no_secrets(tmp_path, monkeypatch):
+    arquivo = tmp_path / "secrets" / "db-password.txt"
+    monkeypatch.setattr(cli, "DATABASE_PASSWORD_FILE", arquivo)
+    monkeypatch.setattr(cli, "criptografado", lambda _caminho: True)
+
+    try:
+        cli._senha_do_banco(tmp_path / "banco.db")
+    except ValueError as exc:
+        assert "configure a senha" in str(exc)
+        assert str(arquivo) in str(exc)
+    else:
+        raise AssertionError("CLI deveria exigir secrets/db-password.txt")
 
 
 def test_cli_atualizar_usa_configuracao_do_servidor(monkeypatch):
