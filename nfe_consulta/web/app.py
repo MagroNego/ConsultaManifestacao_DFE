@@ -29,10 +29,15 @@ from nfe_consulta.web.status_view import WebStatus, read_web_status
 from nfe_consulta.web.audit import AuditLog
 from nfe_consulta.web.consulta_local import consultar_numero_nota
 from nfe_consulta.web.auth import (
+    PUBLIC_USER,
     WebUser,
+    admin_session_active,
+    authenticate_admin,
+    clear_admin_cookie,
     csrf_token,
     current_user,
     require_admin,
+    set_admin_cookie,
     validate_csrf,
 )
 from nfe_consulta.web.settings import WebSettings, get_settings
@@ -110,6 +115,12 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
     @app.middleware("http")
     async def security_headers(request: Request, call_next):
         response = await call_next(request)
+
+        if (
+            request.url.path != "/admin/logout"
+            and admin_session_active(request)
+        ):
+            set_admin_cookie(response, settings)
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
         response.headers.setdefault("X-Frame-Options", "DENY")
         response.headers.setdefault("Referrer-Policy", "no-referrer")
@@ -144,17 +155,16 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
 
     @app.exception_handler(HTTPException)
     async def http_error(request: Request, exc: HTTPException):
+        if exc.status_code == 401 and request.url.path.startswith("/atualizar"):
+            return RedirectResponse(
+                url=request.url_for("admin_login_page"),
+                status_code=303,
+            )
         if exc.status_code in {401, 403}:
-            user = None
-            if exc.status_code == 403:
-                try:
-                    user = current_user(request)
-                except HTTPException:
-                    user = None
             return _render(
                 request,
                 "error.html",
-                user,
+                current_user(request),
                 status_code=exc.status_code,
                 title="Acesso negado",
                 message=str(exc.detail),
@@ -171,6 +181,103 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             "version": __version__,
             "database": settings.database_path.is_file(),
         }
+
+    @app.get("/admin/login", response_class=HTMLResponse)
+    async def admin_login_page(
+        request: Request,
+        user: Annotated[WebUser, Depends(current_user)],
+    ):
+        if user.is_admin:
+            return RedirectResponse(
+                url=request.url_for("atualizar_page"),
+                status_code=303,
+            )
+
+        return _render(
+            request,
+            "login.html",
+            user,
+            admin_username=settings.admin_username,
+            admin_configured=bool(settings.admin_password),
+        )
+
+    @app.post("/admin/login")
+    async def admin_login(
+        request: Request,
+        user: Annotated[WebUser, Depends(current_user)],
+        csrf: str = Form(...),
+        username: str = Form(...),
+        password: str = Form(...),
+    ):
+        validate_csrf(csrf, user, settings)
+
+        if not settings.admin_password:
+            return _render(
+                request,
+                "login.html",
+                user,
+                status_code=503,
+                admin_username=settings.admin_username,
+                admin_configured=False,
+                error="Login de administrador ainda não configurado no servidor.",
+            )
+
+        if not authenticate_admin(username, password, settings):
+            app.state.audit.write(
+                request,
+                PUBLIC_USER,
+                "admin_login",
+                "erro",
+                reason="invalid_credentials",
+            )
+            return _render(
+                request,
+                "login.html",
+                user,
+                status_code=401,
+                admin_username=settings.admin_username,
+                admin_configured=True,
+                error="Usuário ou senha inválidos.",
+            )
+
+        admin_user = WebUser(
+            username=settings.admin_username,
+            display_name="Administrador",
+            is_admin=True,
+        )
+        app.state.audit.write(
+            request,
+            admin_user,
+            "admin_login",
+            "ok",
+        )
+
+        response = RedirectResponse(
+            url=request.url_for("atualizar_page"),
+            status_code=303,
+        )
+        set_admin_cookie(response, settings)
+        return response
+
+    @app.post("/admin/logout")
+    async def admin_logout(
+        request: Request,
+        user: Annotated[WebUser, Depends(require_admin)],
+        csrf: str = Form(...),
+    ):
+        validate_csrf(csrf, user, settings)
+        app.state.audit.write(
+            request,
+            user,
+            "admin_logout",
+            "ok",
+        )
+        response = RedirectResponse(
+            url=request.url_for("excel_page"),
+            status_code=303,
+        )
+        clear_admin_cookie(response, settings)
+        return response
 
     @app.get("/", response_class=HTMLResponse)
     async def excel_page(
