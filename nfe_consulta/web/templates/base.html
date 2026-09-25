@@ -20,8 +20,9 @@
     {% if user %}
     <nav class="tabs" aria-label="Navegação principal">
       <a href="{{ url_for('excel_page') }}" class="{% if request.url.path == '/' %}active{% endif %}">Excel</a>
+      <a href="{{ url_for('status_page') }}" class="{% if request.url.path.startswith('/status') %}active{% endif %}">Status</a>
       {% if user.is_admin %}
-      <a href="{{ url_for('sefaz_page') }}" class="{% if request.url.path.startswith('/sefaz') %}active{% endif %}">SEFAZ</a>
+      <a href="{{ url_for('atualizar_page') }}" class="{% if request.url.path.startswith('/atualizar') %}active{% endif %}">Atualizar</a>
       {% endif %}
     </nav>
 
