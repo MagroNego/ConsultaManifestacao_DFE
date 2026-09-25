@@ -40,6 +40,8 @@ class ParametrosConsulta:
     max_lotes: int = 50
     senha_banco: str | None = None
     cert_indice: int | None = None
+    cert_thumbprint: str | None = None
+    cert_store: str | None = None
 
 
 @dataclass(frozen=True)
@@ -66,11 +68,31 @@ def banco_precisa_senha(caminho: str | Path) -> bool:
     return criptografado(caminho)
 
 
-def resolver_certificado(cnpj: str, indice: int | None = None) -> CertificadoWindows:
+def resolver_certificado(
+    cnpj: str,
+    indice: int | None = None,
+    thumbprint: str | None = None,
+    store: str | None = None,
+) -> CertificadoWindows:
     """Seleciona o certificado do CNPJ sem interação de terminal."""
-    certs = listar_certificados_cliente()
+    certs = listar_certificados_cliente(store)
     if not certs:
         raise NfeErroCertificado("Nenhum certificado de cliente foi encontrado no Windows.")
+
+    if thumbprint:
+        procurado = thumbprint.replace(" ", "").upper()
+        candidatos_thumb = [
+            cert for cert in certs
+            if cert.thumbprint.replace(" ", "").upper() == procurado
+        ]
+        if len(candidatos_thumb) != 1:
+            raise NfeErroCertificado("Certificado configurado não foi encontrado.")
+        certificado = candidatos_thumb[0]
+        if not certificado.cnpj or certificado.cnpj[:8] != cnpj[:8]:
+            raise NfeErroCertificado(
+                "O certificado configurado não apresenta CNPJ compatível com a empresa."
+            )
+        return certificado
 
     if indice is None:
         candidatos = [i for i, cert in enumerate(certs) if cert.cnpj == cnpj]
@@ -92,6 +114,51 @@ def resolver_certificado(cnpj: str, indice: int | None = None) -> CertificadoWin
         )
     return certificado
 
+
+
+@dataclass(frozen=True)
+class ParametrosSincronizacao:
+    banco: Path
+    cnpj: str
+    uf: str = "RJ"
+    max_lotes: int = 50
+    senha_banco: str | None = None
+    cert_indice: int | None = None
+    cert_thumbprint: str | None = None
+    cert_store: str | None = None
+
+
+def sincronizar_banco(
+    parametros: ParametrosSincronizacao,
+    *,
+    progresso_sincronizacao: ProgressoSincronizacao | None = None,
+) -> ResumoSincronizacao:
+    """Sincroniza somente o banco, sem depender de TXT ou gerar planilha."""
+    banco_path = Path(parametros.banco).expanduser()
+    if parametros.max_lotes < 1 or parametros.max_lotes > 500:
+        raise ValueError("max_lotes deve estar entre 1 e 500.")
+
+    cnpj = validar_cnpj(parametros.cnpj)
+    c_uf = validar_uf(parametros.uf)
+    certificado = resolver_certificado(
+        cnpj,
+        parametros.cert_indice,
+        parametros.cert_thumbprint,
+        parametros.cert_store,
+    )
+
+    banco = BancoManifestacoes(str(banco_path), senha=parametros.senha_banco)
+    try:
+        return sincronizar(
+            banco,
+            cnpj,
+            c_uf,
+            certificado,
+            max_lotes=parametros.max_lotes,
+            progresso_fn=progresso_sincronizacao,
+        )
+    finally:
+        banco.fechar()
 
 def _cobertura_local(banco: BancoManifestacoes, cnpj: str) -> str:
     ult_nsu, max_nsu = banco.obter_estado(cnpj)
@@ -133,7 +200,12 @@ def executar_consulta(
         resumo: ResumoSincronizacao | None = None
 
         if parametros.sincronizar_sefaz:
-            certificado = resolver_certificado(cnpj, parametros.cert_indice)
+            certificado = resolver_certificado(
+                cnpj,
+                parametros.cert_indice,
+                parametros.cert_thumbprint,
+                parametros.cert_store,
+            )
             resumo = sincronizar(
                 banco,
                 cnpj,
