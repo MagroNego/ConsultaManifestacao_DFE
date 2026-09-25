@@ -120,6 +120,8 @@ secrets\admin-password.txt
 
 Arquivos em `secrets` não devem ser versionados e devem ter ACL restrita no servidor.
 
+As senhas de runtime são lidas exclusivamente dessa pasta. Variáveis de ambiente como `NFE_ADMIN_PASSWORD`, `NFE_DATABASE_PASSWORD` e `NFE_CERT_PASSWORD` não são usadas como fonte de senha.
+
 ## Segurança
 
 A aplicação inclui:
