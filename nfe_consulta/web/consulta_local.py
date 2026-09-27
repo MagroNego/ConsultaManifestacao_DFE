@@ -62,7 +62,7 @@ class EventoNota:
 
     @property
     def recebido_label(self) -> str:
-        return _data_label(self.recebido_em)
+        return _data_label(self.recebido_em, recebido_utc=True)
 
 
 @dataclass(frozen=True)
@@ -85,7 +85,7 @@ class ResultadoEventos:
         return min(self.pagina * self.por_pagina, self.total) if self.total else 0
 
 
-def _data_label(valor: str) -> str:
+def _data_label(valor: str, *, recebido_utc: bool = False) -> str:
     valor = (valor or "").strip()
     if not valor:
         return "—"
@@ -93,9 +93,8 @@ def _data_label(valor: str) -> str:
         instante = datetime.fromisoformat(valor.replace("Z", "+00:00"))
     except ValueError:
         return valor
-    if instante.tzinfo is not None:
-        instante = instante.astimezone()
-    return instante.strftime("%d/%m/%Y %H:%M:%S")
+    sufixo = " UTC" if recebido_utc and instante.tzinfo is None else ""
+    return instante.strftime("%d/%m/%Y %H:%M:%S") + sufixo
 
 
 def _parse_data(valor: str, rotulo: str) -> date | None:
