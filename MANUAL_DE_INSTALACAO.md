@@ -1,64 +1,87 @@
-# Instalação no Windows — Consulta de Manifestação v1.0
+# Instalação no Windows — Consulta de Manifestação NF-e
+
+A aplicação é distribuída como serviço Web interno. A interface de uso é acessada pelo navegador.
 
 ## Requisitos
 
-- Windows 10/11.
-- Python 3.11 ou mais recente.
-- `py -m pip` permitido pela TI.
-- Para atualização SEFAZ: certificado A1 da empresa com chave privada em `Cert:\CurrentUser\My`.
-- Acesso HTTPS ao Ambiente Nacional da NF-e.
+- Windows 10/11 ou Windows Server;
+- Python 3.11 ou superior;
+- acesso HTTPS ao Ambiente Nacional da NF-e para a rotina de sincronização;
+- certificado A1 válido;
+- banco SQLite/SQLCipher existente;
+- permissão de leitura e escrita nas pastas da aplicação.
 
 ## Instalação
 
-Extraia o projeto para uma pasta gravável e execute:
+Extraia o pacote em uma pasta definitiva, por exemplo:
+
+```text
+C:\ConsultaManifestacao
+```
+
+Execute:
 
 ```powershell
 INSTALAR.cmd
 ```
 
-Instalação manual equivalente:
+O instalador:
+
+1. cria o ambiente virtual `.venv`;
+2. instala as dependências;
+3. cria as pastas `dados`, `secrets` e `logs`;
+4. valida o runtime Web.
+
+## Configuração inicial
+
+Configure o acesso administrativo:
 
 ```powershell
-py -m pip install -e .
-nfe-consulta --version
+CONFIGURAR_ADMIN.cmd
 ```
 
-A versão esperada é `1.0.0`.
-
-Para abrir:
+Depois inicie a aplicação:
 
 ```powershell
-nfe-consulta gui
+INICIAR_WEB.cmd
 ```
 
-ou use `ABRIR_CONSULTA.cmd`.
+Acesse a área **Atualizar** para configurar o banco central e o certificado A1.
 
-## Atualização de versão
+## Segredos
 
-Preserve o banco antes de substituir a pasta do aplicativo. O banco contém o cursor NSU e o histórico local.
+As credenciais de runtime são lidas da pasta:
 
-Após instalar uma nova versão:
-
-```powershell
-py -m pip install -e . --force-reinstall
-nfe-consulta --version
+```text
+secrets\
 ```
 
-## Desinstalação
+Arquivos principais:
 
-```powershell
-py -m pip uninstall nfe-consulta
+```text
+admin-user.txt
+admin-password.txt
+db-path.txt
+db-password.txt
+cert-path.txt
+cert-password.txt
 ```
 
-A desinstalação do pacote não remove banco, TXT ou planilhas.
+A pasta deve ter ACL NTFS restrita à conta que executa a aplicação e aos administradores autorizados.
 
-## Validação pela TI
+## Produção
 
-Antes de liberar em produção:
+Em ambiente corporativo, publique a aplicação atrás de IIS/HTTPS e mantenha o Uvicorn em `127.0.0.1:8080`.
+
+Consulte `SERVIDOR_WEB.md` para detalhes de implantação.
+
+## Validação
+
+Para executar a suíte automatizada:
 
 ```powershell
 py -m pip install -e ".[dev]"
 py -m pytest -q
 ```
 
-Também devem ser validados certificado, proxy, acesso ao endpoint, permissões das pastas e coexistência com outros sistemas que consultam o mesmo CNPJ.
+Os testes automatizados não acessam a SEFAZ real nem utilizam certificado de produção.
