@@ -660,3 +660,38 @@ def test_exportacao_da_consulta_respeita_os_mesmos_filtros(tmp_path):
     assert ws["A5"].value == 91780
     assert ws["E5"].value == "Operação não Realizada"
     assert ws["A6"].value is None
+
+
+
+def test_consulta_identifica_banco_sem_sincronizacao(tmp_path):
+    cfg = settings_web(tmp_path)
+    criar_banco(cfg.database_path)
+    app = create_app(cfg)
+
+    with TestClient(app) as client:
+        resposta = client.get("/consulta", params={"numero": "91779"})
+
+    assert resposta.status_code == 200
+    assert "Banco não sincronizado" in resposta.text
+    assert "ainda não possui uma sincronização concluída" in resposta.text
+    assert "informe a senha" not in resposta.text.casefold()
+    assert "sqlcipher" not in resposta.text.casefold()
+
+
+def test_consulta_publica_nao_expoe_erro_de_senha_do_banco(tmp_path, monkeypatch):
+    cfg = settings_web(tmp_path)
+    criar_banco(cfg.database_path)
+
+    def falha_banco(_settings):
+        raise ValueError("Banco criptografado: informe a senha para abri-lo.")
+
+    monkeypatch.setattr("nfe_consulta.web.app._status_web", falha_banco)
+
+    app = create_app(cfg)
+    with TestClient(app) as client:
+        resposta = client.get("/consulta", params={"numero": "91779"})
+
+    assert resposta.status_code == 200
+    assert "Banco não sincronizado" in resposta.text
+    assert "informe a senha" not in resposta.text.casefold()
+    assert "criptografado" not in resposta.text.casefold()
