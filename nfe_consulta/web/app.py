@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import shutil
 import tempfile
 import threading
@@ -29,9 +31,7 @@ from nfe_consulta.modelos import NfeConsumoIndevidoErro, NfeLimiteConsultaErro
 from nfe_consulta.relatorio_eventos import gravar_eventos_xlsx
 from nfe_consulta.servico import (
     ParametrosConsulta,
-    ParametrosSincronizacao,
     executar_consulta,
-    sincronizar_banco,
 )
 from nfe_consulta.web.status_view import WebStatus, read_web_status
 from nfe_consulta.web.audit import AuditLog
@@ -53,7 +53,9 @@ from nfe_consulta.web.auth import (
     set_admin_cookie,
     validate_csrf,
 )
+from nfe_consulta.web.scheduler import loop_sincronizacao_automatica
 from nfe_consulta.web.settings import WebSettings, get_settings
+from nfe_consulta.web.sync_runtime import sincronizar_configurado
 from nfe_consulta.web.uploads import consolidar_txts
 
 
@@ -192,6 +194,37 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
     app.state.settings = settings
     app.state.sync_lock = threading.Lock()
     app.state.audit = AuditLog(settings.audit_log)
+    app.state.auto_sync_task = None
+    app.state.auto_sync_next_at = None
+
+    @app.on_event("startup")
+    async def start_auto_sync():
+        if not settings.auto_sync_enabled:
+            return
+        app.state.auto_sync_task = asyncio.create_task(
+            loop_sincronizacao_automatica(app)
+        )
+        app.state.audit.write_system(
+            "sefaz_scheduler",
+            "iniciado",
+            hora=settings.auto_sync_hour,
+            minuto=settings.auto_sync_minute,
+            dias=list(settings.auto_sync_weekdays),
+            max_lotes=settings.auto_sync_max_lotes,
+        )
+
+    @app.on_event("shutdown")
+    async def stop_auto_sync():
+        task = app.state.auto_sync_task
+        if task is None:
+            return
+        task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
+        app.state.audit.write_system(
+            "sefaz_scheduler",
+            "encerrado",
+        )
 
     @app.middleware("http")
     async def security_headers(request: Request, call_next):
@@ -957,28 +990,10 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             )
 
         try:
-            cert_arquivo = carregar_config_certificado_arquivo(
-                settings.certificate_path_file,
-                settings.certificate_password_file,
-            )
             resumo = await run_in_threadpool(
-                sincronizar_banco,
-                ParametrosSincronizacao(
-                    banco=_database_path(settings),
-                    cnpj=CNPJ_PADRAO,
-                    uf=UF_PADRAO,
-                    max_lotes=max_lotes,
-                    senha_banco=settings.database_password,
-                    cert_thumbprint=(
-                        None if cert_arquivo is not None else settings.certificate_thumbprint
-                    ),
-                    cert_store=settings.certificate_store,
-                    cert_arquivo=cert_arquivo.path if cert_arquivo is not None else None,
-                    cert_senha_arquivo=(
-                        cert_arquivo.password if cert_arquivo is not None else None
-                    ),
-                    cooldown_minutos=settings.sync_cooldown_minutes,
-                ),
+                sincronizar_configurado,
+                settings,
+                max_lotes=max_lotes,
             )
             app.state.audit.write(
                 request,
