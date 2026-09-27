@@ -110,6 +110,17 @@ class WebSettings:
     def production(self) -> bool:
         return self.environment == "production"
 
+    def current_database_password(self) -> str | None:
+        """Retorna a senha atual do banco, priorizando o arquivo local configurado."""
+        if self.database_password_file is not None:
+            senha = _ler_segredo(
+                self.database_password_file,
+                rotulo="senha do banco",
+            )
+            if senha is not None:
+                return senha
+        return self.database_password
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> WebSettings:
