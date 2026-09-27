@@ -57,6 +57,14 @@ Ela permite:
 
 Após uma tentativa válida, o sistema aplica o cooldown configurado. A rejeição 656 possui tratamento próprio.
 
+## Sincronização automática
+
+Em produção, a aplicação sincroniza automaticamente com a SEFAZ às **08:00 de segunda a sexta-feira**, desde que o serviço Web esteja em execução.
+
+A rotina utiliza o mesmo banco, certificado e cooldown da área **Atualizar**. Se uma sincronização manual estiver em andamento ou o cooldown ainda estiver ativo, a execução automática é ignorada.
+
+O resultado é registrado no log de auditoria com a ação `sefaz_sync_auto`.
+
 ## Observações
 
 - ausência de evento no banco não comprova que a NF-e nunca recebeu manifestação;
