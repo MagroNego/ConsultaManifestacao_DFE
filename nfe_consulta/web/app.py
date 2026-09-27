@@ -104,13 +104,53 @@ def _database_error_message(
 ) -> str:
     if settings.environment == "development" and user.is_admin:
         return f"{type(exc).__name__}: {exc}"
-    return "Não foi possível abrir o banco configurado."
+    return (
+        "Banco de manifestações indisponível ou ainda não sincronizado. "
+        "Procure o responsável pela aplicação."
+    )
 
 def _database_path(settings: WebSettings) -> Path:
     return carregar_caminho_banco(
         settings.database_path,
         path_file=settings.database_path_file,
     )
+
+
+def _consulta_database_state(settings: WebSettings) -> dict:
+    caminho = _database_path(settings)
+    if not caminho.is_file():
+        return {
+            "ready": False,
+            "label": "Banco indisponível",
+            "notice": "O banco de manifestações ainda não está disponível para consulta.",
+        }
+
+    try:
+        status = _status_web(settings)
+    except Exception:
+        return {
+            "ready": False,
+            "label": "Banco não sincronizado",
+            "notice": (
+                "O banco de manifestações ainda não está configurado ou sincronizado "
+                "para consulta."
+            ),
+        }
+
+    if status.updated_at is None:
+        return {
+            "ready": False,
+            "label": "Banco não sincronizado",
+            "notice": (
+                "O banco de manifestações ainda não possui uma sincronização concluída."
+            ),
+        }
+
+    return {
+        "ready": True,
+        "label": "Banco disponível",
+        "notice": None,
+    }
 
 
 def _database_web(settings: WebSettings) -> dict:
