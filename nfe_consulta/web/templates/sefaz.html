@@ -72,6 +72,22 @@
       <div><span>ultNSU</span><strong class="mono">{{ status_web.ult_nsu or "—" }}</strong></div>
       <div><span>maxNSU</span><strong class="mono">{{ status_web.max_nsu or "—" }}</strong></div>
       <div><span>Estado</span><strong>{{ "Completo" if status_web.complete else "Parcial" if status_web.updated_at else "Sem registro" }}</strong></div>
+      <div>
+        <span>Sincronização automática</span>
+        <strong>
+          {% if request.app.state.settings.auto_sync_enabled %}
+            Ativa · {{ "%02d:%02d"|format(request.app.state.settings.auto_sync_hour, request.app.state.settings.auto_sync_minute) }}
+          {% else %}
+            Desativada
+          {% endif %}
+        </strong>
+      </div>
+      {% if request.app.state.auto_sync_next_at %}
+      <div>
+        <span>Próxima automática</span>
+        <strong>{{ request.app.state.auto_sync_next_at.strftime("%d/%m/%Y %H:%M") }}</strong>
+      </div>
+      {% endif %}
     </div>
   </section>
 </div>
