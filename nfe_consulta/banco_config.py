@@ -61,42 +61,6 @@ def validar_banco(caminho: str | Path, senha: str | None) -> Path:
     return arquivo
 
 
-def salvar_senha_banco(
-    senha: str,
-    *,
-    password_file: str | Path,
-) -> Path:
-    """Persiste a senha SQLCipher em arquivo local protegido da instalação."""
-    if not senha or any(caractere in senha for caractere in "\x00\r\n"):
-        raise ValueError("Senha do banco inválida.")
-    if len(senha) < 12:
-        raise ValueError("A senha do banco deve ter pelo menos 12 caracteres.")
-
-    destino = Path(password_file).expanduser()
-    destino.parent.mkdir(parents=True, exist_ok=True)
-
-    fd, temporario = tempfile.mkstemp(
-        prefix="." + destino.name + "-",
-        dir=destino.parent,
-        text=True,
-    )
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8", newline="") as arquivo:
-            arquivo.write(senha)
-        os.replace(temporario, destino)
-        try:
-            destino.chmod(0o600)
-        except OSError:
-            pass
-    finally:
-        try:
-            os.unlink(temporario)
-        except FileNotFoundError:
-            pass
-
-    return destino
-
-
 def salvar_caminho_banco(
     caminho: str | Path,
     senha: str | None,
