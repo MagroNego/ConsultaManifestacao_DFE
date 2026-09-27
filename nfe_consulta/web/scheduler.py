@@ -97,7 +97,7 @@ def ultima_execucao_agendada(settings) -> date | None:
 
     conexao = abrir_banco(
         banco,
-        settings.database_password,
+        settings.current_database_password(),
     )
     try:
         _garantir_tabela_agendamento(conexao)
@@ -122,7 +122,7 @@ def registrar_execucao_agendada(settings, dia_local: date) -> None:
 
     conexao = abrir_banco(
         banco,
-        settings.database_password,
+        settings.current_database_password(),
     )
     try:
         _garantir_tabela_agendamento(conexao)
