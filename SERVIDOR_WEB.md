@@ -239,7 +239,9 @@ logs\web_audit.log
 
 com a ação `sefaz_sync_auto`.
 
-O serviço Web precisa permanecer ativo no horário agendado. Em desenvolvimento, o agendador fica desligado por padrão; em produção, fica ligado por padrão.
+Em desenvolvimento, o agendador fica desligado por padrão; em produção, fica ligado por padrão.
+
+Se o serviço estiver indisponível às 08:00 e voltar depois desse horário no mesmo dia útil, a aplicação tenta recuperar a execução perdida. O controle diário fica persistido na tabela `controle_agendamento`, evitando que reinicializações do processo provoquem múltiplos disparos automáticos no mesmo dia.
 
 ## Banco central configurado pela área administrativa
 
