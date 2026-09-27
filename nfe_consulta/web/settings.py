@@ -99,6 +99,7 @@ class WebSettings:
     certificate_path_file: Path | None = None
     certificate_password_file: Path | None = None
     database_path_file: Path | None = None
+    database_password_file: Path | None = None
     auto_sync_enabled: bool = False
     auto_sync_hour: int = 8
     auto_sync_minute: int = 0
