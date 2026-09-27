@@ -191,7 +191,7 @@ def test_admin_pode_disparar_atualizacao_sefaz(tmp_path, monkeypatch):
             cache=False,
         )
 
-    monkeypatch.setattr("nfe_consulta.web.app.sincronizar_banco", fake_sync)
+    monkeypatch.setattr("nfe_consulta.web.sync_runtime.sincronizar_banco", fake_sync)
 
     with TestClient(app) as client:
         login = client.post(
@@ -288,7 +288,7 @@ def test_consulta_rapida_por_numero_mostra_eventos_do_banco(tmp_path, monkeypatc
     banco.fechar()
 
     monkeypatch.setattr(
-        "nfe_consulta.web.app.sincronizar_banco",
+        "nfe_consulta.web.sync_runtime.sincronizar_banco",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(
             AssertionError("Consulta rápida não deve acessar a SEFAZ")
         ),
@@ -419,7 +419,7 @@ def test_sincronizacao_web_usa_certificado_configurado_em_arquivo(tmp_path, monk
             cache=False,
         )
 
-    monkeypatch.setattr("nfe_consulta.web.app.sincronizar_banco", fake_sync)
+    monkeypatch.setattr("nfe_consulta.web.sync_runtime.sincronizar_banco", fake_sync)
     monkeypatch.setattr(
         "nfe_consulta.web.app.carregar_certificado_arquivo",
         lambda *_args, **_kwargs: SimpleNamespace(
