@@ -598,8 +598,8 @@ def test_consulta_completa_filtra_por_data_e_manifestacao(tmp_path):
     assert resposta.status_code == 200
     assert "Operação não Realizada" in resposta.text
     assert "91780" in resposta.text
-    assert "Ciência da Operação" not in resposta.text
-    assert "91779" not in resposta.text
+    assert "135260000000101" not in resposta.text
+    assert ">91779<" not in resposta.text
 
 
 def test_exportacao_da_consulta_respeita_os_mesmos_filtros(tmp_path):
