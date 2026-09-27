@@ -25,6 +25,16 @@ def _lista(valor: str | None) -> frozenset[str]:
     return frozenset(item.strip().casefold() for item in valor.split(",") if item.strip())
 
 
+def _dias_semana(valor: str) -> tuple[int, ...]:
+    try:
+        dias = tuple(sorted({int(item.strip()) for item in valor.split(",") if item.strip()}))
+    except ValueError as exc:
+        raise RuntimeError("NFE_AUTO_SYNC_WEEKDAYS deve conter números de 0 a 6.") from exc
+    if not dias or any(dia < 0 or dia > 6 for dia in dias):
+        raise RuntimeError("NFE_AUTO_SYNC_WEEKDAYS deve conter ao menos um dia entre 0 e 6.")
+    return dias
+
+
 def _ler_segredo(caminho: Path, *, rotulo: str) -> str | None:
     """Lê segredos somente da pasta secrets da instalação."""
     if not caminho.is_file():
@@ -89,6 +99,11 @@ class WebSettings:
     certificate_path_file: Path | None = None
     certificate_password_file: Path | None = None
     database_path_file: Path | None = None
+    auto_sync_enabled: bool = False
+    auto_sync_hour: int = 8
+    auto_sync_minute: int = 0
+    auto_sync_weekdays: tuple[int, ...] = (0, 1, 2, 3, 4)
+    auto_sync_max_lotes: int = 50
 
     @property
     def production(self) -> bool:
@@ -145,6 +160,24 @@ def get_settings() -> WebSettings:
         )
     ).expanduser()
 
+    auto_sync_enabled = os.getenv(
+        "NFE_AUTO_SYNC_ENABLED",
+        "1" if ambiente == "production" else "0",
+    ).strip() == "1"
+    auto_sync_hour = int(os.getenv("NFE_AUTO_SYNC_HOUR", "8"))
+    auto_sync_minute = int(os.getenv("NFE_AUTO_SYNC_MINUTE", "0"))
+    auto_sync_max_lotes = int(os.getenv("NFE_AUTO_SYNC_MAX_LOTES", "50"))
+    auto_sync_weekdays = _dias_semana(
+        os.getenv("NFE_AUTO_SYNC_WEEKDAYS", "0,1,2,3,4")
+    )
+
+    if not 0 <= auto_sync_hour <= 23:
+        raise RuntimeError("NFE_AUTO_SYNC_HOUR deve estar entre 0 e 23.")
+    if not 0 <= auto_sync_minute <= 59:
+        raise RuntimeError("NFE_AUTO_SYNC_MINUTE deve estar entre 0 e 59.")
+    if not 1 <= auto_sync_max_lotes <= 500:
+        raise RuntimeError("NFE_AUTO_SYNC_MAX_LOTES deve estar entre 1 e 500.")
+
     return WebSettings(
         environment=ambiente,
         auth_mode=auth_mode,
@@ -182,4 +215,9 @@ def get_settings() -> WebSettings:
         certificate_path_file=CERT_PATH_FILE,
         certificate_password_file=CERT_PASSWORD_FILE,
         database_path_file=DATABASE_PATH_FILE,
+        auto_sync_enabled=auto_sync_enabled,
+        auto_sync_hour=auto_sync_hour,
+        auto_sync_minute=auto_sync_minute,
+        auto_sync_weekdays=auto_sync_weekdays,
+        auto_sync_max_lotes=auto_sync_max_lotes,
     )
