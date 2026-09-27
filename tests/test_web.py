@@ -1,6 +1,8 @@
+from io import BytesIO
 from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
+from openpyxl import load_workbook
 
 from nfe_consulta.banco import BancoManifestacoes
 from nfe_consulta.modelos import Manifestacao, RetornoDistribuicao
@@ -537,3 +539,124 @@ def test_admin_rejeita_arquivo_que_nao_e_banco_de_manifestacoes(tmp_path):
 
     assert resposta.status_code == 400
     assert not cfg.database_path_file.exists()
+
+
+
+def test_consulta_completa_filtra_por_data_e_manifestacao(tmp_path):
+    cfg = settings_web(tmp_path)
+    banco = BancoManifestacoes(str(cfg.database_path))
+
+    chave_2 = CHAVE[:25] + "000091780" + CHAVE[34:]
+    eventos = (
+        (
+            CHAVE,
+            Manifestacao(
+                codigo="210210",
+                descricao="Ciência da Operação",
+                data="2026-09-10T08:00:00-03:00",
+                protocolo="135260000000101",
+                nsu="563701",
+                schema="procEventoNFe_v1.00.xsd",
+            ),
+        ),
+        (
+            chave_2,
+            Manifestacao(
+                codigo="210240",
+                descricao="Operação não Realizada",
+                data="2026-09-20T09:30:00-03:00",
+                protocolo="135260000000102",
+                nsu="563702",
+                schema="procEventoNFe_v1.00.xsd",
+            ),
+        ),
+    )
+    banco.salvar_retorno(
+        "16840128000101",
+        RetornoDistribuicao(
+            status_codigo=138,
+            status_motivo="Documentos localizados",
+            ult_nsu="563702".zfill(15),
+            max_nsu="563702".zfill(15),
+            manifestacoes=eventos,
+        ),
+    )
+    banco.fechar()
+
+    app = create_app(cfg)
+    with TestClient(app) as client:
+        resposta = client.get(
+            "/consulta",
+            params={
+                "consultar": "1",
+                "data_inicial": "2026-09-15",
+                "data_final": "2026-09-30",
+                "codigo": "210240",
+            },
+        )
+
+    assert resposta.status_code == 200
+    assert "Operação não Realizada" in resposta.text
+    assert "91780" in resposta.text
+    assert "Ciência da Operação" not in resposta.text
+    assert "91779" not in resposta.text
+
+
+def test_exportacao_da_consulta_respeita_os_mesmos_filtros(tmp_path):
+    cfg = settings_web(tmp_path)
+    banco = BancoManifestacoes(str(cfg.database_path))
+
+    chave_2 = CHAVE[:25] + "000091780" + CHAVE[34:]
+    banco.salvar_retorno(
+        "16840128000101",
+        RetornoDistribuicao(
+            status_codigo=138,
+            status_motivo="Documentos localizados",
+            ult_nsu="563704".zfill(15),
+            max_nsu="563704".zfill(15),
+            manifestacoes=(
+                (
+                    CHAVE,
+                    Manifestacao(
+                        codigo="210210",
+                        descricao="Ciência da Operação",
+                        data="2026-09-10T08:00:00-03:00",
+                        protocolo="135260000000201",
+                        nsu="563703",
+                        schema="procEventoNFe_v1.00.xsd",
+                    ),
+                ),
+                (
+                    chave_2,
+                    Manifestacao(
+                        codigo="210240",
+                        descricao="Operação não Realizada",
+                        data="2026-09-20T09:30:00-03:00",
+                        protocolo="135260000000202",
+                        nsu="563704",
+                        schema="procEventoNFe_v1.00.xsd",
+                    ),
+                ),
+            ),
+        ),
+    )
+    banco.fechar()
+
+    app = create_app(cfg)
+    with TestClient(app) as client:
+        resposta = client.get(
+            "/consulta/exportar",
+            params={
+                "data_inicial": "2026-09-15",
+                "data_final": "2026-09-30",
+                "codigo": "210240",
+            },
+        )
+
+    assert resposta.status_code == 200
+    assert resposta.content.startswith(b"PK")
+    wb = load_workbook(BytesIO(resposta.content), read_only=True)
+    ws = wb["Manifestacoes"]
+    assert ws["A5"].value == 91780
+    assert ws["E5"].value == "Operação não Realizada"
+    assert ws["A6"].value is None
