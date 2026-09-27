@@ -3,7 +3,7 @@ setlocal EnableExtensions
 cd /d "%~dp0"
 
 echo ============================================
-echo Consulta de Manifestacao - v2 Web
+echo Consulta de Manifestacao - Web
 echo ============================================
 echo.
 
@@ -34,7 +34,7 @@ if not exist "secrets" mkdir "secrets"
 if not exist "logs" mkdir "logs"
 
 echo.
-".venv\Scripts\python.exe" -m nfe_consulta.cli --version
+".venv\Scripts\python.exe" -c "import nfe_consulta; import nfe_consulta.web.app; print('Versao:', nfe_consulta.__version__)"
 if errorlevel 1 goto :erro
 
 echo.
