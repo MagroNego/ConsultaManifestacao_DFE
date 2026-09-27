@@ -13,12 +13,14 @@ A versão Web foi projetada para uso em rede interna, com separação entre oper
 | Persistência | SQLite / SQLCipher |
 | Certificado | A1 PFX/P12 ou Windows Certificate Store |
 | Plataforma alvo | Windows / Windows Server |
-| Versão atual | 2.0.1 |
+| Versão em desenvolvimento | 2.1.0-dev |
 
 ## Funcionalidades
 
-- geração de planilha Excel a partir de um arquivo `CHAVES.txt`;
-- consulta rápida de manifestações pelo número da NF;
+- consulta completa do histórico por período, número da NF, série, chave e tipo de manifestação;
+- exportação para Excel usando exatamente os filtros aplicados na consulta;
+- paginação dos resultados na interface Web;
+- geração de planilha Excel a partir de um arquivo `CHAVES.txt` para listas específicas;
 - painel de status com `ultNSU`, `maxNSU` e disponibilidade da próxima sincronização;
 - sincronização independente com o Ambiente Nacional da NF-e;
 - cooldown persistente para controle de consumo da SEFAZ;
@@ -35,9 +37,11 @@ A versão Web foi projetada para uso em rede interna, com separação entre oper
 ```text
 Usuários internos
         |
-        +-- Excel ---------> banco central -> XLSX
-        |
         +-- Consulta ------> banco central
+        |       |
+        |       +-- filtros e paginação
+        |       +-- exportação XLSX
+        |       +-- CHAVES.txt
         |
         +-- Status --------> banco central
         |
@@ -48,7 +52,7 @@ Usuários internos
                                +-- SEFAZ
 ```
 
-As operações de Excel, Consulta rápida e Status não acessam a SEFAZ.
+As operações de Consulta, exportação para Excel e Status não acessam a SEFAZ.
 
 ## Instalação
 
@@ -162,13 +166,7 @@ As instruções de implantação estão em `SERVIDOR_WEB.md`.
 
 ## Atualização agendada
 
-O arquivo:
-
-```text
-ATUALIZAR_BANCO_MANHA.cmd
-```
-
-pode ser executado pelo Agendador de Tarefas do Windows. Ele utiliza o mesmo banco e certificado configurados pela área administrativa.
+A rotina matinal existente permanece preservada durante o desenvolvimento da v2.1 e será revisada separadamente. A interface pública do produto passa a ser exclusivamente Web.
 
 ## Desenvolvimento
 
@@ -190,7 +188,7 @@ Os testes automatizados não acessam a SEFAZ real e não utilizam certificado de
 
 ## Releases
 
-A versão estável atual é **v2.0.1**.
+A versão estável atual é **v2.0.1**. A branch `web/v2.1` contém o desenvolvimento da próxima versão, ainda não publicada.
 
 Os pacotes de instalação são publicados em **GitHub Releases**. Para implantação, utilize o arquivo `ConsultaManifestacao_DFE-vX.Y.Z.zip`, e não os pacotes automáticos de source code gerados pelo GitHub.
 
@@ -200,3 +198,5 @@ Os pacotes de instalação são publicados em **GitHub Releases**. Para implanta
 - **v1.0**: refatoração da arquitetura desktop e CLI;
 - **v2.0.0**: interface Web corporativa, administração centralizada e publicação para rede interna.
 - **v2.0.1**: centralização de segredos de runtime e ajustes de configuração/implantação.
+
+- **v2.1.0**: consulta completa com filtros, exportação do resultado para Excel e retirada da CLI como interface pública (em desenvolvimento).
