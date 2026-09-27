@@ -1,82 +1,65 @@
-# Manual de uso — v1.0
+# Manual de uso — Consulta de Manifestação NF-e
 
-## Abrir
+## Consulta
 
-Use `ABRIR_CONSULTA.cmd` ou:
+A tela **Consulta** trabalha exclusivamente com o histórico salvo no banco central. Ela não acessa a SEFAZ.
 
-```powershell
-nfe-consulta gui
-```
+Filtros disponíveis:
 
-## Arquivos
+- data inicial e final do evento;
+- número da NF;
+- série;
+- chave de acesso;
+- tipo de manifestação.
 
-A tela usa três caminhos:
+Os resultados são exibidos em páginas de até 100 registros.
 
-- **CHAVES.TXT**: uma chave de NF-e por linha.
-- **BANCO**: histórico local de eventos e cursor NSU.
-- **PLANILHA**: arquivo `.xlsx` gerado.
+## Exportar Excel
 
-Os botões `…` alteram os caminhos.
+Após executar uma consulta, use **Exportar Excel**.
 
-## Atualizar SEFAZ
+A planilha contém exatamente os registros correspondentes aos filtros aplicados na tela, com:
 
-Clique em **Atualizar SEFAZ**.
+- número da NF;
+- série;
+- chave;
+- código e descrição da manifestação;
+- data do evento;
+- protocolo;
+- NSU;
+- data de recebimento no banco.
 
-O aplicativo:
+## Consulta por arquivo
 
-1. abre o banco;
-2. seleciona o certificado compatível com o CNPJ;
-3. continua do último NSU salvo;
-4. grava os novos eventos;
-5. cruza o histórico com as chaves do TXT;
-6. gera a planilha.
+Para trabalhar com uma lista específica de NF-e, use a seção **Consulta por arquivo** e selecione um `CHAVES.txt` com uma chave de 44 dígitos por linha.
 
-O campo **Lotes** limita quantos lotes de distribuição podem ser processados na execução.
+Esse fluxo também utiliza somente o banco central.
 
-Se houver rejeição 656, a pausa é gravada no banco. Não tente contornar a pausa repetindo chamadas por fora do aplicativo.
+## Status
 
-## Gerar Excel
+A tela **Status** apresenta:
 
-Clique em **Gerar Excel** para trabalhar somente com os dados já existentes no banco. Nenhuma chamada à SEFAZ é feita.
+- data da última gravação;
+- `ultNSU`;
+- `maxNSU`;
+- estado da sincronização;
+- próxima sincronização permitida.
 
-## Resultados
+## Atualizar
 
-A tabela mostra número, série, manifestação, data e chave de acesso.
+A área **Atualizar** exige login administrativo.
 
-Use a busca para localizar uma nota ou chave. Ao selecionar uma linha, o histórico aparece na faixa inferior.
+Ela permite:
 
-**Abrir Excel** abre a última planilha gerada.
+- configurar o banco central;
+- configurar o certificado A1;
+- sincronizar o banco com o serviço `NFeDistribuicaoDFe`.
 
-## CLI
-
-Uso normal:
-
-```powershell
-nfe-consulta atualizar
-nfe-consulta excel
-nfe-consulta status
-nfe-consulta gui
-```
-
-Com caminhos explícitos:
-
-```powershell
-nfe-consulta atualizar C:\caminho\CHAVES.txt `
-  --banco C:\caminho\historico.db `
-  --saida C:\caminho\resultado.xlsx
-```
-
-## Banco criptografado
-
-```powershell
-nfe-consulta proteger-banco origem.db destino_seguro.db
-```
-
-A migração cria um novo arquivo e preserva o original.
+Após uma tentativa válida, o sistema aplica o cooldown configurado. A rejeição 656 possui tratamento próprio.
 
 ## Observações
 
-- O aplicativo consulta manifestação por distribuição de DF-e e mantém um histórico local.
-- A primeira sincronização pode exigir vários lotes.
-- Eventos antigos podem não estar mais disponíveis no Ambiente Nacional.
-- O banco deve ser mantido entre as execuções para preservar o cursor NSU e o histórico.
+- ausência de evento no banco não comprova que a NF-e nunca recebeu manifestação;
+- a consulta Web nunca chama a SEFAZ;
+- banco, certificado e senhas permanecem no servidor;
+- a interface pública da aplicação é exclusivamente Web.
