@@ -544,10 +544,11 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         codigo: str = "",
     ):
         banco = _database_path(settings)
-        if not banco.is_file():
+        database_state = _consulta_database_state(settings)
+        if not database_state["ready"]:
             raise HTTPException(
                 status_code=503,
-                detail="Banco de manifestações indisponível no servidor.",
+                detail=database_state["notice"],
             )
 
         try:
@@ -574,7 +575,10 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                 "erro",
                 reason=type(exc).__name__,
             )
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+            raise HTTPException(
+                status_code=400,
+                detail=_database_error_message(exc, settings, user),
+            ) from exc
         except Exception as exc:
             app.state.audit.write(
                 request,
@@ -663,6 +667,8 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                 user,
                 status_code=503,
                 database_ready=False,
+                database_status_label="Banco indisponível",
+                database_notice="O banco de manifestações ainda não está disponível para consulta.",
                 filtros=_filtros_iniciais(),
                 tipos_manifestacao=TIPOS_MANIFESTACAO,
                 consultou=False,
@@ -737,7 +743,9 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                 "consulta.html",
                 user,
                 status_code=400,
-                database_ready=True,
+                database_ready=_consulta_database_state(settings)["ready"],
+                database_status_label=_consulta_database_state(settings)["label"],
+                database_notice=_consulta_database_state(settings)["notice"],
                 filtros=_filtros_iniciais(),
                 tipos_manifestacao=TIPOS_MANIFESTACAO,
                 consultou=False,
@@ -758,7 +766,9 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                 "consulta.html",
                 user,
                 status_code=500,
-                database_ready=True,
+                database_ready=_consulta_database_state(settings)["ready"],
+                database_status_label=_consulta_database_state(settings)["label"],
+                database_notice=_consulta_database_state(settings)["notice"],
                 filtros=_filtros_iniciais(),
                 tipos_manifestacao=TIPOS_MANIFESTACAO,
                 consultou=False,
