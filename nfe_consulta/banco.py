@@ -73,6 +73,12 @@ class BancoManifestacoes:
                 ultima_tentativa_em TEXT NOT NULL,
                 proxima_tentativa_em TEXT NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS controle_agendamento (
+                cnpj TEXT PRIMARY KEY,
+                ultima_execucao_local TEXT NOT NULL,
+                atualizado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
             """
         )
         self.conexao.commit()
