@@ -73,6 +73,18 @@ A pasta deve ter ACL NTFS restrita à conta que executa a aplicação e aos admi
 
 Em ambiente corporativo, publique a aplicação atrás de IIS/HTTPS e mantenha o Uvicorn em `127.0.0.1:8080`.
 
+A sincronização automática da manhã roda dentro do próprio processo Web. Em produção, o padrão é segunda a sexta-feira às 08:00:
+
+```text
+NFE_AUTO_SYNC_ENABLED=1
+NFE_AUTO_SYNC_HOUR=8
+NFE_AUTO_SYNC_MINUTE=0
+NFE_AUTO_SYNC_WEEKDAYS=0,1,2,3,4
+NFE_AUTO_SYNC_MAX_LOTES=50
+```
+
+O serviço Web precisa permanecer ativo no horário programado.
+
 Consulte `SERVIDOR_WEB.md` para detalhes de implantação.
 
 ## Validação
