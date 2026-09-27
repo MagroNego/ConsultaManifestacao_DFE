@@ -186,6 +186,8 @@ Em ambiente de desenvolvimento o agendador fica desativado por padrão. Em produ
 
 A execução automática aparece no mesmo log de auditoria da aplicação com a ação `sefaz_sync_auto`.
 
+Se o serviço estiver desligado no horário programado e voltar ainda no mesmo dia útil, a aplicação faz uma execução de recuperação. O disparo diário é registrado no próprio banco para que reinícios do serviço não repitam a mesma sincronização automática.
+
 ## Desenvolvimento
 
 Instale as dependências de desenvolvimento:
