@@ -1,0 +1,217 @@
+{% extends "base.html" %}
+{% block title %}Consulta · Manifestação NF-e{% endblock %}
+{% block content %}
+<section class="page-heading">
+  <div>
+    <h1>Consulta</h1>
+    <p>Consulte o histórico de manifestações salvo no banco e exporte o mesmo resultado para Excel.</p>
+  </div>
+  <span class="status-dot {{ 'ok' if database_ready else 'bad' }}">
+    {{ "Banco disponível" if database_ready else "Banco indisponível" }}
+  </span>
+</section>
+
+{% if error %}
+<div class="alert error">{{ error }}</div>
+{% endif %}
+
+<section class="card consultation-card">
+  <div class="card-title">
+    <div>
+      <h2>Filtros</h2>
+      <span class="muted">A consulta é feita somente no banco local. Nenhuma chamada à SEFAZ é realizada.</span>
+    </div>
+  </div>
+
+  <form class="filters-form" action="{{ url_for('consulta_page') }}" method="get">
+    <input type="hidden" name="consultar" value="1">
+
+    <div class="filters-grid">
+      <label class="field">
+        <span>Data inicial do evento</span>
+        <input type="date" name="data_inicial" value="{{ filtros.data_inicial_texto }}">
+      </label>
+
+      <label class="field">
+        <span>Data final do evento</span>
+        <input type="date" name="data_final" value="{{ filtros.data_final_texto }}">
+      </label>
+
+      <label class="field">
+        <span>Número da NF</span>
+        <input
+          type="number"
+          name="numero"
+          min="1"
+          max="999999999"
+          step="1"
+          value="{{ filtros.numero_texto }}"
+          placeholder="Ex.: 91779"
+        >
+      </label>
+
+      <label class="field">
+        <span>Série</span>
+        <input
+          type="number"
+          name="serie"
+          min="0"
+          max="999"
+          step="1"
+          value="{{ filtros.serie_texto }}"
+          placeholder="Ex.: 1"
+        >
+      </label>
+
+      <label class="field filter-wide">
+        <span>Chave NF-e</span>
+        <input
+          type="text"
+          name="chave"
+          inputmode="numeric"
+          maxlength="44"
+          value="{{ filtros.chave or '' }}"
+          placeholder="44 dígitos"
+          autocomplete="off"
+        >
+      </label>
+
+      <label class="field">
+        <span>Manifestação</span>
+        <select name="codigo">
+          <option value="">Todas</option>
+          {% for codigo, descricao in tipos_manifestacao.items() %}
+          <option value="{{ codigo }}" {% if filtros.codigo == codigo %}selected{% endif %}>
+            {{ descricao }}
+          </option>
+          {% endfor %}
+        </select>
+      </label>
+    </div>
+
+    <div class="filter-actions">
+      <a class="button secondary" href="{{ url_for('consulta_page') }}">Limpar</a>
+      <button class="button primary" type="submit" {% if not database_ready %}disabled{% endif %}>
+        Consultar
+      </button>
+    </div>
+  </form>
+</section>
+
+{% if consulta_error %}
+<div class="alert error query-alert">{{ consulta_error }}</div>
+{% endif %}
+
+{% if consultou and not consulta_error %}
+<section class="card results-card">
+  <div class="results-heading">
+    <div>
+      <strong>{{ resultado.total }} evento{{ '' if resultado.total == 1 else 's' }}</strong>
+      {% if resultado.total %}
+      <span>Exibindo {{ resultado.primeiro }}–{{ resultado.ultimo }}</span>
+      {% else %}
+      <span>Nenhum registro corresponde aos filtros.</span>
+      {% endif %}
+    </div>
+
+    {% if resultado.total %}
+    <form action="{{ url_for('exportar_consulta_eventos') }}" method="get">
+      <input type="hidden" name="data_inicial" value="{{ filtros.data_inicial_texto }}">
+      <input type="hidden" name="data_final" value="{{ filtros.data_final_texto }}">
+      <input type="hidden" name="numero" value="{{ filtros.numero_texto }}">
+      <input type="hidden" name="serie" value="{{ filtros.serie_texto }}">
+      <input type="hidden" name="chave" value="{{ filtros.chave or '' }}">
+      <input type="hidden" name="codigo" value="{{ filtros.codigo or '' }}">
+      <button class="button secondary export-button" type="submit">Exportar Excel</button>
+    </form>
+    {% endif %}
+  </div>
+
+  {% if resultado.eventos %}
+  <div class="table-wrap result-table-wrap">
+    <table class="query-table result-table">
+      <thead>
+        <tr>
+          <th>NF</th>
+          <th>Série</th>
+          <th>Manifestação</th>
+          <th>Data do evento</th>
+          <th>Protocolo</th>
+          <th>Chave NF-e</th>
+          <th>NSU</th>
+          <th>Recebido no banco</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for evento in resultado.eventos %}
+        <tr>
+          <td>{{ evento.numero }}</td>
+          <td>{{ evento.serie }}</td>
+          <td>
+            <strong>{{ evento.descricao }}</strong>
+            <small>{{ evento.codigo }}</small>
+          </td>
+          <td>{{ evento.data_label }}</td>
+          <td class="mono">{{ evento.protocolo or "—" }}</td>
+          <td class="mono access-key">{{ evento.chave }}</td>
+          <td class="mono">{{ evento.nsu }}</td>
+          <td>{{ evento.recebido_label }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if resultado.paginas > 1 %}
+  <nav class="pagination" aria-label="Paginação da consulta">
+    {% if resultado.pagina > 1 %}
+    <a href="{{ request.url.include_query_params(pagina=resultado.pagina - 1) }}">Anterior</a>
+    {% else %}
+    <span class="disabled">Anterior</span>
+    {% endif %}
+
+    <span>Página {{ resultado.pagina }} de {{ resultado.paginas }}</span>
+
+    {% if resultado.pagina < resultado.paginas %}
+    <a href="{{ request.url.include_query_params(pagina=resultado.pagina + 1) }}">Próxima</a>
+    {% else %}
+    <span class="disabled">Próxima</span>
+    {% endif %}
+  </nav>
+  {% endif %}
+  {% else %}
+  <div class="empty-result">
+    Nenhum evento encontrado no período ou critérios informados.
+  </div>
+  {% endif %}
+</section>
+{% endif %}
+
+<section class="card file-query-card">
+  <div class="card-title">
+    <div>
+      <h2>Consulta por arquivo</h2>
+      <span class="muted">Para listas específicas de chaves, mantenha o fluxo por CHAVES.txt.</span>
+    </div>
+  </div>
+
+  <form action="{{ url_for('exportar_excel_chaves') }}" method="post" enctype="multipart/form-data" data-processing-form>
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+
+    <label class="upload-box upload-box-single compact-upload">
+      <span class="upload-icon">TXT</span>
+      <strong>CHAVES.txt</strong>
+      <small>Selecione o arquivo com as chaves de acesso</small>
+      <input type="file" name="files" accept=".txt,text/plain" required data-file-input>
+    </label>
+
+    <div class="selection" data-selection>Nenhum arquivo selecionado</div>
+
+    <div class="actions">
+      <button class="button primary" type="submit" {% if not database_ready %}disabled{% endif %}>
+        Gerar Excel por chaves
+      </button>
+    </div>
+  </form>
+</section>
+{% endblock %}
