@@ -58,7 +58,7 @@ def test_usuario_comum_acessa_excel_status_e_login_do_atualizar(tmp_path):
     with TestClient(app) as client:
         home = client.get("/")
         assert home.status_code == 200
-        assert ">Excel<" in home.text
+        assert ">Consulta<" in home.text
         assert ">Status<" in home.text
         assert ">Atualizar<" in home.text
         assert client.get("/status").status_code == 200
@@ -244,7 +244,7 @@ def test_headers_de_seguranca_e_healthcheck(tmp_path):
 
 
 
-def test_tela_excel_tem_um_unico_txt_e_sem_selecao_de_pasta(tmp_path):
+def test_tela_consulta_tem_filtros_e_fluxo_por_txt(tmp_path):
     cfg = settings_web(tmp_path)
     criar_banco(cfg.database_path)
     app = create_app(cfg)
@@ -256,7 +256,10 @@ def test_tela_excel_tem_um_unico_txt_e_sem_selecao_de_pasta(tmp_path):
     assert "CHAVES.txt" in resposta.text
     assert "webkitdirectory" not in resposta.text
     assert ">Pasta<" not in resposta.text
-    assert "Consulta rápida" in resposta.text
+    assert "Data inicial do evento" in resposta.text
+    assert "Data final do evento" in resposta.text
+    assert "Manifestação" in resposta.text
+    assert "Consulta por arquivo" in resposta.text
 
 
 def test_consulta_rapida_por_numero_mostra_eventos_do_banco(tmp_path, monkeypatch):
@@ -294,7 +297,7 @@ def test_consulta_rapida_por_numero_mostra_eventos_do_banco(tmp_path, monkeypatc
         resposta = client.get("/consulta", params={"numero": "91779"})
 
     assert resposta.status_code == 200
-    assert "NF 91779" in resposta.text
+    assert "91779" in resposta.text
     assert "Ciência da Operação" in resposta.text
     assert "135260000000001" in resposta.text
     assert ">1<" in resposta.text
@@ -309,7 +312,7 @@ def test_consulta_rapida_nao_aceita_expressao_sql(tmp_path):
         resposta = client.get("/consulta", params={"numero": "91779 OR 1=1"})
 
     assert resposta.status_code == 200
-    assert "Informe somente o número da NF." in resposta.text
+    assert "Informe somente números no campo Número da NF." in resposta.text
 
 
 
