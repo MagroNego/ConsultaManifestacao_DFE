@@ -5,6 +5,7 @@ from __future__ import annotations
 import shutil
 import tempfile
 import threading
+from datetime import date
 from pathlib import Path
 from typing import Annotated
 
@@ -25,6 +26,7 @@ from nfe_consulta.certificado_config import (
     salvar_config_certificado_arquivo,
 )
 from nfe_consulta.modelos import NfeConsumoIndevidoErro, NfeLimiteConsultaErro
+from nfe_consulta.relatorio_eventos import gravar_eventos_xlsx
 from nfe_consulta.servico import (
     ParametrosConsulta,
     ParametrosSincronizacao,
@@ -33,7 +35,12 @@ from nfe_consulta.servico import (
 )
 from nfe_consulta.web.status_view import WebStatus, read_web_status
 from nfe_consulta.web.audit import AuditLog
-from nfe_consulta.web.consulta_local import consultar_numero_nota
+from nfe_consulta.web.consulta_local import (
+    TIPOS_MANIFESTACAO,
+    consultar_eventos,
+    consultar_eventos_exportacao,
+    normalizar_filtros,
+)
 from nfe_consulta.web.auth import (
     PUBLIC_USER,
     WebUser,
@@ -123,6 +130,14 @@ def _status_web(settings: WebSettings) -> WebStatus:
         _database_path(settings),
         CNPJ_PADRAO,
         password=settings.database_password,
+    )
+
+
+def _filtros_iniciais():
+    hoje = date.today()
+    return normalizar_filtros(
+        data_inicial=hoje.replace(day=1).isoformat(),
+        data_final=hoje.isoformat(),
     )
 
 
@@ -339,56 +354,90 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             "ok",
         )
         response = RedirectResponse(
-            url=request.url_for("excel_page"),
+            url=request.url_for("consulta_page"),
             status_code=303,
         )
         clear_admin_cookie(response, settings)
         return response
 
     @app.get("/", response_class=HTMLResponse)
-    async def excel_page(
+    async def home(
         request: Request,
         user: Annotated[WebUser, Depends(current_user)],
     ):
-        return _render(
-            request,
-            "excel.html",
-            user,
-            database_ready=_database_path(settings).is_file(),
-            consulta_numero="",
-            consulta_eventos=(),
+        return RedirectResponse(
+            url=request.url_for("consulta_page"),
+            status_code=303,
         )
 
     @app.get("/consulta", response_class=HTMLResponse)
-    async def consulta_rapida(
+    async def consulta_page(
         request: Request,
         user: Annotated[WebUser, Depends(current_user)],
+        consultar: str = "",
+        data_inicial: str = "",
+        data_final: str = "",
         numero: str = "",
+        serie: str = "",
+        chave: str = "",
+        codigo: str = "",
+        pagina: int = 1,
     ):
-        numero_limpo = numero.strip()
-        eventos = ()
-        erro_consulta = None
+        consultou = consultar == "1" or any(
+            valor.strip()
+            for valor in (data_inicial, data_final, numero, serie, chave, codigo)
+        )
 
-        if numero_limpo:
-            if not numero_limpo.isdigit():
-                erro_consulta = "Informe somente o número da NF."
-            elif not _database_path(settings).is_file():
+        if consultou:
+            try:
+                filtros = normalizar_filtros(
+                    data_inicial=data_inicial,
+                    data_final=data_final,
+                    numero=numero,
+                    serie=serie,
+                    chave=chave,
+                    codigo=codigo,
+                )
+            except ValueError as exc:
+                return _render(
+                    request,
+                    "consulta.html",
+                    user,
+                    database_ready=_database_path(settings).is_file(),
+                    filtros=_filtros_iniciais(),
+                    tipos_manifestacao=TIPOS_MANIFESTACAO,
+                    consultou=True,
+                    resultado=None,
+                    consulta_error=str(exc),
+                )
+        else:
+            filtros = _filtros_iniciais()
+
+        resultado = None
+        erro_consulta = None
+        banco = _database_path(settings)
+
+        if consultou:
+            if not banco.is_file():
                 erro_consulta = "Banco de manifestações indisponível no servidor."
             else:
                 try:
-                    eventos = await run_in_threadpool(
-                        consultar_numero_nota,
-                        _database_path(settings),
+                    resultado = await run_in_threadpool(
+                        consultar_eventos,
+                        banco,
                         CNPJ_PADRAO,
-                        int(numero_limpo),
+                        filtros,
                         password=settings.database_password,
+                        pagina=pagina,
+                        por_pagina=100,
                     )
                     app.state.audit.write(
                         request,
                         user,
-                        "consulta_nf",
+                        "consulta_eventos",
                         "ok",
-                        resultados=len(eventos),
+                        resultados=resultado.total,
+                        pagina=resultado.pagina,
                     )
                 except (ValueError, OSError, RuntimeError) as exc:
                     erro_consulta = str(exc)
@@ -397,16 +446,126 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
 
         return _render(
             request,
-            "excel.html",
+            "consulta.html",
             user,
-            database_ready=_database_path(settings).is_file(),
-            consulta_numero=numero_limpo,
-            consulta_eventos=eventos,
+            database_ready=banco.is_file(),
+            filtros=filtros,
+            tipos_manifestacao=TIPOS_MANIFESTACAO,
+            consultou=consultou,
+            resultado=resultado,
             consulta_error=erro_consulta,
         )
 
+    @app.get("/consulta/exportar")
+    async def exportar_consulta_eventos(
+        request: Request,
+        user: Annotated[WebUser, Depends(current_user)],
+        data_inicial: str = "",
+        data_final: str = "",
+        numero: str = "",
+        serie: str = "",
+        chave: str = "",
+        codigo: str = "",
+    ):
+        banco = _database_path(settings)
+        if not banco.is_file():
+            raise HTTPException(
+                status_code=503,
+                detail="Banco de manifestações indisponível no servidor.",
+            )
+
+        try:
+            filtros = normalizar_filtros(
+                data_inicial=data_inicial,
+                data_final=data_final,
+                numero=numero,
+                serie=serie,
+                chave=chave,
+                codigo=codigo,
+            )
+            eventos = await run_in_threadpool(
+                consultar_eventos_exportacao,
+                banco,
+                CNPJ_PADRAO,
+                filtros,
+                password=settings.database_password,
+            )
+        except (ValueError, OSError, RuntimeError) as exc:
+            app.state.audit.write(
+                request,
+                user,
+                "export_eventos_excel",
+                "erro",
+                reason=type(exc).__name__,
+            )
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except Exception as exc:
+            app.state.audit.write(
+                request,
+                user,
+                "export_eventos_excel",
+                "erro",
+                reason="unexpected",
+            )
+            raise HTTPException(
+                status_code=500,
+                detail=_database_error_message(exc, settings, user),
+            ) from exc
+
+        temporario = Path(tempfile.mkdtemp(prefix="nfe-eventos-web-"))
+        inicio = filtros.data_inicial.isoformat() if filtros.data_inicial else "inicio"
+        fim = filtros.data_final.isoformat() if filtros.data_final else "atual"
+        nome = f"Manifestacoes_{inicio}_a_{fim}.xlsx"
+        saida = temporario / nome
+
+        try:
+            await run_in_threadpool(
+                gravar_eventos_xlsx,
+                saida,
+                eventos,
+                filtros,
+            )
+        except Exception as exc:
+            shutil.rmtree(temporario, ignore_errors=True)
+            app.state.audit.write(
+                request,
+                user,
+                "export_eventos_excel",
+                "erro",
+                reason=type(exc).__name__,
+            )
+            raise HTTPException(
+                status_code=500,
+                detail="Não foi possível gerar a planilha da consulta.",
+            ) from exc
+
+        app.state.audit.write(
+            request,
+            user,
+            "export_eventos_excel",
+            "ok",
+            eventos=len(eventos),
+        )
+        return FileResponse(
+            path=saida,
+            filename=nome,
+            media_type=(
+                "application/vnd.openxmlformats-officedocument."
+                "spreadsheetml.sheet"
+            ),
+            headers={
+                "Cache-Control": "no-store",
+                "X-Content-Type-Options": "nosniff",
+            },
+            background=BackgroundTask(
+                shutil.rmtree,
+                temporario,
+                ignore_errors=True,
+            ),
+        )
+
     @app.post("/excel")
-    async def exportar_excel(
+    async def exportar_excel_chaves(
         request: Request,
         user: Annotated[WebUser, Depends(current_user)],
         csrf: str = Form(...),
@@ -418,16 +577,20 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             app.state.audit.write(
                 request,
                 user,
-                "excel",
+                "excel_chaves",
                 "erro",
                 reason="database_missing",
             )
             return _render(
                 request,
-                "excel.html",
+                "consulta.html",
                 user,
                 status_code=503,
                 database_ready=False,
+                filtros=_filtros_iniciais(),
+                tipos_manifestacao=TIPOS_MANIFESTACAO,
+                consultou=False,
+                resultado=None,
                 error="Banco de manifestações indisponível no servidor.",
             )
 
@@ -458,7 +621,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             app.state.audit.write(
                 request,
                 user,
-                "excel",
+                "excel_chaves",
                 "ok",
                 arquivos=resumo_upload.arquivos_txt,
                 chaves=resumo_upload.chaves,
@@ -489,16 +652,20 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             app.state.audit.write(
                 request,
                 user,
-                "excel",
+                "excel_chaves",
                 "erro",
                 reason=type(exc).__name__,
             )
             return _render(
                 request,
-                "excel.html",
+                "consulta.html",
                 user,
                 status_code=400,
                 database_ready=True,
+                filtros=_filtros_iniciais(),
+                tipos_manifestacao=TIPOS_MANIFESTACAO,
+                consultou=False,
+                resultado=None,
                 error=str(exc),
             )
         except Exception:
@@ -506,16 +673,20 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             app.state.audit.write(
                 request,
                 user,
-                "excel",
+                "excel_chaves",
                 "erro",
                 reason="unexpected",
             )
             return _render(
                 request,
-                "excel.html",
+                "consulta.html",
                 user,
                 status_code=500,
                 database_ready=True,
+                filtros=_filtros_iniciais(),
+                tipos_manifestacao=TIPOS_MANIFESTACAO,
+                consultou=False,
+                resultado=None,
                 error="Não foi possível gerar a planilha.",
             )
 
