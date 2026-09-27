@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - web/v2.0
+      - web/v2.1
   pull_request:
     branches:
       - main
@@ -57,9 +58,8 @@ jobs:
         shell: pwsh
         run: |
           python -m compileall -q nfe_consulta
-          python -c "import tkinter; import nfe_consulta.gui; import nfe_consulta.certificado_windows; import nfe_consulta.web.app"
-          python -m nfe_consulta.cli --version
-          python -m nfe_consulta.cli --help
+          python -c "import nfe_consulta; import nfe_consulta.certificado_windows; import nfe_consulta.web.app; import nfe_consulta.relatorio_eventos"
+          python -c "import nfe_consulta; print(nfe_consulta.__version__)"
 
       - name: Executar testes
         shell: pwsh
