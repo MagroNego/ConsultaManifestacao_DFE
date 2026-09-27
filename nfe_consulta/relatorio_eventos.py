@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 import tempfile
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 
 from openpyxl import Workbook
@@ -23,7 +23,7 @@ HEADERS = [
     "Data do evento",
     "Protocolo",
     "NSU",
-    "Recebido no banco",
+    "Recebido no banco (UTC)",
 ]
 
 
@@ -36,9 +36,7 @@ def _excel_datetime(valor: str) -> datetime | str:
     except ValueError:
         return valor
 
-    if instante.tzinfo is None:
-        instante = instante.replace(tzinfo=timezone.utc)
-    return instante.astimezone().replace(tzinfo=None)
+    return instante.replace(tzinfo=None)
 
 
 def _resumo_filtros(filtros: FiltrosEventos) -> str:
