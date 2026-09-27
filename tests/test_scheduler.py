@@ -1,6 +1,6 @@
 import asyncio
 import threading
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from types import SimpleNamespace
 
 from nfe_consulta.web import scheduler
@@ -53,6 +53,11 @@ def test_sincronizacao_automatica_usa_mesmo_lock_da_web(monkeypatch):
 
     monkeypatch.setattr(
         scheduler,
+        "registrar_execucao_agendada",
+        lambda _settings, _dia: None,
+    )
+    monkeypatch.setattr(
+        scheduler,
         "sincronizar_configurado",
         lambda _settings, *, max_lotes: SimpleNamespace(
             lotes=1,
@@ -73,12 +78,18 @@ def test_sincronizacao_automatica_usa_mesmo_lock_da_web(monkeypatch):
     app.state.sync_lock.release()
 
 
-def test_sincronizacao_automatica_nao_concorre_com_manual():
+def test_sincronizacao_automatica_nao_concorre_com_manual(monkeypatch):
     eventos = []
 
     class Audit:
         def write_system(self, action, result, **details):
             eventos.append((action, result, details))
+
+    monkeypatch.setattr(
+        scheduler,
+        "registrar_execucao_agendada",
+        lambda _settings, _dia: None,
+    )
 
     lock = threading.Lock()
     lock.acquire()
@@ -105,3 +116,40 @@ def test_sincronizacao_automatica_nao_concorre_com_manual():
             {"reason": "sync_in_progress"},
         )
     ]
+
+
+
+def test_recupera_execucao_quando_servidor_sobe_depois_do_horario():
+    agora = datetime(2026, 9, 28, 8, 15, tzinfo=timezone.utc)
+
+    assert scheduler.deve_recuperar_execucao(
+        agora,
+        None,
+        hora=8,
+        minuto=0,
+        dias_semana=(0, 1, 2, 3, 4),
+    )
+
+
+def test_nao_repete_recuperacao_no_mesmo_dia():
+    agora = datetime(2026, 9, 28, 10, 0, tzinfo=timezone.utc)
+
+    assert not scheduler.deve_recuperar_execucao(
+        agora,
+        date(2026, 9, 28),
+        hora=8,
+        minuto=0,
+        dias_semana=(0, 1, 2, 3, 4),
+    )
+
+
+def test_nao_recupera_antes_do_horario():
+    agora = datetime(2026, 9, 28, 7, 59, tzinfo=timezone.utc)
+
+    assert not scheduler.deve_recuperar_execucao(
+        agora,
+        date(2026, 9, 26),
+        hora=8,
+        minuto=0,
+        dias_semana=(0, 1, 2, 3, 4),
+    )
