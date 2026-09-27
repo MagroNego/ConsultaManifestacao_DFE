@@ -30,7 +30,7 @@ A versão Web foi projetada para uso em rede interna, com separação entre oper
 - seleção e validação de certificado A1 pela interface administrativa;
 - log de auditoria com rotação;
 - modo claro e escuro;
-- job para atualização agendada no Windows.
+- sincronização automática interna da SEFAZ pela manhã, sem CLI ou Task Scheduler.
 
 ## Fluxo da aplicação
 
@@ -164,9 +164,27 @@ Enquanto SQLite/SQLCipher for utilizado, execute a aplicação com **1 worker** 
 
 As instruções de implantação estão em `SERVIDOR_WEB.md`.
 
-## Atualização agendada
+## Sincronização automática
 
-A rotina matinal existente permanece preservada durante o desenvolvimento da v2.1 e será revisada separadamente. A interface pública do produto passa a ser exclusivamente Web.
+A v2.1 não utiliza CLI nem `ATUALIZAR_BANCO_MANHA.cmd`.
+
+O próprio processo Web mantém um agendador interno para sincronização com a SEFAZ. Em produção, o padrão é executar às **08:00 de segunda a sexta-feira**, usando o mesmo banco, certificado, cooldown e trava da sincronização manual.
+
+Configurações operacionais:
+
+```text
+NFE_AUTO_SYNC_ENABLED=1
+NFE_AUTO_SYNC_HOUR=8
+NFE_AUTO_SYNC_MINUTE=0
+NFE_AUTO_SYNC_WEEKDAYS=0,1,2,3,4
+NFE_AUTO_SYNC_MAX_LOTES=50
+```
+
+Segunda-feira é `0` e domingo é `6`.
+
+Em ambiente de desenvolvimento o agendador fica desativado por padrão. Em produção, fica ativado por padrão e pode ser desligado com `NFE_AUTO_SYNC_ENABLED=0`.
+
+A execução automática aparece no mesmo log de auditoria da aplicação com a ação `sefaz_sync_auto`.
 
 ## Desenvolvimento
 
@@ -199,4 +217,4 @@ Os pacotes de instalação são publicados em **GitHub Releases**. Para implanta
 - **v2.0.0**: interface Web corporativa, administração centralizada e publicação para rede interna.
 - **v2.0.1**: centralização de segredos de runtime e ajustes de configuração/implantação.
 
-- **v2.1.0**: consulta completa com filtros, exportação do resultado para Excel e retirada da CLI como interface pública (em desenvolvimento).
+- **v2.1.0**: consulta completa com filtros, exportação do resultado para Excel, remoção integral da CLI/GUI legadas e sincronização automática interna (em desenvolvimento).
