@@ -1,4 +1,4 @@
-# Implantação Web — v2.0
+# Implantação Web — v2.1
 
 A v2 foi desenhada para rodar dentro da rede da empresa com **um único processo da aplicação** enquanto o banco for SQLite/SQLCipher.
 
@@ -22,7 +22,7 @@ Não exponha o Uvicorn diretamente aos usuários em produção. O padrão do apl
 
 Pode acessar:
 
-- **Excel**: envia um `CHAVES.txt` e recebe a planilha.
+- **Consulta**: pesquisa o histórico do banco por período, NF, série, chave e manifestação, com exportação para Excel.
 - **Status**: consulta a última gravação do banco e o estado do NSU.
 
 Ao abrir **Atualizar**, o sistema solicita o login administrativo.
@@ -100,9 +100,9 @@ secrets\cert-path.txt
 secrets\cert-password.txt
 ```
 
-A conta do serviço e a conta usada pelo job agendado precisam ter leitura no PFX. Restrinja também a ACL da pasta `secrets`.
+A conta do serviço precisa ter leitura no PFX. Restrinja também a ACL da pasta `secrets`.
 
-O job matinal usa automaticamente a mesma configuração feita na área administrativa.
+A sincronização automática usa a mesma configuração feita na área administrativa.
 
 ### Windows Certificate Store
 
@@ -197,24 +197,49 @@ A TI ainda deve validar:
 - rotação da senha administrativa e do segredo CSRF.
 
 
-## Atualização automática
+## Sincronização automática
 
-O projeto inclui `ATUALIZAR_BANCO_MANHA.cmd` para execução pelo Agendador de Tarefas do Windows. O job usa o mesmo banco e o mesmo cooldown da interface Web.
+A v2.1 executa a rotina matinal dentro do próprio processo Web. Não existe CLI pública, BAT de atualização nem dependência do Agendador de Tarefas do Windows.
 
-Antes de agendar, configure o banco e o certificado pela área administrativa. O job lê diretamente `secrets\db-path.txt`, `secrets\db-password.txt`, `secrets\cert-path.txt` e `secrets\cert-password.txt`.
-
-Se o certificado estiver no Windows Certificate Store em vez de PFX/P12, mantenha `NFE_CERT_STORE` e `NFE_CERT_THUMBPRINT` configurados.
-
-Os arquivos de senha não devem ser versionados. Restrinja a ACL da pasta `secrets` à conta do serviço.
-
-No Agendador de Tarefas, execute o BAT uma vez pela manhã, com uma conta que tenha leitura da chave privada do certificado. O retorno e eventuais erros são gravados em:
+Em produção, o padrão é:
 
 ```text
-logs\atualizacao_agendada.log
+segunda a sexta-feira
+08:00
+50 lotes no máximo
 ```
 
-O job falha sem chamar a SEFAZ se banco, arquivo de senha, thumbprint ou Python não estiverem configurados.
+Configuração:
 
+```text
+NFE_AUTO_SYNC_ENABLED=1
+NFE_AUTO_SYNC_HOUR=8
+NFE_AUTO_SYNC_MINUTE=0
+NFE_AUTO_SYNC_WEEKDAYS=0,1,2,3,4
+NFE_AUTO_SYNC_MAX_LOTES=50
+```
+
+Segunda-feira é `0` e domingo é `6`.
+
+A rotina automática usa:
+
+- o banco selecionado pela área administrativa;
+- a senha SQLCipher em `secrets\db-password.txt`;
+- o PFX/P12 configurado em `secrets\cert-path.txt` e `secrets\cert-password.txt`, ou o Windows Certificate Store;
+- o mesmo cooldown persistente da sincronização manual;
+- o mesmo lock de processo da rota administrativa.
+
+Se uma sincronização manual já estiver em andamento, a execução automática é ignorada. Se o cooldown ainda estiver ativo, a rotina também é ignorada sem tentar contornar o bloqueio.
+
+As execuções são registradas em:
+
+```text
+logs\web_audit.log
+```
+
+com a ação `sefaz_sync_auto`.
+
+O serviço Web precisa permanecer ativo no horário agendado. Em desenvolvimento, o agendador fica desligado por padrão; em produção, fica ligado por padrão.
 
 ## Banco central configurado pela área administrativa
 
@@ -230,4 +255,4 @@ A senha permanece em:
 secrets\db-password.txt
 ```
 
-O mesmo caminho é utilizado pelas telas Web e por `ATUALIZAR_BANCO_MANHA.cmd`. A conta do serviço e a conta do job precisam ter leitura e escrita no banco. Para SQLite/SQLCipher, mantenha o arquivo em disco local do servidor sempre que possível.
+O mesmo caminho é utilizado pelas telas Web e pela sincronização automática interna. A conta do serviço precisa ter leitura e escrita no banco. Para SQLite/SQLCipher, mantenha o arquivo em disco local do servidor sempre que possível.
