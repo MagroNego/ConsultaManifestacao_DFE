@@ -123,7 +123,7 @@ def _database_web(settings: WebSettings) -> dict:
             settings.database_path_file
             and settings.database_path_file.is_file()
         ),
-        "password_configured": bool(settings.database_password),
+        "password_configured": bool(settings.current_database_password()),
     }
 
 
@@ -131,7 +131,7 @@ def _status_web(settings: WebSettings) -> WebStatus:
     return read_web_status(
         _database_path(settings),
         CNPJ_PADRAO,
-        password=settings.database_password,
+        password=settings.current_database_password(),
     )
 
 
@@ -460,7 +460,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                         banco,
                         CNPJ_PADRAO,
                         filtros,
-                        password=settings.database_password,
+                        password=settings.current_database_password(),
                         pagina=pagina,
                         por_pagina=100,
                     )
@@ -521,7 +521,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                 banco,
                 CNPJ_PADRAO,
                 filtros,
-                password=settings.database_password,
+                password=settings.current_database_password(),
             )
         except (ValueError, OSError, RuntimeError) as exc:
             app.state.audit.write(
@@ -647,7 +647,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                     cnpj=CNPJ_PADRAO,
                     uf=UF_PADRAO,
                     sincronizar_sefaz=False,
-                    senha_banco=settings.database_password,
+                    senha_banco=settings.current_database_password(),
                 ),
             )
 
@@ -797,7 +797,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             banco = await run_in_threadpool(
                 salvar_caminho_banco,
                 caminho,
-                settings.database_password,
+                settings.current_database_password(),
                 path_file=settings.database_path_file,
             )
             app.state.audit.write(
