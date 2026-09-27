@@ -36,7 +36,7 @@ def sincronizar_configurado(settings: WebSettings, *, max_lotes: int = 50):
             cnpj=CNPJ_PADRAO,
             uf=UF_PADRAO,
             max_lotes=max_lotes,
-            senha_banco=settings.database_password,
+            senha_banco=settings.current_database_password(),
             cert_thumbprint=(
                 None if cert_arquivo is not None else settings.certificate_thumbprint
             ),
