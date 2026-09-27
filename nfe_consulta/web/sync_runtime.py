@@ -21,6 +21,10 @@ def caminho_banco_configurado(settings: WebSettings):
 
 def sincronizar_configurado(settings: WebSettings, *, max_lotes: int = 50):
     """Executa a mesma sincronização usada pela área administrativa."""
+    banco = caminho_banco_configurado(settings)
+    if not banco.is_file():
+        raise FileNotFoundError(f"Banco configurado não encontrado: {banco}")
+
     cert_arquivo = carregar_config_certificado_arquivo(
         settings.certificate_path_file,
         settings.certificate_password_file,
@@ -28,7 +32,7 @@ def sincronizar_configurado(settings: WebSettings, *, max_lotes: int = 50):
 
     return sincronizar_banco(
         ParametrosSincronizacao(
-            banco=caminho_banco_configurado(settings),
+            banco=banco,
             cnpj=CNPJ_PADRAO,
             uf=UF_PADRAO,
             max_lotes=max_lotes,
