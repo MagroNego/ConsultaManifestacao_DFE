@@ -227,6 +227,7 @@ def get_settings() -> WebSettings:
         certificate_path_file=CERT_PATH_FILE,
         certificate_password_file=CERT_PASSWORD_FILE,
         database_path_file=DATABASE_PATH_FILE,
+        database_password_file=DATABASE_PASSWORD_FILE,
         auto_sync_enabled=auto_sync_enabled,
         auto_sync_hour=auto_sync_hour,
         auto_sync_minute=auto_sync_minute,
