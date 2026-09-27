@@ -1,7 +1,7 @@
-"""Camada de aplicação compartilhada pela interface gráfica e pela CLI.
+"""Camada de aplicação compartilhada pela interface Web e rotinas internas.
 
-Toda a regra de orquestração fica aqui para que GUI e terminal sejam apenas
-duas formas de acionar o mesmo fluxo.
+Toda a regra de orquestração fica aqui para manter HTTP, agendamento e
+persistência desacoplados das integrações fiscais.
 """
 
 from dataclasses import dataclass
