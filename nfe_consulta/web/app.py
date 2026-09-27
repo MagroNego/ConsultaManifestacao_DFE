@@ -476,7 +476,9 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                     request,
                     "consulta.html",
                     user,
-                    database_ready=_database_path(settings).is_file(),
+                    database_ready=_consulta_database_state(settings)["ready"],
+                    database_status_label=_consulta_database_state(settings)["label"],
+                    database_notice=_consulta_database_state(settings)["notice"],
                     filtros=_filtros_iniciais(),
                     tipos_manifestacao=TIPOS_MANIFESTACAO,
                     consultou=True,
@@ -489,10 +491,11 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         resultado = None
         erro_consulta = None
         banco = _database_path(settings)
+        database_state = _consulta_database_state(settings)
 
         if consultou:
-            if not banco.is_file():
-                erro_consulta = "Banco de manifestações indisponível no servidor."
+            if not database_state["ready"]:
+                erro_consulta = database_state["notice"]
             else:
                 try:
                     resultado = await run_in_threadpool(
@@ -512,8 +515,6 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                         resultados=resultado.total,
                         pagina=resultado.pagina,
                     )
-                except (ValueError, OSError, RuntimeError) as exc:
-                    erro_consulta = str(exc)
                 except Exception as exc:
                     erro_consulta = _database_error_message(exc, settings, user)
 
@@ -521,7 +522,9 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             request,
             "consulta.html",
             user,
-            database_ready=banco.is_file(),
+            database_ready=database_state["ready"],
+            database_status_label=database_state["label"],
+            database_notice=database_state["notice"],
             filtros=filtros,
             tipos_manifestacao=TIPOS_MANIFESTACAO,
             consultou=consultou,
