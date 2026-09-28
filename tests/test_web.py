@@ -87,6 +87,34 @@ def test_admin_cadastra_alertas_sem_liberar_configuracao_ao_usuario(tmp_path):
         assert "a@empresa.com.br" in client.get("/atualizar").text
 
 
+def test_identidade_corporativa_exige_gateway_e_lista_admin(tmp_path):
+    cfg = settings_web(
+        tmp_path,
+        auth_mode="proxy",
+        admin_users=frozenset({"dominio\\luan.a"}),
+    )
+    criar_banco(cfg.database_path)
+    app = create_app(cfg)
+    with TestClient(app) as client:
+        assert client.get("/atualizar").status_code == 403
+        cabecalhos = {"X-NFE-User": "DOMINIO\\luan.a"}
+        assert client.get("/atualizar", headers=cabecalhos).status_code == 403
+        cabecalhos["X-NFE-Proxy-Secret"] = "segredo-errado"
+        assert client.get("/atualizar", headers=cabecalhos).status_code == 403
+        cabecalhos["X-NFE-Proxy-Secret"] = cfg.proxy_secret
+        assert client.get("/atualizar", headers=cabecalhos).status_code == 200
+        assert "DOMINIO\\luan.a" in client.get("/atualizar", headers=cabecalhos).text
+        cabecalhos["X-NFE-User"] = "DOMINIO\\outro"
+        assert client.get("/atualizar", headers=cabecalhos).status_code == 403
+
+        # A senha local não é aceita e nenhum cookie antigo concede admin no modo proxy.
+        assert client.post("/admin/login", data={
+            "csrf": csrf_token(PUBLIC_USER, cfg),
+            "username": "admin", "password": cfg.admin_password,
+        }).status_code == 403
+        assert client.get("/atualizar").status_code == 403
+
+
 def test_usuario_comum_acessa_excel_status_e_login_do_atualizar(tmp_path):
     cfg = settings_web(tmp_path)
     app = create_app(cfg)

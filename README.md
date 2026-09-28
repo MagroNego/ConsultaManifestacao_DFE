@@ -26,6 +26,7 @@ A versão Web foi projetada para uso em rede interna, com separação entre oper
 - cooldown persistente para controle de consumo da SEFAZ;
 - tratamento específico para rejeição 656;
 - autenticação administrativa para configuração e atualização;
+- opção de identidade corporativa via gateway autenticado, com lista de administradores e sem senha local de usuário em produção;
 - seleção e validação do banco central pela interface administrativa;
 - seleção e validação de certificado A1 pela interface administrativa;
 - log de auditoria com rotação;
@@ -73,7 +74,7 @@ INSTALAR.cmd
 
 O instalador cria o ambiente virtual e prepara as pastas locais necessárias.
 
-Depois configure o acesso administrativo:
+Para testes locais, configure o acesso administrativo:
 
 ```powershell
 CONFIGURAR_ADMIN.cmd
@@ -83,6 +84,10 @@ E inicie a aplicação:
 
 ```powershell
 INICIAR_WEB.cmd
+
+Em produção, o acesso administrativo vem do gateway de identidade corporativa.
+Veja `SERVIDOR_WEB.md` antes da implantação; `CONFIGURAR_ADMIN.cmd` é somente
+para desenvolvimento e testes isolados.
 ```
 
 ## Administração

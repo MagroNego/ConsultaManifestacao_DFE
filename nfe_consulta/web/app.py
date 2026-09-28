@@ -276,6 +276,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
 
         if (
             request.url.path != "/admin/logout"
+            and settings.auth_mode == "dev"
             and admin_session_active(request)
         ):
             set_admin_cookie(response, settings)
@@ -345,6 +346,8 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         request: Request,
         user: Annotated[WebUser, Depends(current_user)],
     ):
+        if settings.auth_mode == "proxy":
+            return RedirectResponse(url=request.url_for("atualizar_page"), status_code=303)
         if user.is_admin:
             return RedirectResponse(
                 url=request.url_for("atualizar_page"),
@@ -367,6 +370,8 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         username: str = Form(...),
         password: str = Form(...),
     ):
+        if settings.auth_mode == "proxy":
+            raise HTTPException(status_code=403, detail="Login local desativado no modo corporativo.")
         validate_csrf(csrf, user, settings)
 
         if not settings.admin_password:
@@ -423,6 +428,8 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         user: Annotated[WebUser, Depends(require_admin)],
         csrf: str = Form(...),
     ):
+        if settings.auth_mode == "proxy":
+            raise HTTPException(status_code=403, detail="A sessão corporativa é administrada pelo gateway.")
         validate_csrf(csrf, user, settings)
         app.state.audit.write(
             request,

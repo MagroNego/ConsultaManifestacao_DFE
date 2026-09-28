@@ -54,7 +54,9 @@ quantidade pendente e oferece **Tentar enviar pendentes** após corrigir a
 configuração do servidor. A sincronização da SEFAZ não é refeita para reenviar
 esses avisos.
 
-A área **Atualizar** exige login administrativo.
+A área **Atualizar** exige login administrativo em testes locais. Na instalação
+corporativa, a TI define as identidades autorizadas no gateway; a aplicação
+reconhece essa identidade e dispensa uma senha própria.
 
 Ela permite:
 

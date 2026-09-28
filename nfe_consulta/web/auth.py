@@ -78,6 +78,26 @@ def admin_session_active(request: Request) -> bool:
 def current_user(request: Request) -> WebUser:
     settings: WebSettings = request.app.state.settings
 
+    if settings.auth_mode == "proxy":
+        usuario = request.headers.get(settings.user_header, "").strip()
+        assinatura = request.headers.get(settings.proxy_secret_header, "")
+        if (
+            not settings.proxy_secret
+            or not hmac.compare_digest(assinatura, settings.proxy_secret)
+            or not usuario
+            or len(usuario) > 128
+            or any(c in usuario for c in "\r\n\t")
+        ):
+            return PUBLIC_USER
+        nome = request.headers.get(settings.name_header, "").strip()
+        if not nome or len(nome) > 128 or any(c in nome for c in "\r\n\t"):
+            nome = usuario
+        return WebUser(
+            username=usuario,
+            display_name=nome,
+            is_admin=usuario.casefold() in settings.admin_users,
+        )
+
     if admin_session_active(request):
         return WebUser(
             username=settings.admin_username,
@@ -92,8 +112,11 @@ def require_admin(request: Request) -> WebUser:
     user = current_user(request)
     if not user.is_admin:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Faça login para acessar a área Atualizar.",
+            status_code=(status.HTTP_403_FORBIDDEN if request.app.state.settings.auth_mode == "proxy"
+                         else status.HTTP_401_UNAUTHORIZED),
+            detail=("Seu usuário corporativo não tem acesso à área Atualizar."
+                    if request.app.state.settings.auth_mode == "proxy"
+                    else "Faça login para acessar a área Atualizar."),
         )
     return user
 
@@ -103,7 +126,7 @@ def authenticate_admin(
     password: str,
     settings: WebSettings,
 ) -> bool:
-    if not settings.admin_password:
+    if settings.auth_mode != "dev" or not settings.admin_password:
         return False
 
     usuario_ok = hmac.compare_digest(

@@ -34,10 +34,13 @@ O instalador:
 
 ## Configuração inicial
 
-Configure o acesso administrativo:
+Para testes locais, configure o acesso administrativo:
 
 ```powershell
 CONFIGURAR_ADMIN.cmd
+
+No servidor corporativo, a TI configura o gateway de identidade conforme
+`SERVIDOR_WEB.md`. Não use o login local em produção.
 ```
 
 Depois inicie a aplicação:

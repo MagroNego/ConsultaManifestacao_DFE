@@ -3,6 +3,12 @@
 # As senhas do banco, administrador e certificado são lidas de secrets/.
 
 NFE_WEB_ENV=development
+# Em produção, usar um gateway de autenticação corporativa; sem senha de usuário no app.
+# O gateway deve autenticar a pessoa, remover cabeçalhos recebidos do cliente e
+# injetar X-NFE-User e X-NFE-Proxy-Secret. Configure o segredo no ambiente do serviço.
+# NFE_WEB_AUTH_MODE=proxy
+# NFE_WEB_ADMIN_USERS=DOMINIO\\luan.a,DOMINIO\\outro.admin
+# NFE_WEB_PROXY_SECRET=<valor aleatório de pelo menos 32 caracteres>
 NFE_WEB_HOST=127.0.0.1
 NFE_WEB_PORT=8080
 NFE_WEB_FORWARDED_ALLOW_IPS=127.0.0.1
