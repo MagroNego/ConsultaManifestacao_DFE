@@ -1,0 +1,54 @@
+name: Publicar v2.1.1
+
+on:
+  push:
+    branches: [web/v2.1]
+    paths:
+      - ".github/workflows/publish-v2.1.1.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    if: github.event.head_commit.message == 'chore: executar publicação v2.1.1'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 17f2d11628d205189cf2eaae96b095124c0a59bb
+      - name: Validar versão
+        run: |
+          grep -q 'version = "2.1.1"' pyproject.toml
+          grep -q '__version__ = "2.1.1"' nfe_consulta/__init__.py
+      - name: Montar pacote de instalação
+        run: |
+          mkdir -p dist/ConsultaManifestacao_DFE-v2.1.1
+          rsync -a ./ dist/ConsultaManifestacao_DFE-v2.1.1/ \
+            --exclude=".git/" --exclude=".github/" --exclude="tests/" \
+            --exclude="dist/" --exclude=".pytest_cache/" \
+            --exclude="__pycache__/" --exclude="*.pyc" \
+            --exclude="dados/*" --exclude="secrets/*" --exclude="logs/*"
+          mkdir -p dist/ConsultaManifestacao_DFE-v2.1.1/{dados,secrets,logs}
+          cd dist
+          zip -qr ConsultaManifestacao_DFE-v2.1.1.zip ConsultaManifestacao_DFE-v2.1.1
+      - name: Publicar release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cat > /tmp/release-notes.md <<'EOF'
+          Consulta de Manifestação NF-e v2.1.1
+
+          - Consulta Web e exportação Excel validadas em Windows.
+          - Diagnóstico da rejeição 656 registra NSU enviado e NSU retornado pela SEFAZ quando disponível, sem avançar o cursor em caso de erro.
+          - Login administrativo e certificado do Windows validados no ambiente do usuário.
+          - Documentação de instalação, uso, segurança e operação atualizada.
+          - 73 testes passaram na CI.
+
+          Faça backup das pastas dados e secrets antes de atualizar. Preserve essas pastas na instalação nova.
+          EOF
+          gh release create v2.1.1 \
+            dist/ConsultaManifestacao_DFE-v2.1.1.zip \
+            --target 17f2d11628d205189cf2eaae96b095124c0a59bb \
+            --title "Consulta de Manifestação NF-e v2.1.1" \
+            --notes-file /tmp/release-notes.md
