@@ -30,7 +30,7 @@ class SyncHistoryItem:
     detail: str
 
 
-def _tail_lines(path: Path, max_bytes: int = 256 * 1024) -> list[str]:
+def _tail_lines(path: Path, max_bytes: int = 6 * 1024 * 1024) -> list[str]:
     with path.open("rb") as stream:
         size = stream.seek(0, 2)
         stream.seek(max(0, size - max_bytes))
