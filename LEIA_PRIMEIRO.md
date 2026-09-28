@@ -1,24 +1,25 @@
-# Consulta de Manifestação YAB — versão 1.0
+# Consulta de Manifestação NF-e — v2.1.1
 
-Este pacote contém código-fonte, testes, instalador e documentação. Não inclui certificado digital, senha, banco real, chaves reais ou resultado fiscal.
+Esta versão usa uma interface Web para consultar manifestações, exportar Excel,
+ver o estado do banco e sincronizar com a SEFAZ. A consulta e as exportações
+usam somente o banco local; a sincronização exige login administrativo.
 
-## Início rápido
+## Primeira instalação no Windows
 
-1. Leia `MANUAL_DE_INSTALACAO.md`.
-2. Execute `INSTALAR.cmd`.
-3. Abra `ABRIR_CONSULTA.cmd`.
-4. Coloque o TXT em `entrada/CHAVES.txt` ou escolha outro arquivo na tela.
-5. Mantenha o mesmo banco entre as sincronizações.
+1. Extraia o pacote em uma pasta definitiva.
+2. Execute `INSTALAR.cmd` e depois `CONFIGURAR_ADMIN.cmd`.
+3. Execute `INICIAR_WEB.cmd` e abra `http://127.0.0.1:8080` no navegador.
+4. Configure o banco existente e o certificado na aba **Atualizar**.
 
-CLI principal:
+Leia `MANUAL_DE_INSTALACAO.md` antes de instalar no servidor e
+`MANUAL_DE_USO.md` para usar a interface.
 
-```powershell
-nfe-consulta atualizar
-nfe-consulta excel
-nfe-consulta status
-nfe-consulta gui
-```
+## Atualização de uma instalação existente
 
-A planilha padrão é `saidas/Consulta_Manifestacao_YAB.xlsx`.
+Feche o aplicativo, faça backup da pasta atual e instale o novo código na
+mesma pasta. Preserve `dados`, `secrets`, logs e os caminhos já configurados.
+Reinicie o aplicativo e confirme `v2.1.1` no cabeçalho. Não altere manualmente
+o `ultNSU` do banco.
 
-Para proteção do banco, consulte `SEGURANCA_BANCO.md`. Para revisão técnica e de segurança, consulte `REVISAO.md`.
+O pacote não inclui banco real, senha ou certificado. A instalação em rede
+interna e o agendamento estão descritos em `SERVIDOR_WEB.md`.

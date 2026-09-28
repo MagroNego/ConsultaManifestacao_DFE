@@ -1,27 +1,12 @@
 import sqlite3
-import subprocess
-import sys
 from datetime import datetime, timedelta, timezone
 
-from nfe_consulta.assistente import main as abrir_assistente
 from nfe_consulta.banco import BancoManifestacoes
 from nfe_consulta.modelos import RetornoDistribuicao
 from nfe_consulta.status import consultar_status
 
 
 CNPJ = "16840128000101"
-
-
-def test_status_banco_inexistente_nao_cria_arquivo(tmp_path):
-    caminho = tmp_path / "nao_existe.db"
-    retorno = subprocess.run(
-        [sys.executable, "-m", "nfe_consulta.cli", "status", "--banco", str(caminho)],
-        capture_output=True,
-        text=True,
-    )
-    assert retorno.returncode == 0
-    assert "Banco nao encontrado" in retorno.stdout
-    assert not caminho.exists()
 
 
 def test_status_parcial_completo_e_pausa(tmp_path):
@@ -58,21 +43,6 @@ def test_status_banco_anterior_sem_tabela_pausa(tmp_path):
     assert "Fila percorrida" in consultar_status(str(caminho), CNPJ)
 
 
-def test_assistente_status_nao_pede_txt_ou_planilha(tmp_path, monkeypatch):
-    import nfe_consulta.assistente as assistente
-    (tmp_path / "nfe_consulta").mkdir()
-    (tmp_path / "Downloads").mkdir()
-    monkeypatch.setattr(assistente, "__file__", str(tmp_path / "nfe_consulta" / "assistente.py"))
-    monkeypatch.setattr(assistente.Path, "home", lambda: tmp_path)
-    respostas = iter(["3", ""])
-    monkeypatch.setattr("builtins.input", lambda *_: next(respostas))
-    comandos = []
-    monkeypatch.setattr(assistente.subprocess, "call", lambda args, cwd: comandos.append(args) or 0)
-    assert abrir_assistente() == 0
-    assert "status" in comandos[0]
-    assert "excel" not in comandos[0]
-
-
 def test_motivo_656_persistido_sem_avancar_cursor(tmp_path, monkeypatch):
     from nfe_consulta.modelos import CertificadoWindows, NfeConsumoIndevidoErro
     from nfe_consulta.sincronizacao import sincronizar
@@ -95,6 +65,8 @@ def test_motivo_656_persistido_sem_avancar_cursor(tmp_path, monkeypatch):
             sincronizar(banco, CNPJ, "33", certificado)
         assert banco.obter_estado(CNPJ) == ("10".zfill(15), "20".zfill(15))
         assert motivo in consultar_status(str(caminho), CNPJ)
+        assert "ultNSU enviado: 000000000000010" in consultar_status(str(caminho), CNPJ)
+        assert "ultNSU informado pela SEFAZ: 000000000000011" in consultar_status(str(caminho), CNPJ)
         assert motivo in consultar_status(str(caminho), CNPJ, datetime.now(timezone.utc) + timedelta(hours=2))
     finally:
         banco.fechar()

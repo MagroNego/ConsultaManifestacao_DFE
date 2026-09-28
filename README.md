@@ -13,12 +13,14 @@ A versão Web foi projetada para uso em rede interna, com separação entre oper
 | Persistência | SQLite / SQLCipher |
 | Certificado | A1 PFX/P12 ou Windows Certificate Store |
 | Plataforma alvo | Windows / Windows Server |
-| Versão atual | 2.0.1 |
+| Versão estável | 2.1.1 |
 
 ## Funcionalidades
 
-- geração de planilha Excel a partir de um arquivo `CHAVES.txt`;
-- consulta rápida de manifestações pelo número da NF;
+- consulta completa do histórico por período, número da NF, série, chave e tipo de manifestação;
+- exportação para Excel usando exatamente os filtros aplicados na consulta;
+- paginação dos resultados na interface Web;
+- geração de planilha Excel a partir de um arquivo `CHAVES.txt` para listas específicas;
 - painel de status com `ultNSU`, `maxNSU` e disponibilidade da próxima sincronização;
 - sincronização independente com o Ambiente Nacional da NF-e;
 - cooldown persistente para controle de consumo da SEFAZ;
@@ -28,16 +30,18 @@ A versão Web foi projetada para uso em rede interna, com separação entre oper
 - seleção e validação de certificado A1 pela interface administrativa;
 - log de auditoria com rotação;
 - modo claro e escuro;
-- job para atualização agendada no Windows.
+- sincronização automática interna da SEFAZ pela manhã, sem CLI ou Task Scheduler.
 
 ## Fluxo da aplicação
 
 ```text
 Usuários internos
         |
-        +-- Excel ---------> banco central -> XLSX
-        |
         +-- Consulta ------> banco central
+        |       |
+        |       +-- filtros e paginação
+        |       +-- exportação XLSX
+        |       +-- CHAVES.txt
         |
         +-- Status --------> banco central
         |
@@ -48,7 +52,7 @@ Usuários internos
                                +-- SEFAZ
 ```
 
-As operações de Excel, Consulta rápida e Status não acessam a SEFAZ.
+As operações de Consulta, exportação para Excel e Status não acessam a SEFAZ.
 
 ## Instalação
 
@@ -160,15 +164,29 @@ Enquanto SQLite/SQLCipher for utilizado, execute a aplicação com **1 worker** 
 
 As instruções de implantação estão em `SERVIDOR_WEB.md`.
 
-## Atualização agendada
+## Sincronização automática
 
-O arquivo:
+A v2.1 não utiliza CLI nem `ATUALIZAR_BANCO_MANHA.cmd`.
+
+O próprio processo Web mantém um agendador interno para sincronização com a SEFAZ. Em produção, o padrão é executar às **08:00 de segunda a sexta-feira**, usando o mesmo banco, certificado, cooldown e trava da sincronização manual.
+
+Configurações operacionais:
 
 ```text
-ATUALIZAR_BANCO_MANHA.cmd
+NFE_AUTO_SYNC_ENABLED=1
+NFE_AUTO_SYNC_HOUR=8
+NFE_AUTO_SYNC_MINUTE=0
+NFE_AUTO_SYNC_WEEKDAYS=0,1,2,3,4
+NFE_AUTO_SYNC_MAX_LOTES=50
 ```
 
-pode ser executado pelo Agendador de Tarefas do Windows. Ele utiliza o mesmo banco e certificado configurados pela área administrativa.
+Segunda-feira é `0` e domingo é `6`.
+
+Em ambiente de desenvolvimento o agendador fica desativado por padrão. Em produção, fica ativado por padrão e pode ser desligado com `NFE_AUTO_SYNC_ENABLED=0`.
+
+A execução automática aparece no mesmo log de auditoria da aplicação com a ação `sefaz_sync_auto`.
+
+Se o serviço estiver desligado no horário programado e voltar ainda no mesmo dia útil, a aplicação faz uma execução de recuperação. O disparo diário é registrado no próprio banco para que reinícios do serviço não repitam a mesma sincronização automática.
 
 ## Desenvolvimento
 
@@ -190,7 +208,7 @@ Os testes automatizados não acessam a SEFAZ real e não utilizam certificado de
 
 ## Releases
 
-A versão estável atual é **v2.0.1**.
+A versão estável atual é **v2.1.1**. O pacote da release contém o código e a documentação, sem banco, senhas ou certificado. O agendamento interno é desativado por padrão em desenvolvimento; para uso automático a instalação precisa permanecer em execução e a configuração deve ser validada pela TI.
 
 Os pacotes de instalação são publicados em **GitHub Releases**. Para implantação, utilize o arquivo `ConsultaManifestacao_DFE-vX.Y.Z.zip`, e não os pacotes automáticos de source code gerados pelo GitHub.
 
@@ -200,3 +218,5 @@ Os pacotes de instalação são publicados em **GitHub Releases**. Para implanta
 - **v1.0**: refatoração da arquitetura desktop e CLI;
 - **v2.0.0**: interface Web corporativa, administração centralizada e publicação para rede interna.
 - **v2.0.1**: centralização de segredos de runtime e ajustes de configuração/implantação.
+
+- **v2.1.1**: consulta completa com filtros e exportação, retirada da CLI/GUI legadas, agendador interno, diagnóstico do NSU enviado e informado no erro 656.

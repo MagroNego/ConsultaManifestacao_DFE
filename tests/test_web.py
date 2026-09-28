@@ -1,6 +1,8 @@
+from io import BytesIO
 from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
+from openpyxl import load_workbook
 
 from nfe_consulta.banco import BancoManifestacoes
 from nfe_consulta.modelos import Manifestacao, RetornoDistribuicao
@@ -58,7 +60,7 @@ def test_usuario_comum_acessa_excel_status_e_login_do_atualizar(tmp_path):
     with TestClient(app) as client:
         home = client.get("/")
         assert home.status_code == 200
-        assert ">Excel<" in home.text
+        assert ">Consulta<" in home.text
         assert ">Status<" in home.text
         assert ">Atualizar<" in home.text
         assert client.get("/status").status_code == 200
@@ -189,7 +191,7 @@ def test_admin_pode_disparar_atualizacao_sefaz(tmp_path, monkeypatch):
             cache=False,
         )
 
-    monkeypatch.setattr("nfe_consulta.web.app.sincronizar_banco", fake_sync)
+    monkeypatch.setattr("nfe_consulta.web.sync_runtime.sincronizar_banco", fake_sync)
 
     with TestClient(app) as client:
         login = client.post(
@@ -244,7 +246,7 @@ def test_headers_de_seguranca_e_healthcheck(tmp_path):
 
 
 
-def test_tela_excel_tem_um_unico_txt_e_sem_selecao_de_pasta(tmp_path):
+def test_tela_consulta_tem_filtros_e_fluxo_por_txt(tmp_path):
     cfg = settings_web(tmp_path)
     criar_banco(cfg.database_path)
     app = create_app(cfg)
@@ -256,7 +258,10 @@ def test_tela_excel_tem_um_unico_txt_e_sem_selecao_de_pasta(tmp_path):
     assert "CHAVES.txt" in resposta.text
     assert "webkitdirectory" not in resposta.text
     assert ">Pasta<" not in resposta.text
-    assert "Consulta rápida" in resposta.text
+    assert "Data inicial do evento" in resposta.text
+    assert "Data final do evento" in resposta.text
+    assert "Manifestação" in resposta.text
+    assert "Consulta por arquivo" in resposta.text
 
 
 def test_consulta_rapida_por_numero_mostra_eventos_do_banco(tmp_path, monkeypatch):
@@ -283,7 +288,7 @@ def test_consulta_rapida_por_numero_mostra_eventos_do_banco(tmp_path, monkeypatc
     banco.fechar()
 
     monkeypatch.setattr(
-        "nfe_consulta.web.app.sincronizar_banco",
+        "nfe_consulta.web.sync_runtime.sincronizar_banco",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(
             AssertionError("Consulta rápida não deve acessar a SEFAZ")
         ),
@@ -294,7 +299,7 @@ def test_consulta_rapida_por_numero_mostra_eventos_do_banco(tmp_path, monkeypatc
         resposta = client.get("/consulta", params={"numero": "91779"})
 
     assert resposta.status_code == 200
-    assert "NF 91779" in resposta.text
+    assert "91779" in resposta.text
     assert "Ciência da Operação" in resposta.text
     assert "135260000000001" in resposta.text
     assert ">1<" in resposta.text
@@ -309,7 +314,7 @@ def test_consulta_rapida_nao_aceita_expressao_sql(tmp_path):
         resposta = client.get("/consulta", params={"numero": "91779 OR 1=1"})
 
     assert resposta.status_code == 200
-    assert "Informe somente o número da NF." in resposta.text
+    assert "Informe somente números no campo Número da NF." in resposta.text
 
 
 
@@ -414,7 +419,7 @@ def test_sincronizacao_web_usa_certificado_configurado_em_arquivo(tmp_path, monk
             cache=False,
         )
 
-    monkeypatch.setattr("nfe_consulta.web.app.sincronizar_banco", fake_sync)
+    monkeypatch.setattr("nfe_consulta.web.sync_runtime.sincronizar_banco", fake_sync)
     monkeypatch.setattr(
         "nfe_consulta.web.app.carregar_certificado_arquivo",
         lambda *_args, **_kwargs: SimpleNamespace(
@@ -534,3 +539,159 @@ def test_admin_rejeita_arquivo_que_nao_e_banco_de_manifestacoes(tmp_path):
 
     assert resposta.status_code == 400
     assert not cfg.database_path_file.exists()
+
+
+
+def test_consulta_completa_filtra_por_data_e_manifestacao(tmp_path):
+    cfg = settings_web(tmp_path)
+    banco = BancoManifestacoes(str(cfg.database_path))
+
+    chave_2 = CHAVE[:25] + "000091780" + CHAVE[34:]
+    eventos = (
+        (
+            CHAVE,
+            Manifestacao(
+                codigo="210210",
+                descricao="Ciência da Operação",
+                data="2026-09-10T08:00:00-03:00",
+                protocolo="135260000000101",
+                nsu="563701",
+                schema="procEventoNFe_v1.00.xsd",
+            ),
+        ),
+        (
+            chave_2,
+            Manifestacao(
+                codigo="210240",
+                descricao="Operação não Realizada",
+                data="2026-09-20T09:30:00-03:00",
+                protocolo="135260000000102",
+                nsu="563702",
+                schema="procEventoNFe_v1.00.xsd",
+            ),
+        ),
+    )
+    banco.salvar_retorno(
+        "16840128000101",
+        RetornoDistribuicao(
+            status_codigo=138,
+            status_motivo="Documentos localizados",
+            ult_nsu="563702".zfill(15),
+            max_nsu="563702".zfill(15),
+            manifestacoes=eventos,
+        ),
+    )
+    banco.fechar()
+
+    app = create_app(cfg)
+    with TestClient(app) as client:
+        resposta = client.get(
+            "/consulta",
+            params={
+                "consultar": "1",
+                "data_inicial": "2026-09-15",
+                "data_final": "2026-09-30",
+                "codigo": "210240",
+            },
+        )
+
+    assert resposta.status_code == 200
+    assert "Operação não Realizada" in resposta.text
+    assert "91780" in resposta.text
+    assert "135260000000101" not in resposta.text
+    assert ">91779<" not in resposta.text
+
+
+def test_exportacao_da_consulta_respeita_os_mesmos_filtros(tmp_path):
+    cfg = settings_web(tmp_path)
+    banco = BancoManifestacoes(str(cfg.database_path))
+
+    chave_2 = CHAVE[:25] + "000091780" + CHAVE[34:]
+    banco.salvar_retorno(
+        "16840128000101",
+        RetornoDistribuicao(
+            status_codigo=138,
+            status_motivo="Documentos localizados",
+            ult_nsu="563704".zfill(15),
+            max_nsu="563704".zfill(15),
+            manifestacoes=(
+                (
+                    CHAVE,
+                    Manifestacao(
+                        codigo="210210",
+                        descricao="Ciência da Operação",
+                        data="2026-09-10T08:00:00-03:00",
+                        protocolo="135260000000201",
+                        nsu="563703",
+                        schema="procEventoNFe_v1.00.xsd",
+                    ),
+                ),
+                (
+                    chave_2,
+                    Manifestacao(
+                        codigo="210240",
+                        descricao="Operação não Realizada",
+                        data="2026-09-20T09:30:00-03:00",
+                        protocolo="135260000000202",
+                        nsu="563704",
+                        schema="procEventoNFe_v1.00.xsd",
+                    ),
+                ),
+            ),
+        ),
+    )
+    banco.fechar()
+
+    app = create_app(cfg)
+    with TestClient(app) as client:
+        resposta = client.get(
+            "/consulta/exportar",
+            params={
+                "data_inicial": "2026-09-15",
+                "data_final": "2026-09-30",
+                "codigo": "210240",
+            },
+        )
+
+    assert resposta.status_code == 200
+    assert resposta.content.startswith(b"PK")
+    wb = load_workbook(BytesIO(resposta.content), read_only=True)
+    ws = wb["Manifestacoes"]
+    assert ws["A5"].value == 91780
+    assert ws["E5"].value == "Operação não Realizada"
+    assert ws["A6"].value is None
+
+
+
+def test_consulta_identifica_banco_sem_sincronizacao(tmp_path):
+    cfg = settings_web(tmp_path)
+    criar_banco(cfg.database_path)
+    app = create_app(cfg)
+
+    with TestClient(app) as client:
+        resposta = client.get("/consulta", params={"numero": "91779"})
+
+    assert resposta.status_code == 200
+    assert "Banco não sincronizado" in resposta.text
+    assert "ainda não possui uma sincronização concluída" in resposta.text
+    assert "informe a senha" not in resposta.text.casefold()
+    assert "sqlcipher" not in resposta.text.casefold()
+
+
+def test_consulta_publica_nao_expoe_erro_de_senha_do_banco(tmp_path, monkeypatch):
+    cfg = settings_web(tmp_path)
+    criar_banco(cfg.database_path)
+
+    def falha_banco(_settings):
+        raise ValueError("Banco criptografado: informe a senha para abri-lo.")
+
+    monkeypatch.setattr("nfe_consulta.web.app._status_web", falha_banco)
+
+    app = create_app(cfg)
+    with TestClient(app) as client:
+        resposta = client.get("/consulta", params={"numero": "91779"})
+
+    assert resposta.status_code == 200
+    assert "Banco não sincronizado" in resposta.text
+    assert "informe a senha" not in resposta.text.casefold()
+    assert "criptografado" not in resposta.text.casefold()

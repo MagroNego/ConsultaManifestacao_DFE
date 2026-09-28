@@ -32,10 +32,20 @@ def _motivo_exibivel(motivo: str) -> str:
     ).split())[:400]
 
 
-def _erro_consumo_indevido(retorno: RetornoDistribuicao) -> NfeConsumoIndevidoErro:
+def _erro_consumo_indevido(
+    retorno: RetornoDistribuicao, *, ult_nsu_enviado: str | None = None
+) -> NfeConsumoIndevidoErro:
     motivo = _motivo_exibivel(retorno.status_motivo) or "Consumo Indevido (sem xMotivo na resposta)"
+    diagnostico = ""
+    if ult_nsu_enviado is not None:
+        diagnostico = f" | ultNSU enviado: {ult_nsu_enviado.zfill(15)}"
+        if retorno.ult_nsu_informado:
+            diagnostico += f" | ultNSU informado pela SEFAZ: {retorno.ult_nsu}"
+        else:
+            diagnostico += " | ultNSU da SEFAZ: não informado na rejeição"
     return NfeConsumoIndevidoErro(
-        f"SEFAZ retornou 656 | xMotivo: {motivo} | Aguarde uma hora antes de tentar novamente."
+        f"SEFAZ retornou 656 | xMotivo: {motivo}{diagnostico} "
+        "| Aguarde uma hora antes de tentar novamente."
     )
 
 
@@ -174,7 +184,7 @@ def consultar_distribuicao(
     resposta = _enviar_soap_windows(montar_soap(dist_dfe), certificado)
     retorno = parse_retorno_distribuicao(resposta)
     if retorno.status_codigo == 656:
-        raise _erro_consumo_indevido(retorno)
+        raise _erro_consumo_indevido(retorno, ult_nsu_enviado=ult_nsu)
     if retorno.status_codigo not in (137, 138):
         raise NfeErroComunicacao(
             f"SEFAZ retornou {retorno.status_codigo}: {retorno.status_motivo}"

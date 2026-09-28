@@ -49,6 +49,9 @@ class BancoManifestacoes:
             CREATE INDEX IF NOT EXISTS idx_manifestacoes_chave
                 ON manifestacoes(chave);
 
+            CREATE INDEX IF NOT EXISTS idx_manifestacoes_cnpj_data
+                ON manifestacoes(cnpj, data_evento);
+
             CREATE TABLE IF NOT EXISTS consultas_pontuais (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 cnpj TEXT NOT NULL,
@@ -69,6 +72,12 @@ class BancoManifestacoes:
                 cnpj TEXT PRIMARY KEY,
                 ultima_tentativa_em TEXT NOT NULL,
                 proxima_tentativa_em TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS controle_agendamento (
+                cnpj TEXT PRIMARY KEY,
+                ultima_execucao_local TEXT NOT NULL,
+                atualizado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
             """
         )

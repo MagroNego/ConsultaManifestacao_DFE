@@ -28,6 +28,11 @@ class AuditLog:
         handler.setFormatter(logging.Formatter("%(asctime)s %(message)s"))
         self._logger.addHandler(handler)
 
+    def _write_payload(self, payload: dict) -> None:
+        self._logger.info(
+            json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+        )
+
     def write(
         self,
         request: Request,
@@ -36,14 +41,30 @@ class AuditLog:
         result: str,
         **details,
     ) -> None:
-        payload = {
-            "user": user.username,
-            "admin": user.is_admin,
-            "action": action,
-            "result": result,
-            "client": request.client.host if request.client else None,
-            **details,
-        }
-        self._logger.info(
-            json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+        self._write_payload(
+            {
+                "user": user.username,
+                "admin": user.is_admin,
+                "action": action,
+                "result": result,
+                "client": request.client.host if request.client else None,
+                **details,
+            }
+        )
+
+    def write_system(
+        self,
+        action: str,
+        result: str,
+        **details,
+    ) -> None:
+        self._write_payload(
+            {
+                "user": "system",
+                "admin": False,
+                "action": action,
+                "result": result,
+                "client": None,
+                **details,
+            }
         )

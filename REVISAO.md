@@ -1,83 +1,38 @@
-# Dossiê técnico e de segurança — versão 1.0
+# Revisão técnica — v2.1.1
 
-## Arquitetura
+## Componentes
 
-A v1 mantém Python e separa a aplicação em camadas.
+- `nfe_consulta/web/app.py`: interface Web, acesso público à consulta e login
+  administrativo para configuração e sincronização.
+- `nfe_consulta/web/consulta_local.py`: filtros, paginação e exportação local.
+- `nfe_consulta/web/scheduler.py`: execução automática enquanto o servidor
+  estiver em funcionamento, com registro diário no banco.
+- `nfe_consulta/sincronizacao.py` e `distribuicao.py`: leitura sequencial de NSU
+  e integração com o Ambiente Nacional da NF-e.
+- `nfe_consulta/banco.py`: eventos, cursor NSU, pausa por 656 e cooldown.
 
-- `servico.py`: orquestra consulta local, sincronização e exportação.
-- `gui.py`: interface Tkinter. Chama a camada de serviço diretamente.
-- `cli.py`: interface de terminal.
-- `distribuicao.py`: comunicação com NFeDistribuicaoDFe.
-- `banco.py`: SQLite/SQLCipher, eventos, cursor NSU e pausa preventiva.
-- `xlsx_writer.py`: exportação Excel.
+## Controles
 
-A GUI não executa a CLI em subprocesso. GUI e CLI usam o mesmo fluxo de aplicação.
+- Banco SQLCipher com senha em `secrets/db-password.txt`.
+- Certificado A1 do Windows (`CurrentUser` ou `LocalMachine`) ou PFX/P12
+  configurado na aba **Atualizar**; arquivos de segredo não entram no pacote.
+- Atualização exige login administrativo, sessão assinada e token CSRF.
+- Consulta e exportação não fazem chamadas à SEFAZ.
+- Uma sincronização por processo; para SQLite, execute somente um processo.
+- Retornos válidos e cursor são gravados em uma transação. O erro 656 registra
+  pausa, NSU enviado e, quando informado, o NSU indicado pela SEFAZ, sem
+  avançar automaticamente o cursor.
+- XML processado com `defusedxml`; limites de tamanho e SQL parametrizado.
+- Auditoria em `logs/web_audit.log`, sem senha nem certificado.
 
-## Rede e certificado
+## Validação
 
-A atualização remota usa:
+Os 73 testes automatizados passaram no ambiente de preparação. Consulta,
+exportação Excel e sincronização manual foram exercitadas no Windows com o
+certificado do usuário em 28/09/2026; a sincronização concluiu com
+`ultNSU = maxNSU = 000000000564242`.
 
-`https://www1.nfe.fazenda.gov.br/NFeDistribuicaoDFe/NFeDistribuicaoDFe.asmx`
-
-O certificado é lido do repositório do usuário do Windows. A chave privada não é exportada pelo aplicativo.
-
-A operação local e a geração de Excel não exigem acesso à SEFAZ.
-
-## Controles relevantes
-
-- XML processado com `defusedxml`.
-- Limites de tamanho para TXT, SOAP e documentos distribuídos.
-- SQL parametrizado.
-- Cursor NSU e eventos gravados em transação.
-- Rejeição 656 registra pausa preventiva no banco.
-- Sincronização completa recente evita repetição imediata.
-- Planilha gravada de forma atômica.
-- Conteúdo externo exportado como texto para reduzir risco de fórmula.
-- Consulta local não cria banco ausente por acidente.
-- Banco SQLCipher opcional com migração explícita e preservação do original.
-- Sem servidor web, porta de escuta ou telemetria.
-
-## CLI v1
-
-```powershell
-nfe-consulta atualizar
-nfe-consulta excel
-nfe-consulta status
-nfe-consulta gui
-```
-
-A v1 usa somente os subcomandos curtos. A sintaxe longa permanece preservada na v0.9.4, que continua intacta na branch `main` até aprovação da nova versão.
-
-## Dados armazenados
-
-O banco pode conter:
-
-- CNPJ consultado;
-- chave da NF-e;
-- código e descrição do evento;
-- data do evento;
-- protocolo;
-- NSU;
-- estado da distribuição;
-- registro de pausa preventiva.
-
-TXT e XLSX não são criptografados automaticamente.
-
-## Limitações
-
-- O histórico recuperável depende da janela disponibilizada pelo Ambiente Nacional.
-- “Sem evento localizado” não comprova ausência histórica de manifestação.
-- Limites de consumo podem ser compartilhados com outros sistemas do mesmo CNPJ.
-- A aplicação não substitui revisão de TI, política de backup ou controle de acesso ao certificado.
-- A interface precisa ser validada em desktop Windows corporativo.
-- Os testes automatizados não substituem teste integrado com certificado real.
-
-## Verificação sugerida
-
-1. Revisar o diff entre v0.9.4 e v1.0.
-2. Validar dependências e origem dos pacotes.
-3. Rodar `py -m pytest -q`.
-4. Testar `nfe-consulta excel` com banco de teste.
-5. Testar `nfe-consulta atualizar` em ambiente controlado.
-6. Confirmar tratamento de 137, 138 e 656.
-7. Confirmar permissões e backup do banco.
+A instalação definitiva, permissões do certificado da conta de serviço,
+backup/restauração e agendamento automático devem ser validados no servidor
+escolhido pela TI. Outros sistemas que consultem o mesmo CNPJ compartilham
+as regras de sequência e consumo do serviço de distribuição.

@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import shutil
 import tempfile
 import threading
+from datetime import date
 from pathlib import Path
 from typing import Annotated
 
@@ -25,15 +28,19 @@ from nfe_consulta.certificado_config import (
     salvar_config_certificado_arquivo,
 )
 from nfe_consulta.modelos import NfeConsumoIndevidoErro, NfeLimiteConsultaErro
+from nfe_consulta.relatorio_eventos import gravar_eventos_xlsx
 from nfe_consulta.servico import (
     ParametrosConsulta,
-    ParametrosSincronizacao,
     executar_consulta,
-    sincronizar_banco,
 )
 from nfe_consulta.web.status_view import WebStatus, read_web_status
 from nfe_consulta.web.audit import AuditLog
-from nfe_consulta.web.consulta_local import consultar_numero_nota
+from nfe_consulta.web.consulta_local import (
+    TIPOS_MANIFESTACAO,
+    consultar_eventos,
+    consultar_eventos_exportacao,
+    normalizar_filtros,
+)
 from nfe_consulta.web.auth import (
     PUBLIC_USER,
     WebUser,
@@ -46,7 +53,9 @@ from nfe_consulta.web.auth import (
     set_admin_cookie,
     validate_csrf,
 )
+from nfe_consulta.web.scheduler import loop_sincronizacao_automatica
 from nfe_consulta.web.settings import WebSettings, get_settings
+from nfe_consulta.web.sync_runtime import sincronizar_configurado
 from nfe_consulta.web.uploads import consolidar_txts
 
 
@@ -95,13 +104,53 @@ def _database_error_message(
 ) -> str:
     if settings.environment == "development" and user.is_admin:
         return f"{type(exc).__name__}: {exc}"
-    return "Não foi possível abrir o banco configurado."
+    return (
+        "Banco de manifestações indisponível ou ainda não sincronizado. "
+        "Procure o responsável pela aplicação."
+    )
 
 def _database_path(settings: WebSettings) -> Path:
     return carregar_caminho_banco(
         settings.database_path,
         path_file=settings.database_path_file,
     )
+
+
+def _consulta_database_state(settings: WebSettings) -> dict:
+    caminho = _database_path(settings)
+    if not caminho.is_file():
+        return {
+            "ready": False,
+            "label": "Banco indisponível",
+            "notice": "O banco de manifestações ainda não está disponível para consulta.",
+        }
+
+    try:
+        status = _status_web(settings)
+    except Exception:
+        return {
+            "ready": False,
+            "label": "Banco não sincronizado",
+            "notice": (
+                "O banco de manifestações ainda não está configurado ou sincronizado "
+                "para consulta."
+            ),
+        }
+
+    if status.updated_at is None:
+        return {
+            "ready": False,
+            "label": "Banco não sincronizado",
+            "notice": (
+                "O banco de manifestações ainda não possui uma sincronização concluída."
+            ),
+        }
+
+    return {
+        "ready": True,
+        "label": "Banco disponível",
+        "notice": None,
+    }
 
 
 def _database_web(settings: WebSettings) -> dict:
@@ -114,7 +163,7 @@ def _database_web(settings: WebSettings) -> dict:
             settings.database_path_file
             and settings.database_path_file.is_file()
         ),
-        "password_configured": bool(settings.database_password),
+        "password_configured": bool(settings.current_database_password()),
     }
 
 
@@ -122,7 +171,15 @@ def _status_web(settings: WebSettings) -> WebStatus:
     return read_web_status(
         _database_path(settings),
         CNPJ_PADRAO,
-        password=settings.database_password,
+        password=settings.current_database_password(),
+    )
+
+
+def _filtros_iniciais():
+    hoje = date.today()
+    return normalizar_filtros(
+        data_inicial=hoje.replace(day=1).isoformat(),
+        data_final=hoje.isoformat(),
     )
 
 
@@ -177,6 +234,37 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
     app.state.settings = settings
     app.state.sync_lock = threading.Lock()
     app.state.audit = AuditLog(settings.audit_log)
+    app.state.auto_sync_task = None
+    app.state.auto_sync_next_at = None
+
+    @app.on_event("startup")
+    async def start_auto_sync():
+        if not settings.auto_sync_enabled:
+            return
+        app.state.auto_sync_task = asyncio.create_task(
+            loop_sincronizacao_automatica(app)
+        )
+        app.state.audit.write_system(
+            "sefaz_scheduler",
+            "iniciado",
+            hora=settings.auto_sync_hour,
+            minuto=settings.auto_sync_minute,
+            dias=list(settings.auto_sync_weekdays),
+            max_lotes=settings.auto_sync_max_lotes,
+        )
+
+    @app.on_event("shutdown")
+    async def stop_auto_sync():
+        task = app.state.auto_sync_task
+        if task is None:
+            return
+        task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
+        app.state.audit.write_system(
+            "sefaz_scheduler",
+            "encerrado",
+        )
 
     @app.middleware("http")
     async def security_headers(request: Request, call_next):
@@ -339,74 +427,225 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             "ok",
         )
         response = RedirectResponse(
-            url=request.url_for("excel_page"),
+            url=request.url_for("consulta_page"),
             status_code=303,
         )
         clear_admin_cookie(response, settings)
         return response
 
     @app.get("/", response_class=HTMLResponse)
-    async def excel_page(
+    async def home(
         request: Request,
         user: Annotated[WebUser, Depends(current_user)],
     ):
-        return _render(
-            request,
-            "excel.html",
-            user,
-            database_ready=_database_path(settings).is_file(),
-            consulta_numero="",
-            consulta_eventos=(),
+        return RedirectResponse(
+            url=request.url_for("consulta_page"),
+            status_code=303,
         )
 
     @app.get("/consulta", response_class=HTMLResponse)
-    async def consulta_rapida(
+    async def consulta_page(
         request: Request,
         user: Annotated[WebUser, Depends(current_user)],
+        consultar: str = "",
+        data_inicial: str = "",
+        data_final: str = "",
         numero: str = "",
+        serie: str = "",
+        chave: str = "",
+        codigo: str = "",
+        pagina: int = 1,
     ):
-        numero_limpo = numero.strip()
-        eventos = ()
-        erro_consulta = None
+        consultou = consultar == "1" or any(
+            valor.strip()
+            for valor in (data_inicial, data_final, numero, serie, chave, codigo)
+        )
 
-        if numero_limpo:
-            if not numero_limpo.isdigit():
-                erro_consulta = "Informe somente o número da NF."
-            elif not _database_path(settings).is_file():
-                erro_consulta = "Banco de manifestações indisponível no servidor."
+        if consultou:
+            try:
+                filtros = normalizar_filtros(
+                    data_inicial=data_inicial,
+                    data_final=data_final,
+                    numero=numero,
+                    serie=serie,
+                    chave=chave,
+                    codigo=codigo,
+                )
+            except ValueError as exc:
+                return _render(
+                    request,
+                    "consulta.html",
+                    user,
+                    database_ready=_consulta_database_state(settings)["ready"],
+                    database_status_label=_consulta_database_state(settings)["label"],
+                    database_notice=_consulta_database_state(settings)["notice"],
+                    filtros=_filtros_iniciais(),
+                    tipos_manifestacao=TIPOS_MANIFESTACAO,
+                    consultou=True,
+                    resultado=None,
+                    consulta_error=str(exc),
+                )
+        else:
+            filtros = _filtros_iniciais()
+
+        resultado = None
+        erro_consulta = None
+        banco = _database_path(settings)
+        database_state = _consulta_database_state(settings)
+
+        if consultou:
+            if not database_state["ready"]:
+                erro_consulta = database_state["notice"]
             else:
                 try:
-                    eventos = await run_in_threadpool(
-                        consultar_numero_nota,
-                        _database_path(settings),
+                    resultado = await run_in_threadpool(
+                        consultar_eventos,
+                        banco,
                         CNPJ_PADRAO,
-                        int(numero_limpo),
-                        password=settings.database_password,
+                        filtros,
+                        password=settings.current_database_password(),
+                        pagina=pagina,
+                        por_pagina=100,
                     )
                     app.state.audit.write(
                         request,
                         user,
-                        "consulta_nf",
+                        "consulta_eventos",
                         "ok",
-                        resultados=len(eventos),
+                        resultados=resultado.total,
+                        pagina=resultado.pagina,
                     )
-                except (ValueError, OSError, RuntimeError) as exc:
-                    erro_consulta = str(exc)
                 except Exception as exc:
                     erro_consulta = _database_error_message(exc, settings, user)
 
         return _render(
             request,
-            "excel.html",
+            "consulta.html",
             user,
-            database_ready=_database_path(settings).is_file(),
-            consulta_numero=numero_limpo,
-            consulta_eventos=eventos,
+            database_ready=database_state["ready"],
+            database_status_label=database_state["label"],
+            database_notice=database_state["notice"],
+            filtros=filtros,
+            tipos_manifestacao=TIPOS_MANIFESTACAO,
+            consultou=consultou,
+            resultado=resultado,
             consulta_error=erro_consulta,
         )
 
+    @app.get("/consulta/exportar")
+    async def exportar_consulta_eventos(
+        request: Request,
+        user: Annotated[WebUser, Depends(current_user)],
+        data_inicial: str = "",
+        data_final: str = "",
+        numero: str = "",
+        serie: str = "",
+        chave: str = "",
+        codigo: str = "",
+    ):
+        banco = _database_path(settings)
+        database_state = _consulta_database_state(settings)
+        if not database_state["ready"]:
+            raise HTTPException(
+                status_code=503,
+                detail=database_state["notice"],
+            )
+
+        try:
+            filtros = normalizar_filtros(
+                data_inicial=data_inicial,
+                data_final=data_final,
+                numero=numero,
+                serie=serie,
+                chave=chave,
+                codigo=codigo,
+            )
+            eventos = await run_in_threadpool(
+                consultar_eventos_exportacao,
+                banco,
+                CNPJ_PADRAO,
+                filtros,
+                password=settings.current_database_password(),
+            )
+        except (ValueError, OSError, RuntimeError) as exc:
+            app.state.audit.write(
+                request,
+                user,
+                "export_eventos_excel",
+                "erro",
+                reason=type(exc).__name__,
+            )
+            raise HTTPException(
+                status_code=400,
+                detail=_database_error_message(exc, settings, user),
+            ) from exc
+        except Exception as exc:
+            app.state.audit.write(
+                request,
+                user,
+                "export_eventos_excel",
+                "erro",
+                reason="unexpected",
+            )
+            raise HTTPException(
+                status_code=500,
+                detail=_database_error_message(exc, settings, user),
+            ) from exc
+
+        temporario = Path(tempfile.mkdtemp(prefix="nfe-eventos-web-"))
+        inicio = filtros.data_inicial.isoformat() if filtros.data_inicial else "inicio"
+        fim = filtros.data_final.isoformat() if filtros.data_final else "atual"
+        nome = f"Manifestacoes_{inicio}_a_{fim}.xlsx"
+        saida = temporario / nome
+
+        try:
+            await run_in_threadpool(
+                gravar_eventos_xlsx,
+                saida,
+                eventos,
+                filtros,
+            )
+        except Exception as exc:
+            shutil.rmtree(temporario, ignore_errors=True)
+            app.state.audit.write(
+                request,
+                user,
+                "export_eventos_excel",
+                "erro",
+                reason=type(exc).__name__,
+            )
+            raise HTTPException(
+                status_code=500,
+                detail="Não foi possível gerar a planilha da consulta.",
+            ) from exc
+
+        app.state.audit.write(
+            request,
+            user,
+            "export_eventos_excel",
+            "ok",
+            eventos=len(eventos),
+        )
+        return FileResponse(
+            path=saida,
+            filename=nome,
+            media_type=(
+                "application/vnd.openxmlformats-officedocument."
+                "spreadsheetml.sheet"
+            ),
+            headers={
+                "Cache-Control": "no-store",
+                "X-Content-Type-Options": "nosniff",
+            },
+            background=BackgroundTask(
+                shutil.rmtree,
+                temporario,
+                ignore_errors=True,
+            ),
+        )
+
     @app.post("/excel")
-    async def exportar_excel(
+    async def exportar_excel_chaves(
         request: Request,
         user: Annotated[WebUser, Depends(current_user)],
         csrf: str = Form(...),
@@ -418,16 +657,22 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             app.state.audit.write(
                 request,
                 user,
-                "excel",
+                "excel_chaves",
                 "erro",
                 reason="database_missing",
             )
             return _render(
                 request,
-                "excel.html",
+                "consulta.html",
                 user,
                 status_code=503,
                 database_ready=False,
+                database_status_label="Banco indisponível",
+                database_notice="O banco de manifestações ainda não está disponível para consulta.",
+                filtros=_filtros_iniciais(),
+                tipos_manifestacao=TIPOS_MANIFESTACAO,
+                consultou=False,
+                resultado=None,
                 error="Banco de manifestações indisponível no servidor.",
             )
 
@@ -451,14 +696,14 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                     cnpj=CNPJ_PADRAO,
                     uf=UF_PADRAO,
                     sincronizar_sefaz=False,
-                    senha_banco=settings.database_password,
+                    senha_banco=settings.current_database_password(),
                 ),
             )
 
             app.state.audit.write(
                 request,
                 user,
-                "excel",
+                "excel_chaves",
                 "ok",
                 arquivos=resumo_upload.arquivos_txt,
                 chaves=resumo_upload.chaves,
@@ -489,16 +734,22 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             app.state.audit.write(
                 request,
                 user,
-                "excel",
+                "excel_chaves",
                 "erro",
                 reason=type(exc).__name__,
             )
             return _render(
                 request,
-                "excel.html",
+                "consulta.html",
                 user,
                 status_code=400,
-                database_ready=True,
+                database_ready=_consulta_database_state(settings)["ready"],
+                database_status_label=_consulta_database_state(settings)["label"],
+                database_notice=_consulta_database_state(settings)["notice"],
+                filtros=_filtros_iniciais(),
+                tipos_manifestacao=TIPOS_MANIFESTACAO,
+                consultou=False,
+                resultado=None,
                 error=str(exc),
             )
         except Exception:
@@ -506,16 +757,22 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             app.state.audit.write(
                 request,
                 user,
-                "excel",
+                "excel_chaves",
                 "erro",
                 reason="unexpected",
             )
             return _render(
                 request,
-                "excel.html",
+                "consulta.html",
                 user,
                 status_code=500,
-                database_ready=True,
+                database_ready=_consulta_database_state(settings)["ready"],
+                database_status_label=_consulta_database_state(settings)["label"],
+                database_notice=_consulta_database_state(settings)["notice"],
+                filtros=_filtros_iniciais(),
+                tipos_manifestacao=TIPOS_MANIFESTACAO,
+                consultou=False,
+                resultado=None,
                 error="Não foi possível gerar a planilha.",
             )
 
@@ -593,7 +850,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             banco = await run_in_threadpool(
                 salvar_caminho_banco,
                 caminho,
-                settings.database_password,
+                settings.current_database_password(),
                 path_file=settings.database_path_file,
             )
             app.state.audit.write(
@@ -786,28 +1043,10 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             )
 
         try:
-            cert_arquivo = carregar_config_certificado_arquivo(
-                settings.certificate_path_file,
-                settings.certificate_password_file,
-            )
             resumo = await run_in_threadpool(
-                sincronizar_banco,
-                ParametrosSincronizacao(
-                    banco=_database_path(settings),
-                    cnpj=CNPJ_PADRAO,
-                    uf=UF_PADRAO,
-                    max_lotes=max_lotes,
-                    senha_banco=settings.database_password,
-                    cert_thumbprint=(
-                        None if cert_arquivo is not None else settings.certificate_thumbprint
-                    ),
-                    cert_store=settings.certificate_store,
-                    cert_arquivo=cert_arquivo.path if cert_arquivo is not None else None,
-                    cert_senha_arquivo=(
-                        cert_arquivo.password if cert_arquivo is not None else None
-                    ),
-                    cooldown_minutos=settings.sync_cooldown_minutes,
-                ),
+                sincronizar_configurado,
+                settings,
+                max_lotes=max_lotes,
             )
             app.state.audit.write(
                 request,
