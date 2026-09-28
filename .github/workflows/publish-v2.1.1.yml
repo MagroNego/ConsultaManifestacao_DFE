@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   publish:
-    if: github.event.head_commit.message == 'chore: executar publicação v2.1.1'
+    if: "github.event.head_commit.message == 'chore: executar publicação v2.1.1'"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
