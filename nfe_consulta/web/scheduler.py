@@ -179,6 +179,7 @@ async def executar_sincronizacao_automatica(
                 sincronizar_configurado,
                 settings,
                 max_lotes=settings.auto_sync_max_lotes,
+                audit=app.state.audit,
             )
         except NfeLimiteConsultaErro:
             app.state.audit.write_system(

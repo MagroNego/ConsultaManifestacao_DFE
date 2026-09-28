@@ -59,7 +59,7 @@ def test_sincronizacao_automatica_usa_mesmo_lock_da_web(monkeypatch):
     monkeypatch.setattr(
         scheduler,
         "sincronizar_configurado",
-        lambda _settings, *, max_lotes: SimpleNamespace(
+        lambda _settings, *, max_lotes, audit=None: SimpleNamespace(
             lotes=1,
             eventos_novos=2,
             ult_nsu="000000000000010",

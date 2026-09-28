@@ -16,6 +16,15 @@ NFE_AUTO_SYNC_MINUTE=0
 NFE_AUTO_SYNC_WEEKDAYS=0,1,2,3,4
 NFE_AUTO_SYNC_MAX_LOTES=50
 
+# Avisos de Operação não Realizada (210240).
+# Os destinatários são editados pelo admin em Atualizar e ficam em secrets/email-recipients.json.
+# A senha SMTP, se necessária, fica somente em secrets/smtp-password.txt.
+NFE_SMTP_HOST=
+NFE_SMTP_PORT=587
+NFE_SMTP_SECURITY=starttls
+NFE_SMTP_FROM=
+NFE_SMTP_USER=
+
 # Para um servidor em produção, configurar no ambiente do processo:
 # NFE_WEB_ENV=production
 # NFE_WEB_CSRF_SECRET=<valor aleatório de pelo menos 32 caracteres>

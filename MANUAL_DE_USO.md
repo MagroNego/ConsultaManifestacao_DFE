@@ -47,6 +47,13 @@ A tela **Status** apresenta:
 
 ## Atualizar
 
+Na seção **Alertas por e-mail**, o administrador informa os destinatários dos
+avisos de novos eventos **Operação não Realizada (210240)**. Endereços separados
+por linha ou vírgula são aceitos. Se o envio SMTP falhar, a tela mostra a
+quantidade pendente e oferece **Tentar enviar pendentes** após corrigir a
+configuração do servidor. A sincronização da SEFAZ não é refeita para reenviar
+esses avisos.
+
 A área **Atualizar** exige login administrativo.
 
 Ela permite:

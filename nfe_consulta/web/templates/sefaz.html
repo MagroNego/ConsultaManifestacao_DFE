@@ -95,6 +95,42 @@
 <section class="card certificate-card">
   <div class="card-title">
     <div>
+      <h2>Alertas por e-mail</h2>
+      <span class="muted">Novo evento de Operação não Realizada</span>
+    </div>
+    <span class="status-dot {{ 'ok' if smtp_ready else 'bad' }}">
+      {{ 'Envio configurado' if smtp_ready else 'SMTP pendente' }}
+    </span>
+  </div>
+  <form action="{{ url_for('atualizar_alertas_email') }}" method="post">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label class="field">
+      <span>Destinatários</span>
+      <textarea name="recipients" rows="4" maxlength="4000" placeholder="fiscal@empresa.com.br&#10;responsavel@empresa.com.br">{{ email_recipients }}</textarea>
+    </label>
+    <div class="actions">
+      <button class="button primary" type="submit">Salvar destinatários</button>
+    </div>
+  </form>
+  <p class="cooldown-note">
+    Um endereço por linha ou separados por vírgula, até 20. Deixe vazio para não gerar novos avisos.
+    O aviso é criado somente quando um evento 210240 novo entra no banco; eventos antigos não são reenviados.
+    {% if not smtp_ready %}A TI precisa configurar o servidor SMTP para realizar os envios.{% endif %}
+  </p>
+  {% if email_pending is not none %}
+  <div class="meta-row"><span>Avisos pendentes</span><strong>{{ email_pending }}</strong></div>
+  {% endif %}
+  {% if email_pending and smtp_ready %}
+  <form action="{{ url_for('atualizar_enviar_pendentes') }}" method="post">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button class="button" type="submit">Tentar enviar pendentes</button>
+  </form>
+  {% endif %}
+</section>
+
+<section class="card certificate-card">
+  <div class="card-title">
+    <div>
       <h2>Banco de dados</h2>
       <span class="muted">SQLite / SQLCipher central</span>
     </div>

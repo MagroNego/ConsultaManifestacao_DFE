@@ -1,4 +1,4 @@
-# Consulta de Manifestação NF-e — v2.1.1
+# Consulta de Manifestação NF-e — v2.2.0-dev
 
 Esta versão usa uma interface Web para consultar manifestações, exportar Excel,
 ver o estado do banco e sincronizar com a SEFAZ. A consulta e as exportações
@@ -18,7 +18,7 @@ Leia `MANUAL_DE_INSTALACAO.md` antes de instalar no servidor e
 
 Feche o aplicativo, faça backup da pasta atual e instale o novo código na
 mesma pasta. Preserve `dados`, `secrets`, logs e os caminhos já configurados.
-Reinicie o aplicativo e confirme `v2.1.1` no cabeçalho. Não altere manualmente
+Reinicie o aplicativo e confirme `v2.2.0-dev` no cabeçalho. Não altere manualmente
 o `ultNSU` do banco.
 
 O pacote não inclui banco real, senha ou certificado. A instalação em rede

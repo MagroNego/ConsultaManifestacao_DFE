@@ -13,7 +13,7 @@ A versão Web foi projetada para uso em rede interna, com separação entre oper
 | Persistência | SQLite / SQLCipher |
 | Certificado | A1 PFX/P12 ou Windows Certificate Store |
 | Plataforma alvo | Windows / Windows Server |
-| Versão estável | 2.1.1 |
+| Versão desta preparação | 2.2.0-dev |
 
 ## Funcionalidades
 
@@ -30,6 +30,7 @@ A versão Web foi projetada para uso em rede interna, com separação entre oper
 - seleção e validação de certificado A1 pela interface administrativa;
 - log de auditoria com rotação;
 - modo claro e escuro;
+- alertas por e-mail para novos eventos de Operação não Realizada (210240), com destinatários administrados na área Atualizar e fila persistente no banco;
 - sincronização automática interna da SEFAZ pela manhã, sem CLI ou Task Scheduler.
 
 ## Fluxo da aplicação
@@ -85,6 +86,23 @@ INICIAR_WEB.cmd
 ```
 
 ## Administração
+
+### Alertas de Operação não Realizada
+
+O administrador cadastra até 20 endereços em **Atualizar → Alertas por e-mail**.
+Somente eventos 210240 inseridos após o cadastro geram avisos; reprocessar um
+evento já gravado não cria outra mensagem. A fila fica no banco central e as
+tentativas de envio ocorrem após a sincronização manual ou automática. Uma falha
+do SMTP não altera o cursor NSU: o aviso fica pendente e pode ser reenviado pelo
+botão **Tentar enviar pendentes** na área administrativa. Uma interrupção entre
+a aceitação pelo SMTP e a confirmação no banco pode resultar em duplicidade.
+
+A TI deve configurar `NFE_SMTP_HOST`, `NFE_SMTP_PORT`, `NFE_SMTP_SECURITY`
+(`starttls` ou `ssl`), `NFE_SMTP_FROM` e, se houver autenticação,
+`NFE_SMTP_USER` com a senha em `secrets/smtp-password.txt`. Sem host e remetente,
+nenhum envio é feito. O arquivo `WEB_CONFIG.example` serve como referência;
+`INICIAR_WEB.cmd` não o carrega automaticamente. Faça um teste com servidor de
+e-mail de homologação antes de usar endereços reais.
 
 A área **Atualizar** permite configurar os recursos utilizados pelo servidor.
 

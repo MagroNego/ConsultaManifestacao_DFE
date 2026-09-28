@@ -55,6 +55,10 @@ from nfe_consulta.web.auth import (
 )
 from nfe_consulta.web.scheduler import loop_sincronizacao_automatica
 from nfe_consulta.web.settings import WebSettings, get_settings
+from nfe_consulta.web.email_alerts import (
+    carregar_destinatarios, salvar_destinatarios, smtp_pronto,
+    contar_pendentes, enviar_pendentes,
+)
 from nfe_consulta.web.sync_runtime import sincronizar_configurado
 from nfe_consulta.web.uploads import consolidar_txts
 
@@ -803,6 +807,8 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         ok: str | None = None,
         cert_ok: str | None = None,
         db_ok: str | None = None,
+        email_ok: str | None = None,
+        email_sent: str | None = None,
     ):
         try:
             status_web = await run_in_threadpool(_status_web, settings)
@@ -820,6 +826,8 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                 "Sincronização concluída." if ok == "1"
                 else "Certificado validado e configurado." if cert_ok == "1"
                 else "Banco validado e configurado." if db_ok == "1"
+                else "Destinatários dos alertas salvos." if email_ok == "1"
+                else f"{email_sent} aviso(s) enviado(s)." if email_sent and email_sent.isdigit()
                 else None
             ),
             error=erro,
@@ -828,6 +836,43 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             certificate_web=_certificado_web(settings),
             database_web=_database_web(settings),
             cooldown_minutes=settings.sync_cooldown_minutes,
+            email_recipients="\n".join(carregar_destinatarios(settings.email_recipients_file)),
+            smtp_ready=smtp_pronto(settings),
+            email_pending=await run_in_threadpool(contar_pendentes, settings) if status_web.database_ready else None,
+        )
+
+    @app.post("/atualizar/alertas-email")
+    async def atualizar_alertas_email(
+        request: Request,
+        user: Annotated[WebUser, Depends(require_admin)],
+        csrf: str = Form(...),
+        recipients: str = Form(""),
+    ):
+        validate_csrf(csrf, user, settings)
+        try:
+            emails = salvar_destinatarios(settings.email_recipients_file, recipients)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        app.state.audit.write(request, user, "email_recipients", "ok", count=len(emails))
+        return RedirectResponse(
+            url=request.url_for("atualizar_page").include_query_params(email_ok="1"),
+            status_code=303,
+        )
+
+    @app.post("/atualizar/alertas-email/enviar-pendentes")
+    async def atualizar_enviar_pendentes(
+        request: Request,
+        user: Annotated[WebUser, Depends(require_admin)],
+        csrf: str = Form(...),
+    ):
+        validate_csrf(csrf, user, settings)
+        if not smtp_pronto(settings):
+            raise HTTPException(status_code=400, detail="Configure o SMTP antes de enviar.")
+        enviados = await run_in_threadpool(enviar_pendentes, settings, app.state.audit)
+        app.state.audit.write(request, user, "email_retry", "ok", sent=enviados)
+        return RedirectResponse(
+            url=request.url_for("atualizar_page").include_query_params(email_sent=str(enviados)),
+            status_code=303,
         )
 
     @app.post("/atualizar/banco")
@@ -1047,6 +1092,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                 sincronizar_configurado,
                 settings,
                 max_lotes=max_lotes,
+                audit=app.state.audit,
             )
             app.state.audit.write(
                 request,

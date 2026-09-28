@@ -143,6 +143,7 @@ class ParametrosSincronizacao:
     cert_arquivo: Path | None = None
     cert_senha_arquivo: str | None = None
     cooldown_minutos: int = 0
+    destinatarios_alerta: tuple[str, ...] = ()
 
 
 def sincronizar_banco(
@@ -184,6 +185,7 @@ def sincronizar_banco(
             certificado,
             max_lotes=parametros.max_lotes,
             progresso_fn=progresso_sincronizacao,
+            destinatarios_alerta=parametros.destinatarios_alerta,
         )
     finally:
         banco.fechar()

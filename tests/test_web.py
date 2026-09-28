@@ -44,6 +44,8 @@ def settings_web(tmp_path, *, admin=False, auth_mode="dev", admin_users=frozense
         certificate_path_file=tmp_path / "secrets" / "cert-path.txt",
         certificate_password_file=tmp_path / "secrets" / "cert-password.txt",
         database_path_file=tmp_path / "secrets" / "db-path.txt",
+        email_recipients_file=tmp_path / "secrets" / "email-recipients.json",
+        smtp_password_file=tmp_path / "secrets" / "smtp-password.txt",
     )
 
 
@@ -51,6 +53,38 @@ def criar_banco(caminho):
     caminho.parent.mkdir(parents=True, exist_ok=True)
     banco = BancoManifestacoes(str(caminho))
     banco.fechar()
+
+
+def test_admin_cadastra_alertas_sem_liberar_configuracao_ao_usuario(tmp_path):
+    cfg = settings_web(tmp_path)
+    criar_banco(cfg.database_path)
+    app = create_app(cfg)
+    with TestClient(app) as client:
+        publico = client.post(
+            "/atualizar/alertas-email",
+            data={"csrf": csrf_token(PUBLIC_USER, cfg), "recipients": "a@empresa.com.br"},
+            follow_redirects=False,
+        )
+        assert publico.status_code == 303
+        assert not cfg.email_recipients_file.exists()
+
+        client.post("/admin/login", data={
+            "csrf": csrf_token(PUBLIC_USER, cfg),
+            "username": "admin", "password": "Senha-Admin-123!",
+        })
+        pagina = client.get("/atualizar")
+        assert "Alertas por e-mail" in pagina.text
+        admin = WebUser("admin", "Administrador", True)
+        invalido = client.post("/atualizar/alertas-email", data={
+            "csrf": "invalido", "recipients": "a@empresa.com.br",
+        })
+        assert invalido.status_code == 403
+        salvo = client.post("/atualizar/alertas-email", data={
+            "csrf": csrf_token(admin, cfg),
+            "recipients": "a@empresa.com.br\nb@empresa.com.br",
+        }, follow_redirects=False)
+        assert salvo.status_code == 303
+        assert "a@empresa.com.br" in client.get("/atualizar").text
 
 
 def test_usuario_comum_acessa_excel_status_e_login_do_atualizar(tmp_path):

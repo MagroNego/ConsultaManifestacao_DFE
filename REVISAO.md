@@ -1,4 +1,9 @@
-# Revisão técnica — v2.1.1
+# Revisão técnica — v2.2.0-dev
+
+Esta versão em desenvolvimento adiciona fila de avisos de e-mail para novos
+eventos 210240, configurável na área administrativa. O envio SMTP ainda precisa
+de validação com a infraestrutura de e-mail da empresa; não foi testado com
+destinatários reais.
 
 ## Componentes
 

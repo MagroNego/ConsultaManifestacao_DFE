@@ -17,6 +17,8 @@ ADMIN_PASSWORD_FILE = SECRETS_DIR / "admin-password.txt"
 CERT_PATH_FILE = SECRETS_DIR / "cert-path.txt"
 CERT_PASSWORD_FILE = SECRETS_DIR / "cert-password.txt"
 DATABASE_PATH_FILE = SECRETS_DIR / "db-path.txt"
+EMAIL_RECIPIENTS_FILE = SECRETS_DIR / "email-recipients.json"
+SMTP_PASSWORD_FILE = SECRETS_DIR / "smtp-password.txt"
 
 
 def _lista(valor: str | None) -> frozenset[str]:
@@ -105,6 +107,13 @@ class WebSettings:
     auto_sync_minute: int = 0
     auto_sync_weekdays: tuple[int, ...] = (0, 1, 2, 3, 4)
     auto_sync_max_lotes: int = 50
+    email_recipients_file: Path = EMAIL_RECIPIENTS_FILE
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_from: str = ""
+    smtp_user: str = ""
+    smtp_security: str = "starttls"
+    smtp_password_file: Path = SMTP_PASSWORD_FILE
 
     @property
     def production(self) -> bool:
@@ -182,6 +191,15 @@ def get_settings() -> WebSettings:
     auto_sync_weekdays = _dias_semana(
         os.getenv("NFE_AUTO_SYNC_WEEKDAYS", "0,1,2,3,4")
     )
+    smtp_security = os.getenv("NFE_SMTP_SECURITY", "starttls").strip().lower()
+    if smtp_security not in {"starttls", "ssl"}:
+        raise RuntimeError("NFE_SMTP_SECURITY deve ser starttls ou ssl.")
+    smtp_port = int(os.getenv("NFE_SMTP_PORT", "587"))
+    if not 1 <= smtp_port <= 65535:
+        raise RuntimeError("NFE_SMTP_PORT inválida.")
+    smtp_from = os.getenv("NFE_SMTP_FROM", "").strip()
+    if any(c in smtp_from for c in "\r\n"):
+        raise RuntimeError("NFE_SMTP_FROM inválido.")
 
     if not 0 <= auto_sync_hour <= 23:
         raise RuntimeError("NFE_AUTO_SYNC_HOUR deve estar entre 0 e 23.")
@@ -233,4 +251,9 @@ def get_settings() -> WebSettings:
         auto_sync_minute=auto_sync_minute,
         auto_sync_weekdays=auto_sync_weekdays,
         auto_sync_max_lotes=auto_sync_max_lotes,
+        smtp_host=os.getenv("NFE_SMTP_HOST", "").strip(),
+        smtp_port=smtp_port,
+        smtp_from=smtp_from,
+        smtp_user=os.getenv("NFE_SMTP_USER", "").strip(),
+        smtp_security=smtp_security,
     )

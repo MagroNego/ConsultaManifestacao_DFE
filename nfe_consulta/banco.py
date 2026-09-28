@@ -79,6 +79,17 @@ class BancoManifestacoes:
                 ultima_execucao_local TEXT NOT NULL,
                 atualizado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
+
+            CREATE TABLE IF NOT EXISTS notificacoes_email (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                manifestacao_id INTEGER NOT NULL REFERENCES manifestacoes(id),
+                destinatario TEXT NOT NULL,
+                criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                enviado_em TEXT,
+                tentativas INTEGER NOT NULL DEFAULT 0,
+                ultimo_erro TEXT,
+                UNIQUE(manifestacao_id, destinatario)
+            );
             """
         )
         self.conexao.commit()
@@ -197,7 +208,10 @@ class BancoManifestacoes:
                 inseridos += cursor.rowcount
         return inseridos
 
-    def salvar_retorno(self, cnpj: str, retorno: RetornoDistribuicao) -> int:
+    def salvar_retorno(
+        self, cnpj: str, retorno: RetornoDistribuicao,
+        destinatarios_alerta: tuple[str, ...] = (),
+    ) -> int:
         anterior, _ = self.obter_estado(cnpj)
         if (not retorno.ult_nsu.isdigit() or not retorno.max_nsu.isdigit()
                 or int(retorno.ult_nsu) < int(anterior)
@@ -214,6 +228,13 @@ class BancoManifestacoes:
                      evento.protocolo, evento.nsu, evento.schema),
                 )
                 inseridos += cursor.rowcount
+                if cursor.rowcount and evento.codigo == "210240":
+                    for destinatario in destinatarios_alerta:
+                        self.conexao.execute(
+                            "INSERT OR IGNORE INTO notificacoes_email(manifestacao_id, destinatario) "
+                            "VALUES (?, ?)",
+                            (cursor.lastrowid, destinatario),
+                        )
             self.conexao.execute(
                 """
                 INSERT INTO estado_distribuicao(cnpj, ult_nsu, max_nsu)
@@ -226,6 +247,28 @@ class BancoManifestacoes:
                 (cnpj, retorno.ult_nsu, retorno.max_nsu),
             )
         return inseridos
+
+    def notificacoes_pendentes(self, limite: int = 100) -> list[tuple]:
+        return self.conexao.execute(
+            "SELECT n.id, n.destinatario, m.chave, m.data_evento, m.protocolo "
+            "FROM notificacoes_email n JOIN manifestacoes m ON m.id = n.manifestacao_id "
+            "WHERE n.enviado_em IS NULL ORDER BY n.id LIMIT ?",
+            (limite,),
+        ).fetchall()
+
+    def contar_notificacoes_pendentes(self) -> int:
+        return self.conexao.execute(
+            "SELECT COUNT(*) FROM notificacoes_email WHERE enviado_em IS NULL"
+        ).fetchone()[0]
+
+    def registrar_envio_email(self, id_notificacao: int, erro: str | None = None) -> None:
+        with self.conexao:
+            self.conexao.execute(
+                "UPDATE notificacoes_email SET tentativas = tentativas + 1, "
+                "enviado_em = CASE WHEN ? IS NULL THEN CURRENT_TIMESTAMP ELSE enviado_em END, "
+                "ultimo_erro = ? WHERE id = ? AND enviado_em IS NULL",
+                (erro, erro, id_notificacao),
+            )
 
     def consultas_na_ultima_hora(self, cnpj: str) -> int:
         linha = self.conexao.execute(

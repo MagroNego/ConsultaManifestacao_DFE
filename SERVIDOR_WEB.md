@@ -140,6 +140,23 @@ rejeição.
 
 ## Rede
 
+### E-mail de alertas
+
+Configure no ambiente do processo Web `NFE_SMTP_HOST`, `NFE_SMTP_PORT` (587
+para STARTTLS ou porta correspondente ao servidor), `NFE_SMTP_SECURITY`
+(`starttls` ou `ssl`), `NFE_SMTP_FROM` e, se exigido, `NFE_SMTP_USER`.
+Grave a senha em `secrets\\smtp-password.txt`, com ACL restrita à conta do
+serviço. Reinicie o processo após alterar as variáveis. O administrador define
+os destinatários na interface; o arquivo local
+`secrets\\email-recipients.json` não deve ser editado manualmente.
+
+Os avisos aguardam em `notificacoes_email` no banco, com uma linha por evento e
+destinatário. Não inclua banco nem `secrets` no pacote de distribuição. A
+entrega exige conectividade com o SMTP e deve ser testada com um destino de
+homologação. A fila persiste nas falhas; a confirmação SMTP e a marcação no
+banco não formam uma transação única, portanto uma falha entre as duas etapas
+pode causar um segundo envio.
+
 A aplicação deve escutar apenas na interface usada pelo reverse proxy. Padrão:
 
 ```text

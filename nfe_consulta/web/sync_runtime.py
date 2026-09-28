@@ -10,6 +10,7 @@ from nfe_consulta.servico import (
     sincronizar_banco,
 )
 from nfe_consulta.web.settings import WebSettings
+from nfe_consulta.web.email_alerts import carregar_destinatarios, enviar_pendentes
 
 
 def caminho_banco_configurado(settings: WebSettings):
@@ -19,7 +20,7 @@ def caminho_banco_configurado(settings: WebSettings):
     )
 
 
-def sincronizar_configurado(settings: WebSettings, *, max_lotes: int = 50):
+def sincronizar_configurado(settings: WebSettings, *, max_lotes: int = 50, audit=None):
     """Executa a mesma sincronização usada pela área administrativa."""
     banco = caminho_banco_configurado(settings)
     if not banco.is_file():
@@ -30,8 +31,10 @@ def sincronizar_configurado(settings: WebSettings, *, max_lotes: int = 50):
         settings.certificate_password_file,
     )
 
-    return sincronizar_banco(
-        ParametrosSincronizacao(
+    destinatarios = carregar_destinatarios(settings.email_recipients_file)
+    try:
+        return sincronizar_banco(
+            ParametrosSincronizacao(
             banco=banco,
             cnpj=CNPJ_PADRAO,
             uf=UF_PADRAO,
@@ -46,5 +49,13 @@ def sincronizar_configurado(settings: WebSettings, *, max_lotes: int = 50):
                 cert_arquivo.password if cert_arquivo is not None else None
             ),
             cooldown_minutos=settings.sync_cooldown_minutes,
+            destinatarios_alerta=destinatarios,
+            )
         )
-    )
+    finally:
+        # Também envia lotes já gravados quando um 656 interrompe a sincronização.
+        if audit is not None:
+            try:
+                enviar_pendentes(settings, audit)
+            except Exception as exc:
+                audit.write_system("email_alert", "erro", reason=type(exc).__name__)

@@ -24,6 +24,7 @@ def sincronizar(
     certificado: CertificadoWindows,
     max_lotes: int = 50,
     progresso_fn: Callable | None = None,
+    destinatarios_alerta: tuple[str, ...] = (),
 ) -> ResumoSincronizacao:
     if max_lotes < 1:
         raise ValueError("max_lotes deve ser maior que zero")
@@ -50,7 +51,7 @@ def sincronizar(
         if retorno.status_codigo == 138 and retorno.ult_nsu == anterior:
             raise NfeErroComunicacao("A SEFAZ nao avancou o ultNSU; sincronizacao interrompida")
         lotes += 1
-        eventos_novos += banco.salvar_retorno(cnpj, retorno)
+        eventos_novos += banco.salvar_retorno(cnpj, retorno, destinatarios_alerta)
         ignorados += retorno.documentos_ignorados
         ult_nsu, max_nsu = retorno.ult_nsu, retorno.max_nsu
 
