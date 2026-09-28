@@ -32,6 +32,7 @@ A versão Web foi projetada para uso em rede interna, com separação entre oper
 - modo claro e escuro;
 - alertas por e-mail para novos eventos de Operação não Realizada (210240), com destinatários administrados na área Atualizar e fila persistente no banco;
 - emitente e indicação de cancelamento na consulta de manifestações e no Excel quando recebidos pela distribuição; registros antigos sem esses dados aparecem sem informação até novo retorno;
+- últimas dez sincronizações na página Status, resumidas do log de auditoria (origem, resultado, lotes, manifestações novas e falha genérica), sem exibir usuário, IP ou detalhes internos;
 - sincronização automática interna da SEFAZ pela manhã, sem CLI ou Task Scheduler.
 
 ## Fluxo da aplicação

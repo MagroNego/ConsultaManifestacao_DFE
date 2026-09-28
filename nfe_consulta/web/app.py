@@ -35,6 +35,7 @@ from nfe_consulta.servico import (
     executar_consulta,
 )
 from nfe_consulta.web.status_view import WebStatus, read_web_status
+from nfe_consulta.web.sync_history import read_sync_history
 from nfe_consulta.web.audit import AuditLog
 from nfe_consulta.web.consulta_local import (
     TIPOS_MANIFESTACAO,
@@ -848,11 +849,17 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             status_web = WebStatus(False, None, None, None, None, None, None, None)
             erro = _database_error_message(exc, settings, user)
 
+        try:
+            history = await run_in_threadpool(read_sync_history, settings.audit_log)
+        except OSError:
+            history = ()
+
         return _render(
             request,
             "status.html",
             user,
             status_web=status_web,
+            sync_history=history,
             error=erro,
         )
 

@@ -306,8 +306,13 @@ def test_admin_pode_disparar_atualizacao_sefaz(tmp_path, monkeypatch):
             data={"csrf": csrf_token(admin, cfg), "max_lotes": "25"},
             follow_redirects=False,
         )
+        history = client.get("/status")
 
     assert resposta.status_code == 303
+    assert "Últimas sincronizações" in history.text
+    assert "Manual" in history.text
+    assert "Concluída" in history.text
+    assert ">2</td>" in history.text
     assert chamadas[0].max_lotes == 25
     assert chamadas[0].cooldown_minutos == 120
 
