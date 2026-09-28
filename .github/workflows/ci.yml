@@ -10,6 +10,7 @@ on:
       - main
       - refactor/v1.0
       - web/v2.0
+      - web/v2.1
   workflow_dispatch:
 
 jobs:

@@ -55,11 +55,16 @@ Ela permite:
 - configurar o certificado A1;
 - sincronizar o banco com o serviço `NFeDistribuicaoDFe`.
 
-Após uma tentativa válida, o sistema aplica o cooldown configurado. A rejeição 656 possui tratamento próprio.
+Após uma tentativa válida, o sistema aplica o cooldown configurado. A rejeição
+656 registra uma pausa e mostra o NSU enviado e, quando houver, o NSU indicado
+pela SEFAZ. Não altere o NSU salvo com base apenas nessa rejeição.
 
 ## Sincronização automática
 
-Em produção, a aplicação sincroniza automaticamente com a SEFAZ às **08:00 de segunda a sexta-feira**, desde que o serviço Web esteja em execução.
+Em produção, com o agendador habilitado, a aplicação tenta sincronizar com a
+SEFAZ às **08:00 de segunda a sexta-feira**, desde que o serviço Web esteja em
+execução. Na instalação de desenvolvimento o agendador fica desativado por
+padrão; a aba **Atualizar** mostra seu estado.
 
 A rotina utiliza o mesmo banco, certificado e cooldown da área **Atualizar**. Se uma sincronização manual estiver em andamento ou o cooldown ainda estiver ativo, a execução automática é ignorada.
 

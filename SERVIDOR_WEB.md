@@ -1,4 +1,4 @@
-# Implantação Web — v2.1
+# Implantação Web — v2.1.1
 
 A v2 foi desenhada para rodar dentro da rede da empresa com **um único processo da aplicação** enquanto o banco for SQLite/SQLCipher.
 
@@ -134,7 +134,9 @@ NFE_SEFAZ_COOLDOWN_MINUTES=120
 
 O cooldown é validado no backend e gravado no banco. Alterar HTML, chamar a rota manualmente ou reiniciar a aplicação não elimina o bloqueio.
 
-A rejeição 656 continua tendo tratamento próprio.
+A rejeição 656 registra uma pausa no banco e, quando a resposta o informa,
+mostra o último NSU indicado pela SEFAZ. O cursor local não é avançado na
+rejeição.
 
 ## Rede
 

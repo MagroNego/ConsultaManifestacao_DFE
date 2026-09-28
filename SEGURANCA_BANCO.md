@@ -1,45 +1,27 @@
-# Proteger o banco de manifestações
+# Banco de manifestações — segurança e continuidade
 
-## Criar banco protegido
+O aplicativo usa o banco selecionado na aba **Atualizar**. Para SQLCipher,
+grave a senha em `secrets/db-password.txt` da mesma instalação. O banco e a
+senha não entram no pacote de release.
 
-Feche o aplicativo e o DB Browser. Depois execute:
+## Atualizar sem perder o histórico
 
-```powershell
-nfe-consulta proteger-banco dados\nfe_manifestacoes.db dados\nfe_manifestacoes_seguro.db
-```
+Antes de substituir o código, pare o servidor Web e faça backup do banco e da
+pasta `secrets` em local protegido. Preserve o caminho configurado em
+`secrets/db-path.txt`. Depois de reiniciar, confira o `ultNSU`, `maxNSU` e a
+data de última gravação na tela **Status**.
 
-A senha deve ter pelo menos 12 caracteres. Ela é solicitada no terminal e não é colocada nos argumentos.
+Não alterne entre cópias do banco nem avance manualmente o `ultNSU`: isso pode
+separar o histórico ou deixar documentos sem processamento. Um `maxNSU` de
+outra cópia não é um cursor para recuperar uma rejeição 656.
 
-A migração:
+## Abrir no DB Browser
 
-1. verifica a integridade do banco original;
-2. cria um novo banco SQLCipher;
-3. exporta as tabelas;
-4. verifica integridade e contagens;
-5. preserva o arquivo original.
+Para um banco protegido, use uma edição do DB Browser com suporte a SQLCipher
+4, preferencialmente em modo somente leitura. Feche o aplicativo antes de
+restaurar backups. Registre a data, o cursor e a origem do backup antes de
+adotá-lo como banco ativo.
 
-## Conferir
-
-```powershell
-nfe-consulta status --banco dados\nfe_manifestacoes_seguro.db
-```
-
-Compare o NSU com o banco original antes de adotar a cópia protegida como banco ativo.
-
-## DB Browser
-
-Para abrir o banco protegido, o DB Browser precisa ter suporte a SQLCipher. Use os padrões SQLCipher 4 e, de preferência, abra em modo somente leitura.
-
-## Escopo
-
-SQLCipher protege o arquivo de banco quando fechado. Não protege automaticamente:
-
-- `CHAVES.txt`;
-- planilhas XLSX;
-- CSVs antigos;
-- cópias do banco original;
-- backups externos.
-
-A proteção também não substitui ACLs do Windows nem o procedimento corporativo de gestão de senhas.
-
-Mantenha uma única cópia ativa do banco para as sincronizações seguintes. Ter dois bancos sendo usados alternadamente separa o histórico e o cursor NSU.
+SQLCipher protege o arquivo do banco, mas não criptografa automaticamente TXT,
+planilhas exportadas, logs e backups. Restrinja o acesso a esses arquivos e à
+pasta `secrets` conforme a política da empresa.

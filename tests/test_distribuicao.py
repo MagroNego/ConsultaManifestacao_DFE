@@ -69,7 +69,21 @@ def test_rejeicao_656_exibe_xmotivo_sem_controles_de_terminal(monkeypatch):
     with pytest.raises(NfeConsumoIndevidoErro) as erro:
         consultar_distribuicao("12345678000199", "33", "10", cert)
     assert "xMotivo: Deve ser utilizado o ultNSU" in str(erro.value)
+    assert "ultNSU enviado: 000000000000010" in str(erro.value)
+    assert "ultNSU informado pela SEFAZ: 000000000000010" in str(erro.value)
     assert _motivo_exibivel("NSU\x1b[31m\nseguinte") == "NSU[31m seguinte"
+
+
+def test_rejeicao_656_sem_nsu_na_resposta_nao_inventa_cursor(monkeypatch):
+    resposta = """<retDistDFeInt><cStat>656</cStat>
+      <xMotivo>Sequencia incorreta</xMotivo></retDistDFeInt>"""
+    monkeypatch.setattr("nfe_consulta.distribuicao._enviar_soap_windows",
+                        lambda soap, certificado: resposta)
+    cert = CertificadoWindows("abc", "empresa", "ac", "2030-01-01")
+    with pytest.raises(NfeConsumoIndevidoErro) as erro:
+        consultar_distribuicao("12345678000199", "33", "563813", cert)
+    assert "ultNSU enviado: 000000000563813" in str(erro.value)
+    assert "ultNSU da SEFAZ: não informado na rejeição" in str(erro.value)
 
 
 def test_parse_retorno_com_evento_compactado():

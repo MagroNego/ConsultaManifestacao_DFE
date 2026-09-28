@@ -127,4 +127,5 @@ def parse_retorno_distribuicao(xml_str: str) -> RetornoDistribuicao:
         max_nsu=(max_nsu or "0").zfill(15),
         manifestacoes=tuple(manifestacoes),
         documentos_ignorados=ignorados,
+        ult_nsu_informado=bool(ult_nsu and ult_nsu.isdigit()),
     )

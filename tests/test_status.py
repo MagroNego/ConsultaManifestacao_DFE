@@ -65,6 +65,8 @@ def test_motivo_656_persistido_sem_avancar_cursor(tmp_path, monkeypatch):
             sincronizar(banco, CNPJ, "33", certificado)
         assert banco.obter_estado(CNPJ) == ("10".zfill(15), "20".zfill(15))
         assert motivo in consultar_status(str(caminho), CNPJ)
+        assert "ultNSU enviado: 000000000000010" in consultar_status(str(caminho), CNPJ)
+        assert "ultNSU informado pela SEFAZ: 000000000000011" in consultar_status(str(caminho), CNPJ)
         assert motivo in consultar_status(str(caminho), CNPJ, datetime.now(timezone.utc) + timedelta(hours=2))
     finally:
         banco.fechar()

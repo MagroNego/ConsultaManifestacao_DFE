@@ -13,7 +13,7 @@ A versão Web foi projetada para uso em rede interna, com separação entre oper
 | Persistência | SQLite / SQLCipher |
 | Certificado | A1 PFX/P12 ou Windows Certificate Store |
 | Plataforma alvo | Windows / Windows Server |
-| Versão em desenvolvimento | 2.1.0-dev |
+| Versão estável | 2.1.1 |
 
 ## Funcionalidades
 
@@ -208,7 +208,7 @@ Os testes automatizados não acessam a SEFAZ real e não utilizam certificado de
 
 ## Releases
 
-A versão estável atual é **v2.0.1**. A branch `web/v2.1` contém o desenvolvimento da próxima versão, ainda não publicada.
+A versão estável atual é **v2.1.1**. O pacote da release contém o código e a documentação, sem banco, senhas ou certificado. O agendamento interno é desativado por padrão em desenvolvimento; para uso automático a instalação precisa permanecer em execução e a configuração deve ser validada pela TI.
 
 Os pacotes de instalação são publicados em **GitHub Releases**. Para implantação, utilize o arquivo `ConsultaManifestacao_DFE-vX.Y.Z.zip`, e não os pacotes automáticos de source code gerados pelo GitHub.
 
@@ -219,4 +219,4 @@ Os pacotes de instalação são publicados em **GitHub Releases**. Para implanta
 - **v2.0.0**: interface Web corporativa, administração centralizada e publicação para rede interna.
 - **v2.0.1**: centralização de segredos de runtime e ajustes de configuração/implantação.
 
-- **v2.1.0**: consulta completa com filtros, exportação do resultado para Excel, remoção integral da CLI/GUI legadas e sincronização automática interna (em desenvolvimento).
+- **v2.1.1**: consulta completa com filtros e exportação, retirada da CLI/GUI legadas, agendador interno, diagnóstico do NSU enviado e informado no erro 656.

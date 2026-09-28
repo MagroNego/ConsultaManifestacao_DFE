@@ -70,3 +70,4 @@ class RetornoDistribuicao:
     max_nsu: str
     manifestacoes: tuple  # tuple[tuple[str, Manifestacao], ...]
     documentos_ignorados: int = 0
+    ult_nsu_informado: bool = False

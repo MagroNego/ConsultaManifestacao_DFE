@@ -48,6 +48,14 @@ INICIAR_WEB.cmd
 
 Acesse a área **Atualizar** para configurar o banco central e o certificado A1.
 
+## Atualizar uma instalação existente
+
+Pare o processo Web e faça backup da pasta atual, principalmente do banco e
+dos arquivos em `secrets`. Extraia a nova release em outra pasta e copie o
+código `nfe_consulta` para a instalação existente. Não substitua `dados`,
+`secrets` ou a configuração do certificado. Reinicie por `INICIAR_WEB.cmd`,
+confirme a versão no cabeçalho e compare os NSUs na tela **Status**.
+
 ## Segredos
 
 As credenciais de runtime são lidas da pasta:
@@ -83,7 +91,11 @@ NFE_AUTO_SYNC_WEEKDAYS=0,1,2,3,4
 NFE_AUTO_SYNC_MAX_LOTES=50
 ```
 
-O serviço Web precisa permanecer ativo no horário programado.
+O serviço Web precisa permanecer ativo no horário programado. Em uma instalação
+de desenvolvimento, o agendador permanece desligado até configurar
+`NFE_AUTO_SYNC_ENABLED=1` no ambiente do processo antes de iniciá-lo.
+`WEB_CONFIG.example` serve como referência e não é carregado por
+`INICIAR_WEB.cmd`.
 
 Consulte `SERVIDOR_WEB.md` para detalhes de implantação.
 
