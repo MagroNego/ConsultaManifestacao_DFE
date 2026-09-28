@@ -24,6 +24,8 @@ HEADERS = [
     "Protocolo",
     "NSU",
     "Recebido no banco (UTC)",
+    "Emitente",
+    "Cancelamento",
 ]
 
 
@@ -71,14 +73,14 @@ def gravar_eventos_xlsx(
     branco = "FFFFFF"
     cinza = "F3F6F9"
 
-    ws.merge_cells("A1:I1")
+    ws.merge_cells("A1:K1")
     ws["A1"] = "Consulta de manifestações · NF-e"
     ws["A1"].font = Font(size=17, bold=True, color=branco)
     ws["A1"].fill = PatternFill("solid", fgColor=azul)
     ws["A1"].alignment = Alignment(vertical="center", indent=1)
     ws.row_dimensions[1].height = 38
 
-    ws.merge_cells("A2:I2")
+    ws.merge_cells("A2:K2")
     ws["A2"] = f"{len(eventos)} evento(s)  |  {_resumo_filtros(filtros)}"
     ws["A2"].font = Font(size=10, bold=True, color=azul)
     ws["A2"].alignment = Alignment(vertical="center", indent=1)
@@ -111,6 +113,8 @@ def gravar_eventos_xlsx(
             evento.protocolo,
             evento.nsu,
             _excel_datetime(evento.recebido_em),
+            evento.emitente,
+            "Cancelada" if evento.cancelada else "",
         ]
 
         fundo = branco if indice % 2 else cinza
@@ -133,11 +137,11 @@ def gravar_eventos_xlsx(
         ws.cell(indice, 5).fill = PatternFill("solid", fgColor=tom)
         ws.cell(indice, 5).font = Font(size=10, bold=True, color=letra)
 
-    larguras = [13, 9, 49, 12, 31, 22, 22, 17, 22]
+    larguras = [13, 9, 49, 12, 31, 22, 22, 17, 22, 42, 16]
     for coluna, largura in enumerate(larguras, 1):
         ws.column_dimensions[get_column_letter(coluna)].width = largura
 
-    ws.auto_filter.ref = f"A4:I{max(4, 4 + len(eventos))}"
+    ws.auto_filter.ref = f"A4:K{max(4, 4 + len(eventos))}"
     ws.print_options.horizontalCentered = False
     ws.sheet_properties.pageSetUpPr.fitToPage = True
     ws.page_setup.fitToWidth = 1

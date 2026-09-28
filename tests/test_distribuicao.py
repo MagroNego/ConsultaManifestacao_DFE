@@ -118,7 +118,7 @@ def test_parse_retorno_com_evento_compactado():
     assert manifestacao.nsu == "12"
 
 
-def test_parse_ignora_documento_que_nao_e_manifestacao():
+def test_parse_aproveita_resumo_nfe_e_cancelamento():
     resumo_nfe = f'<resNFe xmlns="http://www.portalfiscal.inf.br/nfe"><chNFe>{CHAVE}</chNFe></resNFe>'
     xml = f"""
     <retDistDFeInt xmlns="http://www.portalfiscal.inf.br/nfe" versao="1.01">
@@ -129,7 +129,18 @@ def test_parse_ignora_documento_que_nao_e_manifestacao():
     """
     retorno = parse_retorno_distribuicao(xml)
     assert retorno.manifestacoes == ()
-    assert retorno.documentos_ignorados == 1
+    assert retorno.documentos_ignorados == 0
+    assert retorno.informacoes_notas[0].chave == CHAVE
+
+    resumo = f'<resNFe xmlns="http://www.portalfiscal.inf.br/nfe"><chNFe>{CHAVE}</chNFe><xNome>Fornecedor Teste</xNome><cSitNFe>1</cSitNFe></resNFe>'
+    cancelamento = f'<resEvento xmlns="http://www.portalfiscal.inf.br/nfe"><chNFe>{CHAVE}</chNFe><tpEvento>110111</tpEvento></resEvento>'
+    xml = f"""<retDistDFeInt><cStat>138</cStat><ultNSU>2</ultNSU><maxNSU>2</maxNSU>
+      <loteDistDFeInt><docZip NSU="1" schema="resNFe_v1.01.xsd">{_doc_zip(resumo)}</docZip>
+      <docZip NSU="2" schema="resEvento_v1.01.xsd">{_doc_zip(cancelamento)}</docZip></loteDistDFeInt></retDistDFeInt>"""
+    retorno = parse_retorno_distribuicao(xml)
+    assert len(retorno.informacoes_notas) == 2
+    assert retorno.informacoes_notas[0].emitente == "Fornecedor Teste"
+    assert retorno.informacoes_notas[1].cancelada
 
 
 

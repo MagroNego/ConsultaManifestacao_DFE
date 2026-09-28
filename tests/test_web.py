@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 from openpyxl import load_workbook
 
 from nfe_consulta.banco import BancoManifestacoes
-from nfe_consulta.modelos import Manifestacao, RetornoDistribuicao
+from nfe_consulta.modelos import InformacaoNota, Manifestacao, RetornoDistribuicao
 from nfe_consulta.web.app import create_app
 from nfe_consulta.web.auth import PUBLIC_USER, WebUser, csrf_token
 from nfe_consulta.web.settings import WebSettings
@@ -674,6 +674,7 @@ def test_consulta_completa_filtra_por_data_e_manifestacao(tmp_path):
             ult_nsu="563702".zfill(15),
             max_nsu="563702".zfill(15),
             manifestacoes=eventos,
+            informacoes_notas=(InformacaoNota(chave_2, "Fornecedor Teste", True),),
         ),
     )
     banco.fechar()
@@ -692,6 +693,9 @@ def test_consulta_completa_filtra_por_data_e_manifestacao(tmp_path):
 
     assert resposta.status_code == 200
     assert "Operação não Realizada" in resposta.text
+    assert "Fornecedor Teste" in resposta.text
+    assert "Cancelada" in resposta.text
+    assert 'name="serie"' not in resposta.text
     assert "91780" in resposta.text
     assert "135260000000101" not in resposta.text
     assert ">91779<" not in resposta.text
@@ -733,6 +737,7 @@ def test_exportacao_da_consulta_respeita_os_mesmos_filtros(tmp_path):
                     ),
                 ),
             ),
+            informacoes_notas=(InformacaoNota(chave_2, "Fornecedor Teste", True),),
         ),
     )
     banco.fechar()
@@ -754,6 +759,8 @@ def test_exportacao_da_consulta_respeita_os_mesmos_filtros(tmp_path):
     ws = wb["Manifestacoes"]
     assert ws["A5"].value == 91780
     assert ws["E5"].value == "Operação não Realizada"
+    assert ws["J5"].value == "Fornecedor Teste"
+    assert ws["K5"].value == "Cancelada"
     assert ws["A6"].value is None
 
 

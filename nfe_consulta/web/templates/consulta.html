@@ -52,19 +52,6 @@
         >
       </label>
 
-      <label class="field">
-        <span>Série</span>
-        <input
-          type="number"
-          name="serie"
-          min="0"
-          max="999"
-          step="1"
-          value="{{ filtros.serie_texto }}"
-          placeholder="Ex.: 1"
-        >
-      </label>
-
       <label class="field filter-wide">
         <span>Chave NF-e</span>
         <input
@@ -121,7 +108,6 @@
       <input type="hidden" name="data_inicial" value="{{ filtros.data_inicial_texto }}">
       <input type="hidden" name="data_final" value="{{ filtros.data_final_texto }}">
       <input type="hidden" name="numero" value="{{ filtros.numero_texto }}">
-      <input type="hidden" name="serie" value="{{ filtros.serie_texto }}">
       <input type="hidden" name="chave" value="{{ filtros.chave or '' }}">
       <input type="hidden" name="codigo" value="{{ filtros.codigo or '' }}">
       <button class="button secondary export-button" type="submit">Exportar Excel</button>
@@ -136,7 +122,9 @@
         <tr>
           <th>NF</th>
           <th>Série</th>
+          <th>Emitente</th>
           <th>Manifestação</th>
+          <th>Cancelamento</th>
           <th>Data do evento</th>
           <th>Protocolo</th>
           <th>Chave NF-e</th>
@@ -149,10 +137,12 @@
         <tr>
           <td>{{ evento.numero }}</td>
           <td>{{ evento.serie }}</td>
+          <td>{{ evento.emitente or "—" }}</td>
           <td>
             <strong>{{ evento.descricao }}</strong>
             <small>{{ evento.codigo }}</small>
           </td>
+          <td>{{ "Cancelada" if evento.cancelada else "—" }}</td>
           <td>{{ evento.data_label }}</td>
           <td class="mono">{{ evento.protocolo or "—" }}</td>
           <td class="mono access-key">{{ evento.chave }}</td>

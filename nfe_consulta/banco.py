@@ -49,6 +49,14 @@ class BancoManifestacoes:
             CREATE INDEX IF NOT EXISTS idx_manifestacoes_chave
                 ON manifestacoes(chave);
 
+            CREATE TABLE IF NOT EXISTS informacoes_nfe (
+                cnpj TEXT NOT NULL,
+                chave TEXT NOT NULL,
+                emitente TEXT NOT NULL DEFAULT '',
+                cancelada INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (cnpj, chave)
+            );
+
             CREATE INDEX IF NOT EXISTS idx_manifestacoes_cnpj_data
                 ON manifestacoes(cnpj, data_evento);
 
@@ -187,6 +195,15 @@ class BancoManifestacoes:
     def salvar_manifestacoes(self, cnpj: str, retorno: RetornoDistribuicao) -> int:
         inseridos = 0
         with self.conexao:
+            for info in retorno.informacoes_notas:
+                self.conexao.execute(
+                    """INSERT INTO informacoes_nfe(cnpj, chave, emitente, cancelada)
+                    VALUES (?, ?, ?, ?)
+                    ON CONFLICT(cnpj, chave) DO UPDATE SET
+                        emitente = CASE WHEN excluded.emitente != '' THEN excluded.emitente ELSE informacoes_nfe.emitente END,
+                        cancelada = MAX(informacoes_nfe.cancelada, excluded.cancelada)""",
+                    (cnpj, info.chave, info.emitente, int(info.cancelada)),
+                )
             for chave, evento in retorno.manifestacoes:
                 cursor = self.conexao.execute(
                     """
@@ -219,6 +236,15 @@ class BancoManifestacoes:
             raise NfeErroResposta("Cursor NSU invalido ou anterior ao ja salvo; lote nao gravado")
         inseridos = 0
         with self.conexao:
+            for info in retorno.informacoes_notas:
+                self.conexao.execute(
+                    """INSERT INTO informacoes_nfe(cnpj, chave, emitente, cancelada)
+                    VALUES (?, ?, ?, ?)
+                    ON CONFLICT(cnpj, chave) DO UPDATE SET
+                        emitente = CASE WHEN excluded.emitente != '' THEN excluded.emitente ELSE informacoes_nfe.emitente END,
+                        cancelada = MAX(informacoes_nfe.cancelada, excluded.cancelada)""",
+                    (cnpj, info.chave, info.emitente, int(info.cancelada)),
+                )
             for chave, evento in retorno.manifestacoes:
                 cursor = self.conexao.execute(
                     """INSERT OR IGNORE INTO manifestacoes

@@ -41,6 +41,13 @@ class Manifestacao:
 
 
 @dataclass(frozen=True)
+class InformacaoNota:
+    chave: str
+    emitente: str = ""
+    cancelada: bool = False
+
+
+@dataclass(frozen=True)
 class ResultadoConsulta:
     chave: str
     status_codigo: int
@@ -71,3 +78,4 @@ class RetornoDistribuicao:
     manifestacoes: tuple  # tuple[tuple[str, Manifestacao], ...]
     documentos_ignorados: int = 0
     ult_nsu_informado: bool = False
+    informacoes_notas: tuple[InformacaoNota, ...] = ()
