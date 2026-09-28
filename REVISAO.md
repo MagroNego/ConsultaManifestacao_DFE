@@ -21,9 +21,7 @@ destinatários reais.
 - Banco SQLCipher com senha em `secrets/db-password.txt`.
 - Certificado A1 do Windows (`CurrentUser` ou `LocalMachine`) ou PFX/P12
   configurado na aba **Atualizar**; arquivos de segredo não entram no pacote.
-- Atualização exige identidade corporativa verificada pelo gateway no modo
-  produção, lista de administradores e token CSRF. O modo de desenvolvimento
-  mantém login local com sessão assinada para testes.
+- Atualização exige login administrativo, sessão assinada e token CSRF.
 - Consulta e exportação não fazem chamadas à SEFAZ.
 - Uma sincronização por processo; para SQLite, execute somente um processo.
 - Retornos válidos e cursor são gravados em uma transação. O erro 656 registra

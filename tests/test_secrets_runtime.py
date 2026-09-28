@@ -1,31 +1,7 @@
 from pathlib import Path
-import pytest
 
 from nfe_consulta import certificado_config
 from nfe_consulta.web import settings
-
-
-def test_producao_exige_gateway_e_lista_admin(monkeypatch, tmp_path):
-    monkeypatch.setattr(settings, "ADMIN_PASSWORD_FILE", tmp_path / "admin-password.txt")
-    monkeypatch.setenv("NFE_WEB_ENV", "production")
-    monkeypatch.setenv("NFE_WEB_CSRF_SECRET", "c" * 64)
-    settings.get_settings.cache_clear()
-    try:
-        with pytest.raises(RuntimeError, match="NFE_WEB_PROXY_SECRET"):
-            settings.get_settings()
-        monkeypatch.setenv("NFE_WEB_PROXY_SECRET", "p" * 64)
-        with pytest.raises(RuntimeError, match="NFE_WEB_ADMIN_USERS"):
-            settings.get_settings()
-        monkeypatch.setenv("NFE_WEB_ADMIN_USERS", "DOMINIO\\luan.a")
-        cfg = settings.get_settings()
-        assert cfg.auth_mode == "proxy"
-        assert cfg.admin_password is None
-        monkeypatch.setenv("NFE_WEB_HOST", "0.0.0.0")
-        settings.get_settings.cache_clear()
-        with pytest.raises(RuntimeError, match="NFE_WEB_HOST"):
-            settings.get_settings()
-    finally:
-        settings.get_settings.cache_clear()
 
 
 def test_web_settings_usa_senhas_da_pasta_secrets_e_ignora_env(tmp_path, monkeypatch):

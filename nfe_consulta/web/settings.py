@@ -137,19 +137,11 @@ def get_settings() -> WebSettings:
     if ambiente not in {"development", "production"}:
         raise RuntimeError("NFE_WEB_ENV deve ser development ou production.")
 
-    modo_padrao = "proxy" if ambiente == "production" else "dev"
+    modo_padrao = "dev"
     auth_mode = os.getenv("NFE_WEB_AUTH_MODE", modo_padrao).strip().lower()
     if auth_mode not in {"proxy", "dev"}:
         raise RuntimeError("NFE_WEB_AUTH_MODE deve ser proxy ou dev.")
     proxy_secret = os.getenv("NFE_WEB_PROXY_SECRET")
-    admin_users = _lista(os.getenv("NFE_WEB_ADMIN_USERS"))
-    if ambiente == "production" and auth_mode != "proxy":
-        raise RuntimeError("Em produção, configure NFE_WEB_AUTH_MODE=proxy.")
-    if auth_mode == "proxy":
-        if not proxy_secret or len(proxy_secret) < 32:
-            raise RuntimeError("NFE_WEB_PROXY_SECRET deve ter pelo menos 32 caracteres no modo proxy.")
-        if not admin_users:
-            raise RuntimeError("NFE_WEB_ADMIN_USERS deve conter ao menos um administrador no modo proxy.")
 
     csrf_secret = os.getenv("NFE_WEB_CSRF_SECRET")
     if ambiente == "production":
@@ -162,8 +154,10 @@ def get_settings() -> WebSettings:
     admin_username = _usuario_admin()
     if admin_password and len(admin_password) < 12:
         raise RuntimeError("A senha do administrador deve ter pelo menos 12 caracteres.")
-    if ambiente == "production" and admin_password:
-        raise RuntimeError("Remova o login local da instalação de produção: admin-password.txt.")
+    if ambiente == "production" and not admin_password:
+        raise RuntimeError(
+            f"Configure {ADMIN_PASSWORD_FILE} para proteger a área Atualizar."
+        )
 
     admin_session_minutes = int(os.getenv("NFE_ADMIN_SESSION_MINUTES", "30"))
     if not 5 <= admin_session_minutes <= 480:
@@ -213,9 +207,6 @@ def get_settings() -> WebSettings:
         raise RuntimeError("NFE_AUTO_SYNC_MINUTE deve estar entre 0 e 59.")
     if not 1 <= auto_sync_max_lotes <= 500:
         raise RuntimeError("NFE_AUTO_SYNC_MAX_LOTES deve estar entre 1 e 500.")
-    bind_host = os.getenv("NFE_WEB_HOST", "127.0.0.1").strip()
-    if ambiente == "production" and bind_host not in {"127.0.0.1", "::1"}:
-        raise RuntimeError("Em produção, NFE_WEB_HOST deve ser 127.0.0.1 ou ::1 atrás do gateway.")
 
     return WebSettings(
         environment=ambiente,
@@ -226,7 +217,7 @@ def get_settings() -> WebSettings:
             "NFE_WEB_PROXY_SECRET_HEADER", "X-NFE-Proxy-Secret"
         ).strip(),
         proxy_secret=proxy_secret,
-        admin_users=admin_users,
+        admin_users=_lista(os.getenv("NFE_WEB_ADMIN_USERS")),
         dev_user=os.getenv("NFE_WEB_DEV_USER", "dev@local").strip(),
         dev_name=os.getenv("NFE_WEB_DEV_NAME", "Desenvolvimento").strip(),
         dev_admin=os.getenv("NFE_WEB_DEV_ADMIN", "1").strip() == "1",
@@ -237,7 +228,7 @@ def get_settings() -> WebSettings:
         certificate_thumbprint=(
             os.getenv("NFE_CERT_THUMBPRINT", "").replace(" ", "").strip() or None
         ),
-        bind_host=bind_host,
+        bind_host=os.getenv("NFE_WEB_HOST", "127.0.0.1").strip(),
         bind_port=int(os.getenv("NFE_WEB_PORT", "8080")),
         root_path=os.getenv("NFE_WEB_ROOT_PATH", "").strip(),
         forwarded_allow_ips=os.getenv(

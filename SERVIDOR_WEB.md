@@ -25,12 +25,11 @@ Pode acessar:
 - **Consulta**: pesquisa o histórico do banco por período, NF, série, chave e manifestação, com exportação para Excel.
 - **Status**: consulta a última gravação do banco e o estado do NSU.
 
-Ao abrir **Atualizar**, o app verifica a identidade autenticada pelo gateway
-corporativo e sua presença em `NFE_WEB_ADMIN_USERS`.
+Ao abrir **Atualizar**, o sistema solicita o login administrativo.
 
 ### Administrador
 
-Após autenticar no gateway, um usuário autorizado pode usar:
+Após autenticar com o único login administrativo, pode usar:
 
 - **Atualizar**: sincroniza o banco com `NFeDistribuicaoDFe`.
 
@@ -54,10 +53,11 @@ py -m pytest -q
 
 ## Configuração de produção
 
-As senhas do banco, certificado e SMTP permanecem na pasta `secrets`. A senha
-de usuário administrativo local só existe no modo de desenvolvimento:
+As senhas não são fornecidas por variável de ambiente. A aplicação lê exclusivamente os arquivos locais da pasta `secrets`:
 
 ```text
+C:\ConsultaManifestacao\secrets\admin-user.txt
+C:\ConsultaManifestacao\secrets\admin-password.txt
 C:\ConsultaManifestacao\secrets\db-password.txt
 C:\ConsultaManifestacao\secrets\cert-path.txt
 C:\ConsultaManifestacao\secrets\cert-password.txt
@@ -70,9 +70,6 @@ As variáveis de ambiente continuam disponíveis apenas para configuração não
 
 ```text
 NFE_WEB_ENV=production
-NFE_WEB_AUTH_MODE=proxy
-NFE_WEB_ADMIN_USERS=DOMINIO\\usuario.admin
-NFE_WEB_PROXY_SECRET=<segredo de serviço aleatório com pelo menos 32 caracteres>
 NFE_WEB_CSRF_SECRET=<segredo aleatório com pelo menos 32 caracteres>
 NFE_ADMIN_SESSION_MINUTES=30
 NFE_CERT_STORE=LocalMachine
@@ -80,27 +77,9 @@ NFE_CERT_THUMBPRINT=<thumbprint, se usar Windows Certificate Store>
 NFE_SEFAZ_COOLDOWN_MINUTES=120
 ```
 
-Os arquivos em `secrets` devem ter ACL restrita à conta que executa a aplicação.
-O arquivo `db-password.txt` contém somente a senha SQLCipher. Remova
-`admin-password.txt` de uma instalação de produção após guardar uma cópia
-segura da configuração anterior; o aplicativo recusa iniciar em produção se
-esse arquivo ainda existir. `CONFIGURAR_ADMIN.cmd` serve somente para testes.
+Os arquivos em `secrets` devem ter ACL restrita à conta que executa a aplicação. Rode `CONFIGURAR_ADMIN.cmd` para criar o login administrativo. O arquivo `db-password.txt` deve conter somente a senha do SQLCipher.
 
-O proxy corporativo deve autenticar a pessoa (por exemplo, autenticação
-Windows no IIS ou login pelo Microsoft Entra ID), impedir acesso direto ao
-Uvicorn e **remover** quaisquer `X-NFE-User`, `X-NFE-Name` e
-`X-NFE-Proxy-Secret` enviados pelo navegador antes de injetar valores seus.
-Configure no proxy um cabeçalho `X-NFE-User` com a identidade já autenticada e
-`X-NFE-Proxy-Secret` com o segredo de serviço configurado no app. A aplicação
-compara o segredo e autoriza apenas os usuários listados em
-`NFE_WEB_ADMIN_USERS` (sem diferenciar maiúsculas/minúsculas). Não confie em um
-cabeçalho de identidade vindo diretamente do cliente. O gateway deve controlar
-login e logout; a aplicação não guarda a senha dos funcionários.
-
-**A configuração do proxy é trabalho da TI.** A aplicação não valida tokens
-Entra nem negocia autenticação Windows diretamente. Teste um usuário permitido,
-um usuário não permitido, um cabeçalho sem segredo e uma tentativa de acessar
-o Uvicorn diretamente antes da publicação.
+O reverse proxy continua recomendado para HTTPS e publicação na rede interna, mas não precisa autenticar cada funcionário. A autenticação adicional existe apenas na aba **Atualizar**.
 
 ## Certificado no Windows Server
 

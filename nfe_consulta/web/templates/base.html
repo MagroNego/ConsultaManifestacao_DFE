@@ -24,7 +24,7 @@
     <nav class="tabs" aria-label="Navegação principal">
       <a href="{{ url_for('consulta_page') }}" class="{% if request.url.path == '/' or request.url.path.startswith('/consulta') %}active{% endif %}">Consulta</a>
       <a href="{{ url_for('status_page') }}" class="{% if request.url.path.startswith('/status') %}active{% endif %}">Status</a>
-      <a href="{{ url_for('atualizar_page') if user.is_admin or request.app.state.settings.auth_mode == 'proxy' else url_for('admin_login_page') }}" class="{% if request.url.path.startswith('/atualizar') or request.url.path.startswith('/admin/login') %}active{% endif %}">Atualizar</a>
+      <a href="{{ url_for('atualizar_page') if user.is_admin else url_for('admin_login_page') }}" class="{% if request.url.path.startswith('/atualizar') or request.url.path.startswith('/admin/login') %}active{% endif %}">Atualizar</a>
     </nav>
 
     <div class="account">
@@ -34,14 +34,12 @@
       {% if user.is_admin %}
       <div class="user-chip">
         <strong>Administrador</strong>
-        <small>{{ user.username if request.app.state.settings.auth_mode == 'proxy' else 'Sessão ativa' }}</small>
+        <small>Sessão ativa</small>
       </div>
-      {% if request.app.state.settings.auth_mode == 'dev' %}
       <form action="{{ url_for('admin_logout') }}" method="post" class="logout-form">
         <input type="hidden" name="csrf" value="{{ csrf }}">
         <button type="submit" class="logout-button">Sair</button>
       </form>
-      {% endif %}
       {% endif %}
     </div>
     {% endif %}

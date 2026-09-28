@@ -7,13 +7,12 @@ usam somente o banco local; a sincronização exige login administrativo.
 ## Primeira instalação no Windows
 
 1. Extraia o pacote em uma pasta definitiva.
-2. Execute `INSTALAR.cmd` e, apenas para teste local, `CONFIGURAR_ADMIN.cmd`.
+2. Execute `INSTALAR.cmd` e depois `CONFIGURAR_ADMIN.cmd`.
 3. Execute `INICIAR_WEB.cmd` e abra `http://127.0.0.1:8080` no navegador.
 4. Configure o banco existente e o certificado na aba **Atualizar**.
 
 Leia `MANUAL_DE_INSTALACAO.md` antes de instalar no servidor e
 `MANUAL_DE_USO.md` para usar a interface.
-Em produção, a TI configura a identidade corporativa segundo `SERVIDOR_WEB.md`.
 
 ## Atualização de uma instalação existente
 
