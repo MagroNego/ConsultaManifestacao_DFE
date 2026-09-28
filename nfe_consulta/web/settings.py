@@ -213,6 +213,9 @@ def get_settings() -> WebSettings:
         raise RuntimeError("NFE_AUTO_SYNC_MINUTE deve estar entre 0 e 59.")
     if not 1 <= auto_sync_max_lotes <= 500:
         raise RuntimeError("NFE_AUTO_SYNC_MAX_LOTES deve estar entre 1 e 500.")
+    bind_host = os.getenv("NFE_WEB_HOST", "127.0.0.1").strip()
+    if ambiente == "production" and bind_host not in {"127.0.0.1", "::1"}:
+        raise RuntimeError("Em produção, NFE_WEB_HOST deve ser 127.0.0.1 ou ::1 atrás do gateway.")
 
     return WebSettings(
         environment=ambiente,
@@ -234,7 +237,7 @@ def get_settings() -> WebSettings:
         certificate_thumbprint=(
             os.getenv("NFE_CERT_THUMBPRINT", "").replace(" ", "").strip() or None
         ),
-        bind_host=os.getenv("NFE_WEB_HOST", "127.0.0.1").strip(),
+        bind_host=bind_host,
         bind_port=int(os.getenv("NFE_WEB_PORT", "8080")),
         root_path=os.getenv("NFE_WEB_ROOT_PATH", "").strip(),
         forwarded_allow_ips=os.getenv(

@@ -20,6 +20,10 @@ def test_producao_exige_gateway_e_lista_admin(monkeypatch, tmp_path):
         cfg = settings.get_settings()
         assert cfg.auth_mode == "proxy"
         assert cfg.admin_password is None
+        monkeypatch.setenv("NFE_WEB_HOST", "0.0.0.0")
+        settings.get_settings.cache_clear()
+        with pytest.raises(RuntimeError, match="NFE_WEB_HOST"):
+            settings.get_settings()
     finally:
         settings.get_settings.cache_clear()
 
