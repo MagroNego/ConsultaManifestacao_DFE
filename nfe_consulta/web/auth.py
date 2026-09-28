@@ -9,6 +9,7 @@ from dataclasses import dataclass
 
 from fastapi import HTTPException, Request, Response, status
 
+from nfe_consulta.web.admin_accounts import AdminAccounts
 from nfe_consulta.web.settings import WebSettings
 
 
@@ -26,62 +27,66 @@ PUBLIC_USER = WebUser(
 )
 
 
-def _session_key(settings: WebSettings) -> bytes:
-    material = settings.admin_password or "admin-not-configured"
+def _session_key(settings: WebSettings, password_hash: str) -> bytes:
     return hmac.new(
         settings.csrf_secret.encode("utf-8"),
-        material.encode("utf-8"),
+        password_hash.encode("utf-8"),
         hashlib.sha256,
     ).digest()
 
 
-def _session_signature(payload: str, settings: WebSettings) -> str:
+def _session_signature(payload: str, settings: WebSettings, password_hash: str) -> str:
     return hmac.new(
-        _session_key(settings),
+        _session_key(settings, password_hash),
         payload.encode("utf-8"),
         hashlib.sha256,
     ).hexdigest()
 
 
-def _new_session_token(settings: WebSettings) -> str:
+def _new_session_token(settings: WebSettings, username: str, password_hash: str) -> str:
     expires_at = int(time.time()) + settings.admin_session_minutes * 60
-    payload = f"{settings.admin_username}|{expires_at}"
-    return f"{payload}|{_session_signature(payload, settings)}"
+    payload = f"{username}|{expires_at}"
+    return f"{payload}|{_session_signature(payload, settings, password_hash)}"
 
 
-def _valid_session_token(token: str, settings: WebSettings) -> bool:
+def _session_username(token: str, settings: WebSettings, accounts: AdminAccounts) -> str | None:
     if not token:
-        return False
+        return None
 
     try:
         username, expires_raw, signature = token.rsplit("|", 2)
         expires_at = int(expires_raw)
     except (ValueError, TypeError):
-        return False
+        return None
 
-    if username.casefold() != settings.admin_username.casefold():
-        return False
     if expires_at <= int(time.time()):
-        return False
+        return None
 
+    account = accounts.account(username)
+    if account is None:
+        return None
     payload = f"{username}|{expires_at}"
-    esperado = _session_signature(payload, settings)
-    return hmac.compare_digest(signature, esperado)
+    esperado = _session_signature(payload, settings, account[1])
+    return account[0] if hmac.compare_digest(signature, esperado) else None
 
 
 def admin_session_active(request: Request) -> bool:
     settings: WebSettings = request.app.state.settings
     token = request.cookies.get(settings.admin_cookie_name, "")
-    return _valid_session_token(token, settings)
+    return _session_username(token, settings, request.app.state.admin_accounts) is not None
 
 
 def current_user(request: Request) -> WebUser:
     settings: WebSettings = request.app.state.settings
 
-    if admin_session_active(request):
+    username = _session_username(
+        request.cookies.get(settings.admin_cookie_name, ""),
+        settings, request.app.state.admin_accounts,
+    )
+    if username:
         return WebUser(
-            username=settings.admin_username,
-            display_name="Administrador",
+            username=username,
+            display_name=username,
             is_admin=True,
         )
 
@@ -98,26 +103,13 @@ def require_admin(request: Request) -> WebUser:
     return user
 
 
-def authenticate_admin(
-    username: str,
-    password: str,
-    settings: WebSettings,
-) -> bool:
-    if not settings.admin_password:
-        return False
-
-    usuario_ok = hmac.compare_digest(
-        username.strip().casefold(),
-        settings.admin_username.casefold(),
-    )
-    senha_ok = hmac.compare_digest(password, settings.admin_password)
-    return usuario_ok and senha_ok
-
-
-def set_admin_cookie(response: Response, settings: WebSettings) -> None:
+def set_admin_cookie(response: Response, settings: WebSettings, accounts: AdminAccounts, username: str) -> None:
+    account = accounts.account(username)
+    if account is None:
+        return
     response.set_cookie(
         key=settings.admin_cookie_name,
-        value=_new_session_token(settings),
+        value=_new_session_token(settings, account[0], account[1]),
         max_age=settings.admin_session_minutes * 60,
         httponly=True,
         secure=settings.production,

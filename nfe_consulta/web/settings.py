@@ -98,6 +98,7 @@ class WebSettings:
     admin_password: str | None = None
     admin_session_minutes: int = 30
     admin_cookie_name: str = "nfe_admin_session"
+    admin_accounts_path: Path | None = None
     certificate_path_file: Path | None = None
     certificate_password_file: Path | None = None
     database_path_file: Path | None = None
@@ -154,9 +155,10 @@ def get_settings() -> WebSettings:
     admin_username = _usuario_admin()
     if admin_password and len(admin_password) < 12:
         raise RuntimeError("A senha do administrador deve ter pelo menos 12 caracteres.")
-    if ambiente == "production" and not admin_password:
+    accounts_path = Path(os.getenv("NFE_ADMIN_ACCOUNTS_PATH", str(RAIZ_PROJETO / "dados" / "admin_accounts.db"))).expanduser()
+    if ambiente == "production" and not admin_password and not accounts_path.is_file():
         raise RuntimeError(
-            f"Configure {ADMIN_PASSWORD_FILE} para proteger a área Atualizar."
+            f"Configure {ADMIN_PASSWORD_FILE} para o primeiro acesso administrativo."
         )
 
     admin_session_minutes = int(os.getenv("NFE_ADMIN_SESSION_MINUTES", "30"))
@@ -238,6 +240,7 @@ def get_settings() -> WebSettings:
         sync_cooldown_minutes=int(os.getenv("NFE_SEFAZ_COOLDOWN_MINUTES", "120")),
         admin_username=admin_username,
         admin_password=admin_password,
+        admin_accounts_path=accounts_path,
         admin_session_minutes=admin_session_minutes,
         admin_cookie_name=os.getenv(
             "NFE_ADMIN_COOKIE_NAME", "nfe_admin_session"

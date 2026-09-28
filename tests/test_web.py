@@ -55,6 +55,67 @@ def criar_banco(caminho):
     banco.fechar()
 
 
+def test_contas_admin_pessoais_e_revogacao_de_sessoes(tmp_path):
+    cfg = settings_web(tmp_path)
+    app = create_app(cfg)
+    path = cfg.database_path.parent / "admin_accounts.db"
+    assert path.exists()
+    assert b"Senha-Admin-123!" not in path.read_bytes()
+
+    with TestClient(app) as shared:
+        assert shared.get("/admin/contas").status_code == 401
+        assert shared.get("/consulta").status_code == 200
+        assert shared.get("/status").status_code == 200
+        shared.post("/admin/login", data={
+            "csrf": csrf_token(PUBLIC_USER, cfg), "username": "admin", "password": cfg.admin_password,
+        })
+        admin_csrf = csrf_token(WebUser("admin", "Administrador", True), cfg)
+        create = shared.post("/admin/contas", data={
+            "csrf": admin_csrf, "action": "create", "username": "ana@empresa.com", "password": "Senha-da-Ana-123!",
+        }, follow_redirects=False)
+        assert create.status_code == 303
+        assert "ana@empresa.com" in shared.get("/admin/contas").text
+        assert b"Senha-da-Ana-123!" not in path.read_bytes()
+
+        with TestClient(app) as ana:
+            ana.post("/admin/login", data={
+                "csrf": csrf_token(PUBLIC_USER, cfg), "username": "ana@empresa.com", "password": "Senha-da-Ana-123!",
+            })
+            assert ana.get("/atualizar").status_code == 200
+            assert ana.get("/admin/contas").status_code == 200
+            reset = shared.post("/admin/contas", data={
+                "csrf": admin_csrf, "action": "reset", "username": "ana@empresa.com", "password": "Senha-nova-da-Ana-123!",
+            })
+            assert reset.status_code == 200
+            assert ana.get("/atualizar", follow_redirects=False).status_code == 303
+
+        deactivate = shared.post("/admin/contas", data={
+            "csrf": admin_csrf, "action": "deactivate", "username": "admin",
+        }, follow_redirects=False)
+        assert deactivate.status_code == 303
+        assert shared.get("/atualizar", follow_redirects=False).status_code == 303
+        assert shared.post("/admin/login", data={
+            "csrf": csrf_token(PUBLIC_USER, cfg), "username": "admin", "password": cfg.admin_password,
+        }).status_code == 401
+
+    # Reabrir a aplicação não importa novamente a senha antiga do arquivo.
+    restarted = create_app(cfg)
+    with TestClient(restarted) as client:
+        assert client.post("/admin/login", data={
+            "csrf": csrf_token(PUBLIC_USER, cfg), "username": "admin", "password": cfg.admin_password,
+        }).status_code == 401
+        client.post("/admin/login", data={
+            "csrf": csrf_token(PUBLIC_USER, cfg), "username": "ana@empresa.com", "password": "Senha-nova-da-Ana-123!",
+        })
+        ana_csrf = csrf_token(WebUser("ana@empresa.com", "Administrador", True), cfg)
+        last = client.post("/admin/contas", data={
+            "csrf": ana_csrf, "action": "deactivate", "username": "ana@empresa.com",
+        })
+        assert last.status_code == 400
+        assert "pelo menos um" in last.text
+        assert client.get("/atualizar").status_code == 200
+
+
 def test_admin_cadastra_alertas_sem_liberar_configuracao_ao_usuario(tmp_path):
     cfg = settings_web(tmp_path)
     criar_banco(cfg.database_path)

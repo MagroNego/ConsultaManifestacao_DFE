@@ -140,9 +140,17 @@ secrets\admin-user.txt
 secrets\admin-password.txt
 ```
 
-Arquivos em `secrets` não devem ser versionados e devem ter ACL restrita no servidor.
+Esses arquivos servem para criar a primeira conta no primeiro acesso. O aplicativo
+guarda apenas o hash da senha em `dados/admin_accounts.db`, separado do banco fiscal.
+Em **Atualizar → Gerenciar acessos**, cadastre logins pessoais, desative a conta
+inicial compartilhada e remova `secrets/admin-password.txt`. Faça backup do arquivo
+`dados/admin_accounts.db` junto com os demais dados locais. A senha antiga não é
+reimportada se já houver contas cadastradas. As sessões são encerradas ao desativar
+uma conta ou trocar sua senha.
 
-As senhas de runtime são lidas exclusivamente dessa pasta. Variáveis de ambiente como `NFE_ADMIN_PASSWORD`, `NFE_DATABASE_PASSWORD` e `NFE_CERT_PASSWORD` não são usadas como fonte de senha.
+Arquivos em `secrets` e `dados` não devem ser versionados e devem ter ACL restrita no servidor.
+
+As outras senhas de runtime são lidas exclusivamente de `secrets`. Variáveis de ambiente como `NFE_ADMIN_PASSWORD`, `NFE_DATABASE_PASSWORD` e `NFE_CERT_PASSWORD` não são usadas como fonte de senha.
 
 ## Segurança
 
