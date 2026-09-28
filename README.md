@@ -33,6 +33,9 @@ A versão Web foi projetada para uso em rede interna, com separação entre oper
 - alertas por e-mail para novos eventos de Operação não Realizada (210240), com destinatários administrados na área Atualizar e fila persistente no banco;
 - emitente e indicação de cancelamento na consulta de manifestações e no Excel quando recebidos pela distribuição; registros antigos sem esses dados aparecem sem informação até novo retorno;
 - últimas dez sincronizações na página Status, resumidas do log de auditoria (origem, resultado, lotes, manifestações novas e falha genérica), sem exibir usuário, IP ou detalhes internos;
+- filtro opcional **Somente canceladas** na consulta e na exportação, sem alterar a listagem padrão;
+- histórico administrativo restrito à área Atualizar com responsável, ação e resultado de sincronizações, contas e destinatários dos alertas;
+- planilhas com formatação simples de trabalho, preservando colunas, filtros e chaves de NF-e como texto;
 - sincronização automática interna da SEFAZ pela manhã, sem CLI ou Task Scheduler.
 
 ## Fluxo da aplicação

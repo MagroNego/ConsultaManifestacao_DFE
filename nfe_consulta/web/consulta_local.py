@@ -26,6 +26,7 @@ class FiltrosEventos:
     serie: int | None = None
     chave: str | None = None
     codigo: str | None = None
+    canceladas: bool = False
 
     @property
     def data_inicial_texto(self) -> str:
@@ -117,6 +118,7 @@ def normalizar_filtros(
     serie: str = "",
     chave: str = "",
     codigo: str = "",
+    canceladas: str = "",
 ) -> FiltrosEventos:
     inicio = _parse_data(data_inicial, "Data inicial")
     fim = _parse_data(data_final, "Data final")
@@ -148,6 +150,9 @@ def normalizar_filtros(
     if codigo_limpo and codigo_limpo not in TIPOS_MANIFESTACAO:
         raise ValueError("Tipo de manifestação inválido.")
 
+    if canceladas not in {"", "0", "1"}:
+        raise ValueError("Filtro de cancelamento inválido.")
+
     return FiltrosEventos(
         data_inicial=inicio,
         data_final=fim,
@@ -155,12 +160,15 @@ def normalizar_filtros(
         serie=serie_valor,
         chave=chave_limpa,
         codigo=codigo_limpo or None,
+        canceladas=canceladas == "1",
     )
 
 
 def _where_eventos(
     cnpj: str,
     filtros: FiltrosEventos,
+    *,
+    tem_informacoes: bool = True,
 ) -> tuple[str, list[object]]:
     clausulas = ["cnpj = ?"]
     parametros: list[object] = [cnpj]
@@ -190,6 +198,12 @@ def _where_eventos(
         clausulas.append("codigo = ?")
         parametros.append(filtros.codigo)
 
+    if filtros.canceladas:
+        if tem_informacoes:
+            clausulas.append("EXISTS (SELECT 1 FROM informacoes_nfe info WHERE info.cnpj=manifestacoes.cnpj AND info.chave=manifestacoes.chave AND info.cancelada=1)")
+        else:
+            clausulas.append("0=1")
+
     return " AND ".join(clausulas), parametros
 
 
@@ -212,12 +226,15 @@ def _evento_da_linha(linha) -> EventoNota:
     )
 
 
-def _campos_nota(conexao) -> str:
+def _tem_informacoes_nfe(conexao) -> bool:
     """Bancos existentes continuam consultáveis antes da próxima sincronização."""
-    existe = conexao.execute(
+    return conexao.execute(
         "SELECT 1 FROM sqlite_master WHERE type='table' AND name='informacoes_nfe'"
-    ).fetchone()
-    if not existe:
+    ).fetchone() is not None
+
+
+def _campos_nota(tem_informacoes: bool) -> str:
+    if not tem_informacoes:
         return "'' AS emitente, 0 AS cancelada"
     return """COALESCE((SELECT emitente FROM informacoes_nfe
                         WHERE cnpj=manifestacoes.cnpj AND chave=manifestacoes.chave), '') AS emitente,
@@ -240,10 +257,11 @@ def consultar_eventos(
     if not 1 <= por_pagina <= 500:
         raise ValueError("Quantidade por página inválida.")
 
-    where, parametros = _where_eventos(cnpj, filtros)
     conexao = abrir_banco(database_path, password, somente_leitura=True)
     try:
-        campos_nota = _campos_nota(conexao)
+        tem_informacoes = _tem_informacoes_nfe(conexao)
+        where, parametros = _where_eventos(cnpj, filtros, tem_informacoes=tem_informacoes)
+        campos_nota = _campos_nota(tem_informacoes)
         total = int(
             conexao.execute(
                 f"SELECT COUNT(*) FROM manifestacoes WHERE {where}",
@@ -293,10 +311,11 @@ def consultar_eventos_exportacao(
     limite: int = 200_000,
 ) -> tuple[EventoNota, ...]:
     """Retorna todos os eventos filtrados para exportação."""
-    where, parametros = _where_eventos(cnpj, filtros)
     conexao = abrir_banco(database_path, password, somente_leitura=True)
     try:
-        campos_nota = _campos_nota(conexao)
+        tem_informacoes = _tem_informacoes_nfe(conexao)
+        where, parametros = _where_eventos(cnpj, filtros, tem_informacoes=tem_informacoes)
+        campos_nota = _campos_nota(tem_informacoes)
         total = int(
             conexao.execute(
                 f"SELECT COUNT(*) FROM manifestacoes WHERE {where}",

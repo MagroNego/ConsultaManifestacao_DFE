@@ -768,6 +768,43 @@ def test_exportacao_da_consulta_respeita_os_mesmos_filtros(tmp_path):
     assert ws["K5"].value == "Cancelada"
     assert ws["A6"].value is None
 
+    with TestClient(app) as client:
+        filtrado = client.get("/consulta", params={"consultar": "1", "canceladas": "1"})
+        exportado = client.get("/consulta/exportar", params={"canceladas": "1"})
+    assert filtrado.status_code == 200
+    assert "Somente canceladas" in filtrado.text
+    assert ">91780<" in filtrado.text
+    assert ">91779<" not in filtrado.text
+    filtrado_xlsx = load_workbook(BytesIO(exportado.content), read_only=True)["Manifestacoes"]
+    assert filtrado_xlsx["A5"].value == 91780
+    assert filtrado_xlsx["A6"].value is None
+
+
+def test_historico_administrativo_restrito_e_sem_destinatarios(tmp_path):
+    cfg = settings_web(tmp_path)
+    criar_banco(cfg.database_path)
+    app = create_app(cfg)
+    with TestClient(app) as client:
+        assert client.get("/admin/historico").status_code == 401
+        client.post("/admin/login", data={
+            "csrf": csrf_token(PUBLIC_USER, cfg), "username": "admin", "password": cfg.admin_password,
+        })
+        admin_csrf = csrf_token(WebUser("admin", "Administrador", True), cfg)
+        client.post("/admin/contas", data={
+            "csrf": admin_csrf, "action": "create", "username": "ana@empresa.com", "password": "Senha-da-Ana-123!",
+        })
+        client.post("/atualizar/alertas-email", data={
+            "csrf": admin_csrf, "recipients": "fiscal@empresa.com",
+        })
+        history = client.get("/admin/historico")
+    assert history.status_code == 200
+    assert "ana@empresa.com" in history.text
+    assert "Conta cadastrada" in history.text
+    assert "Destinatários dos alertas" in history.text
+    assert "admin" in history.text
+    assert "fiscal@empresa.com" not in history.text
+    assert "Senha-da-Ana-123!" not in history.text
+
 
 
 def test_consulta_identifica_banco_sem_sincronizacao(tmp_path):

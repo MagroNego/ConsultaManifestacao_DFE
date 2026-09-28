@@ -76,6 +76,13 @@
           {% endfor %}
         </select>
       </label>
+      <label class="field">
+        <span>Cancelamento</span>
+        <select name="canceladas">
+          <option value="">Todas</option>
+          <option value="1" {% if filtros.canceladas %}selected{% endif %}>Somente canceladas</option>
+        </select>
+      </label>
     </div>
 
     <div class="filter-actions">
@@ -110,6 +117,7 @@
       <input type="hidden" name="numero" value="{{ filtros.numero_texto }}">
       <input type="hidden" name="chave" value="{{ filtros.chave or '' }}">
       <input type="hidden" name="codigo" value="{{ filtros.codigo or '' }}">
+      <input type="hidden" name="canceladas" value="{{ '1' if filtros.canceladas else '' }}">
       <button class="button secondary export-button" type="submit">Exportar Excel</button>
     </form>
     {% endif %}

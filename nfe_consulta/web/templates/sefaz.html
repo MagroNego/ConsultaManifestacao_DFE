@@ -9,7 +9,10 @@
   </div>
   <span class="admin-badge">Administrador</span>
 </section>
-<p><a class="button secondary" href="{{ url_for('admin_accounts_page') }}">Gerenciar acessos</a></p>
+<div class="actions">
+  <a class="button secondary" href="{{ url_for('admin_accounts_page') }}">Gerenciar acessos</a>
+  <a class="button secondary" href="{{ url_for('admin_history_page') }}">Histórico administrativo</a>
+</div>
 
 {% if success %}
 <div class="alert success">{{ success }}</div>

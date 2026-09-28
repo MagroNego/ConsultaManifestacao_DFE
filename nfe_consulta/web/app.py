@@ -36,6 +36,7 @@ from nfe_consulta.servico import (
 )
 from nfe_consulta.web.status_view import WebStatus, read_web_status
 from nfe_consulta.web.sync_history import read_sync_history
+from nfe_consulta.web.admin_history import read_admin_history
 from nfe_consulta.web.audit import AuditLog
 from nfe_consulta.web.consulta_local import (
     TIPOS_MANIFESTACAO,
@@ -463,6 +464,19 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                        accounts=app.state.admin_accounts.list_accounts(),
                        success="Acesso atualizado." if ok else None)
 
+    @app.get("/admin/historico", response_class=HTMLResponse)
+    async def admin_history_page(
+        request: Request,
+        user: Annotated[WebUser, Depends(require_admin)],
+    ):
+        try:
+            history = await run_in_threadpool(read_admin_history, settings.audit_log)
+            error = None
+        except OSError:
+            history = ()
+            error = "Histórico temporariamente indisponível."
+        return _render(request, "admin_history.html", user, history=history, error=error)
+
     @app.post("/admin/contas")
     async def admin_accounts_update(
         request: Request,
@@ -515,12 +529,13 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         serie: str = "",
         chave: str = "",
         codigo: str = "",
+        canceladas: str = "",
         pagina: int = 1,
     ):
         consultou = consultar == "1" or any(
             valor.strip()
             for valor in (data_inicial, data_final, numero, serie, chave, codigo)
-        )
+        ) or bool(canceladas)
 
         if consultou:
             try:
@@ -531,6 +546,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                     serie=serie,
                     chave=chave,
                     codigo=codigo,
+                    canceladas=canceladas,
                 )
             except ValueError as exc:
                 return _render(
@@ -603,6 +619,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         serie: str = "",
         chave: str = "",
         codigo: str = "",
+        canceladas: str = "",
     ):
         banco = _database_path(settings)
         database_state = _consulta_database_state(settings)
@@ -620,6 +637,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                 serie=serie,
                 chave=chave,
                 codigo=codigo,
+                canceladas=canceladas,
             )
             eventos = await run_in_threadpool(
                 consultar_eventos_exportacao,
