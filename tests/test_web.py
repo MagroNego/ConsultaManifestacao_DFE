@@ -209,6 +209,7 @@ def test_admin_cadastra_alertas_sem_liberar_configuracao_ao_usuario(tmp_path):
         })
         pagina = client.get("/atualizar")
         assert "Alertas por e-mail" in pagina.text
+        assert "Sem criptografia" in pagina.text
         admin = WebUser("admin", "Administrador", True, client.cookies[cfg.admin_cookie_name])
         invalido = client.post("/atualizar/alertas-email", data={
             "csrf": "invalido", "recipients": "a@empresa.com.br",

@@ -96,7 +96,7 @@
   </section>
 </div>
 
-<section class="card certificate-card">
+  <section class="card certificate-card">
   <div class="card-title">
     <div>
       <h2>Alertas por e-mail</h2>
@@ -183,6 +183,10 @@
     <div>
       <span>Estado</span>
       <strong>{{ "Pronto" if database_web.ready else "Arquivo não encontrado" }}</strong>
+    </div>
+    <div>
+      <span>Proteção do arquivo</span>
+      <strong>{{ "SQLCipher" if database_web.encrypted else "Sem criptografia — restrinja o acesso ao arquivo" if database_web.ready else "—" }}</strong>
     </div>
   </div>
 

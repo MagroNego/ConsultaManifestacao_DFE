@@ -34,6 +34,7 @@ from nfe_consulta.servico import (
     ParametrosConsulta,
     executar_consulta,
 )
+from nfe_consulta.seguranca_banco import criptografado
 from nfe_consulta.web.status_view import WebStatus, read_web_status
 from nfe_consulta.web.sync_history import read_sync_history
 from nfe_consulta.web.admin_history import read_admin_history
@@ -166,6 +167,7 @@ def _database_web(settings: WebSettings) -> dict:
         "path": str(caminho),
         "name": caminho.name,
         "ready": caminho.is_file(),
+        "encrypted": criptografado(caminho) if caminho.is_file() else None,
         "configured": bool(
             settings.database_path_file
             and settings.database_path_file.is_file()
