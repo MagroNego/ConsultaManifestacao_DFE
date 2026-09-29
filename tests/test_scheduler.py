@@ -165,6 +165,30 @@ def test_teste_unico_registra_tentativa_antes_e_nao_repete(monkeypatch):
     assert chamadas == [dia]
 
 
+def test_loop_unico_espera_ate_09_e_termina(monkeypatch):
+    alvo = scheduler.horario_unico(date(2026, 9, 30), 9, 0)
+    instantes = iter((alvo.replace(hour=8, minute=30), alvo))
+    monkeypatch.setattr(scheduler, "agora_brasilia", lambda: next(instantes))
+    esperado = []
+
+    async def dormir(segundos):
+        esperado.append(segundos)
+
+    async def executar(_, dia):
+        esperado.append(dia)
+
+    monkeypatch.setattr(scheduler.asyncio, "sleep", dormir)
+    monkeypatch.setattr(scheduler, "executar_sincronizacao_unica", executar)
+    app = SimpleNamespace(state=SimpleNamespace(
+        settings=SimpleNamespace(auto_sync_once_date=alvo.date(),
+                                 auto_sync_hour=9, auto_sync_minute=0),
+        auto_sync_next_at=None,
+    ))
+    asyncio.run(scheduler.loop_sincronizacao_automatica(app))
+    assert esperado == [1800.0, alvo.date()]
+    assert app.state.auto_sync_next_at is None
+
+
 
 def test_recupera_execucao_quando_servidor_sobe_depois_do_horario():
     agora = datetime(2026, 9, 28, 8, 15, tzinfo=timezone.utc)

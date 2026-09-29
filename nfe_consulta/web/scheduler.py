@@ -59,6 +59,10 @@ def horario_unico(dia: date, hora: int, minuto: int) -> datetime:
     )
 
 
+def agora_brasilia() -> datetime:
+    return datetime.now(timezone(timedelta(hours=-3)))
+
+
 def deve_recuperar_execucao(
     agora: datetime,
     ultima_execucao_local: date | None,
@@ -248,13 +252,12 @@ async def loop_sincronizacao_automatica(app) -> None:
             settings.auto_sync_hour,
             settings.auto_sync_minute,
         )
-        brasilia = alvo.tzinfo
         app.state.auto_sync_next_at = alvo
-        agora = datetime.now(brasilia)
+        agora = agora_brasilia()
         if agora < alvo:
             await asyncio.sleep((alvo - agora).total_seconds())
         try:
-            if datetime.now(brasilia).date() == settings.auto_sync_once_date:
+            if agora_brasilia().date() == settings.auto_sync_once_date:
                 await executar_sincronizacao_unica(app, settings.auto_sync_once_date)
         finally:
             app.state.auto_sync_next_at = None
