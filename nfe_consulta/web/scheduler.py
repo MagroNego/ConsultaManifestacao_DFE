@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 from typing import Iterable
 
 from nfe_consulta.config import CNPJ_PADRAO
@@ -49,6 +49,14 @@ def proxima_execucao(
             return candidato
 
     raise RuntimeError("Não foi possível calcular a próxima sincronização.")
+
+
+def horario_unico(dia: date, hora: int, minuto: int) -> datetime:
+    """Horário civil de Brasília para o teste de data única."""
+    return datetime.combine(
+        dia, time(hora, minuto),
+        tzinfo=timezone(timedelta(hours=-3)),
+    )
 
 
 def deve_recuperar_execucao(
@@ -213,9 +221,44 @@ async def executar_sincronizacao_automatica(
         lock.release()
 
 
-async def loop_sincronizacao_automatica(app) -> None:
-    """Mantém a rotina diária enquanto o processo Web estiver ativo."""
+async def executar_sincronizacao_unica(app, dia: date) -> None:
+    """Registra a tentativa antes da chamada para não repetir após reinício."""
     settings = app.state.settings
+    try:
+        if await asyncio.to_thread(ultima_execucao_agendada, settings) == dia:
+            return
+        await asyncio.to_thread(registrar_execucao_agendada, settings, dia)
+    except Exception as exc:
+        app.state.audit.write_system(
+            "sefaz_sync_auto", "erro",
+            reason=f"schedule_state_{type(exc).__name__}",
+        )
+        return
+    await executar_sincronizacao_automatica(app, dia_agendado=dia)
+
+
+async def loop_sincronizacao_automatica(app) -> None:
+    """Executa uma data única ou mantém a rotina diária opcional."""
+    settings = app.state.settings
+    if settings.auto_sync_once_date is not None:
+        # O teste de 30/09 usa o horário de Brasília, mesmo que o servidor
+        # esteja configurado em outro fuso.
+        alvo = horario_unico(
+            settings.auto_sync_once_date,
+            settings.auto_sync_hour,
+            settings.auto_sync_minute,
+        )
+        brasilia = alvo.tzinfo
+        app.state.auto_sync_next_at = alvo
+        agora = datetime.now(brasilia)
+        if agora < alvo:
+            await asyncio.sleep((alvo - agora).total_seconds())
+        try:
+            if datetime.now(brasilia).date() == settings.auto_sync_once_date:
+                await executar_sincronizacao_unica(app, settings.auto_sync_once_date)
+        finally:
+            app.state.auto_sync_next_at = None
+        return
 
     agora = datetime.now().astimezone()
     try:

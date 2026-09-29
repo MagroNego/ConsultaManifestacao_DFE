@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import secrets
 from dataclasses import dataclass
+from datetime import date
 from functools import lru_cache
 from pathlib import Path
 
@@ -109,6 +110,7 @@ class WebSettings:
     auto_sync_minute: int = 0
     auto_sync_weekdays: tuple[int, ...] = (0, 1, 2, 3, 4)
     auto_sync_max_lotes: int = 50
+    auto_sync_once_date: date | None = None
     email_recipients_file: Path = EMAIL_RECIPIENTS_FILE
     smtp_host: str = ""
     smtp_port: int = 587
@@ -190,6 +192,13 @@ def get_settings() -> WebSettings:
         "NFE_AUTO_SYNC_ENABLED",
         "0",
     ).strip() == "1"
+    once_raw = os.getenv("NFE_AUTO_SYNC_ONCE_DATE", "").strip()
+    try:
+        auto_sync_once_date = date.fromisoformat(once_raw) if once_raw else None
+    except ValueError as exc:
+        raise RuntimeError("NFE_AUTO_SYNC_ONCE_DATE deve ter formato AAAA-MM-DD.") from exc
+    if auto_sync_once_date is not None:
+        auto_sync_enabled = True
     auto_sync_hour = int(os.getenv("NFE_AUTO_SYNC_HOUR", "8"))
     auto_sync_minute = int(os.getenv("NFE_AUTO_SYNC_MINUTE", "0"))
     auto_sync_max_lotes = int(os.getenv("NFE_AUTO_SYNC_MAX_LOTES", "50"))
@@ -257,6 +266,7 @@ def get_settings() -> WebSettings:
         auto_sync_minute=auto_sync_minute,
         auto_sync_weekdays=auto_sync_weekdays,
         auto_sync_max_lotes=auto_sync_max_lotes,
+        auto_sync_once_date=auto_sync_once_date,
         smtp_host=os.getenv("NFE_SMTP_HOST", "").strip(),
         smtp_port=smtp_port,
         smtp_from=smtp_from,

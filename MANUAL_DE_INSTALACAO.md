@@ -81,7 +81,7 @@ A pasta deve ter ACL NTFS restrita à conta que executa a aplicação e aos admi
 
 Em ambiente corporativo, publique a aplicação atrás de IIS/HTTPS e mantenha o Uvicorn em `127.0.0.1:8080`.
 
-A sincronização automática da manhã roda dentro do próprio processo Web. Em produção, o padrão é segunda a sexta-feira às 08:00:
+A sincronização automática fica desativada até a TI configurá-la. Para ativar a rotina recorrente, o padrão é segunda a sexta-feira às 08:00:
 
 ```text
 NFE_AUTO_SYNC_ENABLED=1
@@ -91,11 +91,17 @@ NFE_AUTO_SYNC_WEEKDAYS=0,1,2,3,4
 NFE_AUTO_SYNC_MAX_LOTES=50
 ```
 
-O serviço Web precisa permanecer ativo no horário programado. Em uma instalação
-de desenvolvimento, o agendador permanece desligado até configurar
+O serviço Web precisa permanecer ativo no horário programado. Em qualquer
+ambiente, o agendador permanece desligado até configurar
 `NFE_AUTO_SYNC_ENABLED=1` no ambiente do processo antes de iniciá-lo.
 `WEB_CONFIG.example` serve como referência e não é carregado por
 `INICIAR_WEB.cmd`.
+
+Para o teste único de 30/09/2026 às 09:00 (horário de Brasília), use
+`TESTAR_SYNC_30-09_09H.cmd` no servidor antes do horário. Ele configura
+`NFE_AUTO_SYNC_ONCE_DATE=2026-09-30`, inicia o aplicativo e registra a
+tentativa no banco antes de consultar a SEFAZ, desde que o banco esteja disponível. Não execute outra instância
+em paralelo nem faça sincronização manual dentro do cooldown de 120 minutos.
 
 Consulte `SERVIDOR_WEB.md` para detalhes de implantação.
 

@@ -32,6 +32,12 @@ def test_proxima_execucao_pula_fim_de_semana():
     assert proxima == datetime(2026, 10, 5, 8, 0, tzinfo=timezone.utc)
 
 
+def test_teste_unico_em_30_09_as_09_brasilia():
+    alvo = scheduler.horario_unico(date(2026, 9, 30), 9, 0)
+    assert alvo.isoformat() == "2026-09-30T09:00:00-03:00"
+    assert alvo.astimezone(timezone.utc).hour == 12
+
+
 def test_sincronizacao_automatica_usa_mesmo_lock_da_web(monkeypatch):
     eventos = []
 
@@ -135,6 +141,28 @@ def test_falha_automatica_nao_marca_dia_como_concluido(monkeypatch):
     monkeypatch.setattr(scheduler, "sincronizar_configurado", falhar)
     asyncio.run(scheduler.executar_sincronizacao_automatica(app))
     assert passos == ["erro"]
+
+
+def test_teste_unico_registra_tentativa_antes_e_nao_repete(monkeypatch):
+    dia = date(2026, 9, 30)
+    registrado = []
+    chamadas = []
+    app = SimpleNamespace(state=SimpleNamespace(settings=SimpleNamespace(), audit=None))
+
+    monkeypatch.setattr(scheduler, "ultima_execucao_agendada",
+                        lambda _: registrado[-1] if registrado else None)
+    monkeypatch.setattr(scheduler, "registrar_execucao_agendada",
+                        lambda _, data: registrado.append(data))
+
+    async def executar(_, *, dia_agendado):
+        assert registrado == [dia]
+        chamadas.append(dia_agendado)
+
+    monkeypatch.setattr(scheduler, "executar_sincronizacao_automatica", executar)
+    asyncio.run(scheduler.executar_sincronizacao_unica(app, dia))
+    asyncio.run(scheduler.executar_sincronizacao_unica(app, dia))
+    assert registrado == [dia]
+    assert chamadas == [dia]
 
 
 

@@ -268,6 +268,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             hora=settings.auto_sync_hour,
             minuto=settings.auto_sync_minute,
             dias=list(settings.auto_sync_weekdays),
+            data_unica=settings.auto_sync_once_date.isoformat() if settings.auto_sync_once_date else None,
             max_lotes=settings.auto_sync_max_lotes,
         )
 

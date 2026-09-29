@@ -1,4 +1,5 @@
 from pathlib import Path
+from datetime import date
 
 from nfe_consulta import certificado_config
 from nfe_consulta.web import settings
@@ -87,3 +88,19 @@ def test_producao_usa_segredo_persistente_e_nao_ativa_sync_sozinha(tmp_path, mon
         settings.get_settings.cache_clear()
     assert cfg.csrf_secret == "s" * 48
     assert not cfg.auto_sync_enabled
+
+
+def test_data_unica_ativa_apenas_o_agendamento_especificado(monkeypatch):
+    monkeypatch.setenv("NFE_WEB_ENV", "development")
+    monkeypatch.setenv("NFE_AUTO_SYNC_ONCE_DATE", "2026-09-30")
+    monkeypatch.setenv("NFE_AUTO_SYNC_HOUR", "9")
+    monkeypatch.setenv("NFE_AUTO_SYNC_MINUTE", "0")
+    monkeypatch.delenv("NFE_AUTO_SYNC_ENABLED", raising=False)
+    settings.get_settings.cache_clear()
+    try:
+        cfg = settings.get_settings()
+    finally:
+        settings.get_settings.cache_clear()
+    assert cfg.auto_sync_enabled
+    assert cfg.auto_sync_once_date == date(2026, 9, 30)
+    assert (cfg.auto_sync_hour, cfg.auto_sync_minute) == (9, 0)

@@ -80,7 +80,16 @@
         <span>Sincronização automática</span>
         <strong>
           {% if request.app.state.settings.auto_sync_enabled %}
-            Ativa · {{ "%02d:%02d"|format(request.app.state.settings.auto_sync_hour, request.app.state.settings.auto_sync_minute) }}
+            {% if request.app.state.settings.auto_sync_once_date %}
+              {% if request.app.state.auto_sync_next_at %}
+                Teste único · {{ request.app.state.settings.auto_sync_once_date.strftime("%d/%m/%Y") }}
+                às {{ "%02d:%02d"|format(request.app.state.settings.auto_sync_hour, request.app.state.settings.auto_sync_minute) }} (Brasília)
+              {% else %}
+                Tentativa única encerrada · confira o Status
+              {% endif %}
+            {% else %}
+              Ativa · {{ "%02d:%02d"|format(request.app.state.settings.auto_sync_hour, request.app.state.settings.auto_sync_minute) }}
+            {% endif %}
           {% else %}
             Desativada
           {% endif %}
