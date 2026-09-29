@@ -94,12 +94,16 @@ class BancoManifestacoes:
                 destinatario TEXT NOT NULL,
                 criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 enviado_em TEXT,
+                cancelado_em TEXT,
                 tentativas INTEGER NOT NULL DEFAULT 0,
                 ultimo_erro TEXT,
                 UNIQUE(manifestacao_id, destinatario)
             );
             """
         )
+        colunas_email = {row[1] for row in self.conexao.execute("PRAGMA table_info(notificacoes_email)")}
+        if "cancelado_em" not in colunas_email:
+            self.conexao.execute("ALTER TABLE notificacoes_email ADD COLUMN cancelado_em TEXT")
         self.conexao.commit()
 
     def fechar(self) -> None:
@@ -278,13 +282,13 @@ class BancoManifestacoes:
         return self.conexao.execute(
             "SELECT n.id, n.destinatario, m.chave, m.data_evento, m.protocolo "
             "FROM notificacoes_email n JOIN manifestacoes m ON m.id = n.manifestacao_id "
-            "WHERE n.enviado_em IS NULL ORDER BY n.id LIMIT ?",
+            "WHERE n.enviado_em IS NULL AND n.cancelado_em IS NULL ORDER BY n.id LIMIT ?",
             (limite,),
         ).fetchall()
 
     def contar_notificacoes_pendentes(self) -> int:
         return self.conexao.execute(
-            "SELECT COUNT(*) FROM notificacoes_email WHERE enviado_em IS NULL"
+            "SELECT COUNT(*) FROM notificacoes_email WHERE enviado_em IS NULL AND cancelado_em IS NULL"
         ).fetchone()[0]
 
     def registrar_envio_email(self, id_notificacao: int, erro: str | None = None) -> None:
@@ -292,9 +296,28 @@ class BancoManifestacoes:
             self.conexao.execute(
                 "UPDATE notificacoes_email SET tentativas = tentativas + 1, "
                 "enviado_em = CASE WHEN ? IS NULL THEN CURRENT_TIMESTAMP ELSE enviado_em END, "
-                "ultimo_erro = ? WHERE id = ? AND enviado_em IS NULL",
+                "ultimo_erro = ? WHERE id = ? AND enviado_em IS NULL AND cancelado_em IS NULL",
                 (erro, erro, id_notificacao),
             )
+
+    def cancelar_notificacao(self, id_notificacao: int, motivo: str) -> None:
+        with self.conexao:
+            self.conexao.execute(
+                "UPDATE notificacoes_email SET cancelado_em=CURRENT_TIMESTAMP, ultimo_erro=? "
+                "WHERE id=? AND enviado_em IS NULL AND cancelado_em IS NULL",
+                (motivo, id_notificacao),
+            )
+
+    def cancelar_destinatarios_removidos(self, destinatarios: tuple[str, ...]) -> int:
+        with self.conexao:
+            placeholders = ",".join("?" for _ in destinatarios)
+            condicao = f" AND destinatario NOT IN ({placeholders})" if destinatarios else ""
+            cursor = self.conexao.execute(
+                "UPDATE notificacoes_email SET cancelado_em=CURRENT_TIMESTAMP, ultimo_erro='destinatario_removido' "
+                "WHERE enviado_em IS NULL AND cancelado_em IS NULL" + condicao,
+                destinatarios,
+            )
+        return cursor.rowcount
 
     def consultas_na_ultima_hora(self, cnpj: str) -> int:
         linha = self.conexao.execute(

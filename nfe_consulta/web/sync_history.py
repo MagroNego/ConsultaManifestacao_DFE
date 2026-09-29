@@ -65,12 +65,16 @@ def read_sync_history(path: Path, limit: int = 10) -> tuple[SyncHistoryItem, ...
                 continue
             reason = payload.get("reason") if isinstance(payload.get("reason"), str) else None
             detail = _REASONS.get(reason, "Falha na sincronização") if outcome == "erro" else ""
+            incomplete = outcome == "ok" and payload.get("completo") is False
+            if incomplete:
+                detail = "Ainda há lotes a consultar"
             if outcome == "ignorado":
                 detail = _REASONS.get(reason, "Tentativa não executada")
             items.append(SyncHistoryItem(
                 when=timestamp,
                 origin="Automática" if payload["action"] == "sefaz_sync_auto" else "Manual",
-                result={"ok": "Concluída", "erro": "Falhou", "ignorado": "Não executada"}[outcome],
+                result=("Parcial" if incomplete else
+                        {"ok": "Concluída", "erro": "Falhou", "ignorado": "Não executada"}[outcome]),
                 lots=payload.get("lotes") if isinstance(payload.get("lotes"), int) else None,
                 new_events=payload.get("eventos_novos") if isinstance(payload.get("eventos_novos"), int) else None,
                 detail=detail,

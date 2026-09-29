@@ -31,7 +31,12 @@ def sincronizar_configurado(settings: WebSettings, *, max_lotes: int = 50, audit
         settings.certificate_password_file,
     )
 
-    destinatarios = carregar_destinatarios(settings.email_recipients_file)
+    try:
+        destinatarios = carregar_destinatarios(settings.email_recipients_file)
+    except (ValueError, OSError) as exc:
+        destinatarios = ()
+        if audit is not None:
+            audit.write_system("email_alert", "erro", reason=type(exc).__name__)
     try:
         return sincronizar_banco(
             ParametrosSincronizacao(

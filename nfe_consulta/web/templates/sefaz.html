@@ -117,7 +117,7 @@
     </div>
   </form>
   <p class="cooldown-note">
-    Um endereço por linha ou separados por vírgula, até 20. Deixe vazio para não gerar novos avisos.
+    Um endereço por linha ou separados por vírgula, até 20. Ao remover um endereço, avisos ainda pendentes para ele são cancelados. Deixe vazio para não gerar novos avisos.
     O aviso é criado somente quando um evento 210240 novo entra no banco; eventos antigos não são reenviados.
     {% if not smtp_ready %}A TI precisa configurar o servidor SMTP para realizar os envios.{% endif %}
   </p>

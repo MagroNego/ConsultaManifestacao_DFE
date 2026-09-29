@@ -30,3 +30,14 @@ def test_historico_ler_rotacao_sem_expor_dados_internos(tmp_path):
     assert items[1].new_events == 0
     assert items[1].origin == "Automática"
     assert len(read_sync_history(path, limit=1)) == 1
+
+
+def test_historico_distingue_sincronizacao_parcial(tmp_path):
+    path = tmp_path / "web_audit.log"
+    path.write_text(
+        '2026-09-28 11:00:00 {"action":"sefaz_sync","result":"ok","completo":false,"lotes":50}\n',
+        encoding="utf-8",
+    )
+    item = read_sync_history(path)[0]
+    assert item.result == "Parcial"
+    assert "lotes" in item.detail

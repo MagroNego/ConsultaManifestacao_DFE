@@ -37,13 +37,18 @@ async def consolidar_txts(
             continue
 
         try:
-            bruto = await upload.read()
+            partes = []
+            while True:
+                bloco = await upload.read(min(64 * 1024, max_bytes - total_bytes + 1))
+                if not bloco:
+                    break
+                total_bytes += len(bloco)
+                if total_bytes > max_bytes:
+                    raise ValueError("Os TXT enviados excedem o limite total de 2 MiB.")
+                partes.append(bloco)
+            bruto = b"".join(partes)
         finally:
             await upload.close()
-
-        total_bytes += len(bruto)
-        if total_bytes > max_bytes:
-            raise ValueError("Os TXT enviados excedem o limite total de 2 MiB.")
 
         try:
             texto = bruto.decode("utf-8-sig")

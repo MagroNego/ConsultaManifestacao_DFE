@@ -118,6 +118,25 @@ def test_sincronizacao_automatica_nao_concorre_com_manual(monkeypatch):
     ]
 
 
+def test_falha_automatica_nao_marca_dia_como_concluido(monkeypatch):
+    passos = []
+    class Audit:
+        def write_system(self, action, result, **details):
+            passos.append(result)
+
+    app = SimpleNamespace(state=SimpleNamespace(
+        settings=SimpleNamespace(auto_sync_max_lotes=50, sync_cooldown_minutes=120),
+        sync_lock=threading.Lock(), audit=Audit(),
+    ))
+    monkeypatch.setattr(scheduler, "registrar_execucao_agendada",
+                        lambda *args: passos.append("marcado"))
+    def falhar(*args, **kwargs):
+        raise OSError("indisponível")
+    monkeypatch.setattr(scheduler, "sincronizar_configurado", falhar)
+    asyncio.run(scheduler.executar_sincronizacao_automatica(app))
+    assert passos == ["erro"]
+
+
 
 def test_recupera_execucao_quando_servidor_sobe_depois_do_horario():
     agora = datetime(2026, 9, 28, 8, 15, tzinfo=timezone.utc)

@@ -29,7 +29,7 @@ Ao abrir **Atualizar**, o sistema solicita o login administrativo.
 
 ### Administrador
 
-Após autenticar com o único login administrativo, pode usar:
+Após autenticar com uma conta administrativa autorizada, pode usar:
 
 - **Atualizar**: sincroniza o banco com `NFeDistribuicaoDFe`.
 
@@ -77,7 +77,7 @@ NFE_CERT_THUMBPRINT=<thumbprint, se usar Windows Certificate Store>
 NFE_SEFAZ_COOLDOWN_MINUTES=120
 ```
 
-Os arquivos em `secrets` devem ter ACL restrita à conta que executa a aplicação. Rode `CONFIGURAR_ADMIN.cmd` para criar o login administrativo. O arquivo `db-password.txt` deve conter somente a senha do SQLCipher.
+Os arquivos em `secrets` devem ter ACL restrita à conta que executa a aplicação. Rode `CONFIGURAR_ADMIN.cmd` para criar o primeiro login administrativo. O arquivo `db-password.txt` deve conter somente a senha do SQLCipher. Depois, gerencie as contas em **Atualizar → Gerenciar acessos**. O `INICIAR_WEB.cmd` inicia em modo produção e cria `secrets\web-csrf-secret.txt` na primeira execução; preserve esse arquivo e sua ACL restrita. Com outro serviço de inicialização, defina `NFE_WEB_ENV=production` e o segredo pela variável `NFE_WEB_CSRF_SECRET` ou por esse arquivo.
 
 O reverse proxy continua recomendado para HTTPS e publicação na rede interna, mas não precisa autenticar cada funcionário. A autenticação adicional existe apenas na aba **Atualizar**.
 
@@ -153,7 +153,7 @@ os destinatários na interface; o arquivo local
 Os avisos aguardam em `notificacoes_email` no banco, com uma linha por evento e
 destinatário. Não inclua banco nem `secrets` no pacote de distribuição. A
 entrega exige conectividade com o SMTP e deve ser testada com um destino de
-homologação. A fila persiste nas falhas; a confirmação SMTP e a marcação no
+homologação. A fila persiste nas falhas temporárias. Endereços removidos e rejeições permanentes são cancelados. A confirmação SMTP e a marcação no
 banco não formam uma transação única, portanto uma falha entre as duas etapas
 pode causar um segundo envio.
 
@@ -220,7 +220,7 @@ A TI ainda deve validar:
 
 A v2.1 executa a rotina matinal dentro do próprio processo Web. Não existe CLI pública, BAT de atualização nem dependência do Agendador de Tarefas do Windows.
 
-Em produção, o padrão é:
+Quando ativada explicitamente, a rotina usa por padrão:
 
 ```text
 segunda a sexta-feira
@@ -258,9 +258,9 @@ logs\web_audit.log
 
 com a ação `sefaz_sync_auto`.
 
-Em desenvolvimento, o agendador fica desligado por padrão; em produção, fica ligado por padrão.
+O agendador fica desligado por padrão em todos os ambientes. Defina `NFE_AUTO_SYNC_ENABLED=1` para ativá-lo.
 
-Se o serviço estiver indisponível às 08:00 e voltar depois desse horário no mesmo dia útil, a aplicação tenta recuperar a execução perdida. O controle diário fica persistido na tabela `controle_agendamento`, evitando que reinicializações do processo provoquem múltiplos disparos automáticos no mesmo dia.
+Se o serviço estiver indisponível às 08:00 e voltar depois desse horário no mesmo dia útil, a aplicação tenta recuperar a execução perdida. Uma falha pode ser tentada novamente a cada hora, sempre respeitando o cooldown. A conclusão diária fica persistida na tabela `controle_agendamento`.
 
 ## Banco central configurado pela área administrativa
 

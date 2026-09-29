@@ -14,6 +14,7 @@ SECRETS_DIR = RAIZ_PROJETO / "secrets"
 DATABASE_PASSWORD_FILE = SECRETS_DIR / "db-password.txt"
 ADMIN_USER_FILE = SECRETS_DIR / "admin-user.txt"
 ADMIN_PASSWORD_FILE = SECRETS_DIR / "admin-password.txt"
+CSRF_SECRET_FILE = SECRETS_DIR / "web-csrf-secret.txt"
 CERT_PATH_FILE = SECRETS_DIR / "cert-path.txt"
 CERT_PASSWORD_FILE = SECRETS_DIR / "cert-password.txt"
 DATABASE_PATH_FILE = SECRETS_DIR / "db-path.txt"
@@ -146,8 +147,10 @@ def get_settings() -> WebSettings:
 
     csrf_secret = os.getenv("NFE_WEB_CSRF_SECRET")
     if ambiente == "production":
+        if not csrf_secret:
+            csrf_secret = _ler_segredo(CSRF_SECRET_FILE, rotulo="segredo da sessão Web")
         if not csrf_secret or len(csrf_secret) < 32:
-            raise RuntimeError("Defina NFE_WEB_CSRF_SECRET com pelo menos 32 caracteres.")
+            raise RuntimeError("Defina NFE_WEB_CSRF_SECRET ou secrets/web-csrf-secret.txt com pelo menos 32 caracteres.")
     elif not csrf_secret:
         csrf_secret = secrets.token_urlsafe(32)
 
@@ -185,7 +188,7 @@ def get_settings() -> WebSettings:
 
     auto_sync_enabled = os.getenv(
         "NFE_AUTO_SYNC_ENABLED",
-        "1" if ambiente == "production" else "0",
+        "0",
     ).strip() == "1"
     auto_sync_hour = int(os.getenv("NFE_AUTO_SYNC_HOUR", "8"))
     auto_sync_minute = int(os.getenv("NFE_AUTO_SYNC_MINUTE", "0"))

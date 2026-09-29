@@ -3,6 +3,12 @@ setlocal EnableExtensions
 cd /d "%~dp0"
 
 if not exist "%~dp0secrets" mkdir "%~dp0secrets"
+if exist "%~dp0dados\admin_accounts.db" (
+    echo As contas ja foram criadas. Entre em Atualizar - Gerenciar acessos para criar usuarios ou trocar senhas.
+    echo Alterar secrets\admin-password.txt agora nao altera a conta existente.
+    pause
+    exit /b 1
+)
 
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "$ErrorActionPreference='Stop';" ^

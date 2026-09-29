@@ -85,6 +85,7 @@ def test_filtra_periodo_serie_e_manifestacao(tmp_path):
     assert resultado.eventos[0].numero == 91781
     assert resultado.eventos[0].serie == "2"
     assert resultado.eventos[0].codigo == "210200"
+    assert resultado.eventos[0].emitente == _chave(91781, 2)[6:20]
 
 
 def test_paginacao_preserva_total(tmp_path):

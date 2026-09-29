@@ -199,7 +199,7 @@ As instruções de implantação estão em `SERVIDOR_WEB.md`.
 
 A v2.1 não utiliza CLI nem `ATUALIZAR_BANCO_MANHA.cmd`.
 
-O próprio processo Web mantém um agendador interno para sincronização com a SEFAZ. Em produção, o padrão é executar às **08:00 de segunda a sexta-feira**, usando o mesmo banco, certificado, cooldown e trava da sincronização manual.
+O próprio processo Web pode manter um agendador interno para sincronização com a SEFAZ. Ele vem **desativado**; a TI pode habilitar a execução às **08:00 de segunda a sexta-feira**, usando o mesmo banco, certificado, cooldown e trava da sincronização manual.
 
 Configurações operacionais:
 
@@ -213,11 +213,11 @@ NFE_AUTO_SYNC_MAX_LOTES=50
 
 Segunda-feira é `0` e domingo é `6`.
 
-Em ambiente de desenvolvimento o agendador fica desativado por padrão. Em produção, fica ativado por padrão e pode ser desligado com `NFE_AUTO_SYNC_ENABLED=0`.
+O agendador fica desativado por padrão em todos os ambientes. A ativação exige `NFE_AUTO_SYNC_ENABLED=1`.
 
 A execução automática aparece no mesmo log de auditoria da aplicação com a ação `sefaz_sync_auto`.
 
-Se o serviço estiver desligado no horário programado e voltar ainda no mesmo dia útil, a aplicação faz uma execução de recuperação. O disparo diário é registrado no próprio banco para que reinícios do serviço não repitam a mesma sincronização automática.
+Se o serviço estiver desligado no horário programado e voltar ainda no mesmo dia útil, a aplicação tenta recuperar a execução perdida. Falhas podem ser tentadas novamente a cada hora, respeitando o cooldown; a conclusão é registrada no banco para evitar repetição no dia.
 
 ## Desenvolvimento
 

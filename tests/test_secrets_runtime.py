@@ -68,3 +68,22 @@ def test_certificado_usa_caminho_e_senha_dos_arquivos_secrets(tmp_path, monkeypa
     assert cfg is not None
     assert cfg.path == arquivo_pfx.resolve()
     assert cfg.password == "Senha-PFX-Arquivo-123!"
+
+
+def test_producao_usa_segredo_persistente_e_nao_ativa_sync_sozinha(tmp_path, monkeypatch):
+    secret = tmp_path / "web-csrf-secret.txt"
+    secret.write_text("s" * 48, encoding="utf-8")
+    accounts = tmp_path / "admin_accounts.db"
+    accounts.touch()
+    monkeypatch.setattr(settings, "CSRF_SECRET_FILE", secret)
+    monkeypatch.setenv("NFE_WEB_ENV", "production")
+    monkeypatch.delenv("NFE_WEB_CSRF_SECRET", raising=False)
+    monkeypatch.delenv("NFE_AUTO_SYNC_ENABLED", raising=False)
+    monkeypatch.setenv("NFE_ADMIN_ACCOUNTS_PATH", str(accounts))
+    settings.get_settings.cache_clear()
+    try:
+        cfg = settings.get_settings()
+    finally:
+        settings.get_settings.cache_clear()
+    assert cfg.csrf_secret == "s" * 48
+    assert not cfg.auto_sync_enabled

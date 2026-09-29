@@ -1,5 +1,6 @@
 from pathlib import Path
 from types import SimpleNamespace
+import smtplib
 
 import pytest
 
@@ -51,9 +52,12 @@ def test_falha_smtp_mantem_fila_e_retentativa_entrega(monkeypatch, tmp_path):
     banco = BancoManifestacoes(str(caminho))
     banco.salvar_retorno("123", retorno(), ("a@empresa.com.br",))
     banco.fechar()
+    destinatarios = tmp_path / "email-recipients.json"
+    email_alerts.salvar_destinatarios(destinatarios, "a@empresa.com.br")
     settings = SimpleNamespace(
         smtp_host="smtp.empresa.com.br", smtp_from="app@empresa.com.br",
         smtp_user="", smtp_password_file=Path("nao-usado"),
+        email_recipients_file=destinatarios,
         current_database_password=lambda: None,
     )
     monkeypatch.setattr("nfe_consulta.web.sync_runtime.caminho_banco_configurado", lambda _: caminho)
@@ -98,3 +102,76 @@ def test_sincronizacao_parcial_tenta_entregar_fila_no_finally(monkeypatch, tmp_p
     with pytest.raises(RuntimeError):
         sync_runtime.sincronizar_configurado(settings, audit=object())
     assert chamadas == [("fiscal@empresa.com.br",), "entrega"]
+
+
+def test_remover_destinatario_cancela_fila_sem_enviar(monkeypatch, tmp_path):
+    caminho = tmp_path / "eventos.db"
+    banco = BancoManifestacoes(str(caminho))
+    banco.salvar_retorno("123", retorno(), ("antigo@empresa.com.br", "ativo@empresa.com.br"))
+    banco.fechar()
+    arquivo = tmp_path / "recipients.json"
+    email_alerts.salvar_destinatarios(arquivo, "ativo@empresa.com.br")
+    settings = SimpleNamespace(
+        smtp_host="smtp", smtp_from="app@empresa.com.br", smtp_user="",
+        smtp_password_file=tmp_path / "smtp.txt", email_recipients_file=arquivo,
+        current_database_password=lambda: None,
+    )
+    monkeypatch.setattr(sync_runtime, "caminho_banco_configurado", lambda _: caminho)
+    enviados = []
+    monkeypatch.setattr(email_alerts, "_enviar", lambda _, email, *args: enviados.append(email))
+    audit = SimpleNamespace(write_system=lambda *args, **kwargs: None)
+    assert email_alerts.enviar_pendentes(settings, audit) == 1
+    assert enviados == ["ativo@empresa.com.br"]
+    banco = BancoManifestacoes(str(caminho))
+    assert banco.contar_notificacoes_pendentes() == 0
+    banco.fechar()
+
+
+def test_destinatario_rejeitado_nao_bloqueia_os_demais(monkeypatch, tmp_path):
+    caminho = tmp_path / "eventos.db"
+    banco = BancoManifestacoes(str(caminho))
+    banco.salvar_retorno("123", retorno(), ("ruim@empresa.com.br", "bom@empresa.com.br"))
+    banco.fechar()
+    arquivo = tmp_path / "recipients.json"
+    email_alerts.salvar_destinatarios(arquivo, "ruim@empresa.com.br\nbom@empresa.com.br")
+    settings = SimpleNamespace(
+        smtp_host="smtp", smtp_from="app@empresa.com.br", smtp_user="",
+        smtp_password_file=tmp_path / "smtp.txt", email_recipients_file=arquivo,
+        current_database_password=lambda: None,
+    )
+    monkeypatch.setattr(sync_runtime, "caminho_banco_configurado", lambda _: caminho)
+    enviados = []
+
+    def enviar(_, email, *args):
+        if email.startswith("ruim"):
+            raise smtplib.SMTPRecipientsRefused({email: (550, b"unknown")})
+        enviados.append(email)
+
+    monkeypatch.setattr(email_alerts, "_enviar", enviar)
+    audit = SimpleNamespace(write_system=lambda *args, **kwargs: None)
+    assert email_alerts.enviar_pendentes(settings, audit) == 1
+    assert enviados == ["bom@empresa.com.br"]
+    banco = BancoManifestacoes(str(caminho))
+    assert banco.contar_notificacoes_pendentes() == 0
+    banco.fechar()
+
+
+def test_arquivo_de_email_invalido_nao_interrompe_consulta_sefaz(monkeypatch, tmp_path):
+    caminho = tmp_path / "eventos.db"
+    caminho.touch()
+    arquivo = tmp_path / "recipients.json"
+    arquivo.write_text("{inválido", encoding="utf-8")
+    settings = SimpleNamespace(
+        database_path=caminho, database_path_file=tmp_path / "db-path.txt",
+        certificate_path_file=tmp_path / "cert-path.txt",
+        certificate_password_file=tmp_path / "cert-password.txt",
+        certificate_thumbprint=None, certificate_store="CurrentUser",
+        sync_cooldown_minutes=120, email_recipients_file=arquivo,
+        current_database_password=lambda: None,
+    )
+    chamados = []
+    monkeypatch.setattr(sync_runtime, "sincronizar_banco", lambda params: chamados.append(params.destinatarios_alerta))
+    monkeypatch.setattr(sync_runtime, "enviar_pendentes", lambda *args: None)
+    audit = SimpleNamespace(write_system=lambda *args, **kwargs: None)
+    sync_runtime.sincronizar_configurado(settings, audit=audit)
+    assert chamados == [()]

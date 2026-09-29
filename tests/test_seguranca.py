@@ -29,6 +29,16 @@ def test_bloqueia_gzip_que_expande_demais():
         parse_retorno_distribuicao(xml)
 
 
+def test_limite_de_doczip_inclui_resumos():
+    resumo = gzip.compress(b"<resNFe><chNFe>" + b"1" * 44 + b"</chNFe></resNFe>")
+    zipado = base64.b64encode(resumo).decode()
+    xml = ('<retDistDFeInt><cStat>138</cStat><ultNSU>1</ultNSU><maxNSU>1</maxNSU>'
+           + ''.join(f'<docZip NSU="{i}" schema="resNFe_v1.01.xsd">{zipado}</docZip>' for i in range(51))
+           + '</retDistDFeInt>')
+    with pytest.raises(NfeErroResposta, match="50 documentos"):
+        parse_retorno_distribuicao(xml)
+
+
 def test_exportacoes_tratam_texto_que_parece_formula(tmp_path):
     resultado = ResultadoConsulta(
         '=HYPERLINK("https://example.com")',

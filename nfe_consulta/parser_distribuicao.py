@@ -118,10 +118,12 @@ def parse_retorno_distribuicao(xml_str: str) -> RetornoDistribuicao:
     manifestacoes = []
     informacoes_notas = []
     ignorados = 0
+    total_documentos = 0
     for doc_zip in root.iter():
         if _nome_local(doc_zip.tag) != "docZip":
             continue
-        if ignorados + len(manifestacoes) >= 50:
+        total_documentos += 1
+        if total_documentos > 50:
             raise NfeErroResposta("Resposta da SEFAZ com mais de 50 documentos")
         nsu = doc_zip.attrib.get("NSU", "")
         schema = doc_zip.attrib.get("schema", "")

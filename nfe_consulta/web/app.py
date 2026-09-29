@@ -60,7 +60,7 @@ from nfe_consulta.web.scheduler import loop_sincronizacao_automatica
 from nfe_consulta.web.settings import WebSettings, get_settings
 from nfe_consulta.web.email_alerts import (
     carregar_destinatarios, salvar_destinatarios, smtp_pronto,
-    contar_pendentes, enviar_pendentes,
+    contar_pendentes, enviar_pendentes, cancelar_pendentes_removidos,
 )
 from nfe_consulta.web.sync_runtime import sincronizar_configurado
 from nfe_consulta.web.uploads import consolidar_txts
@@ -245,6 +245,9 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         bootstrap_password=settings.admin_password,
     )
     app.state.login_attempts = {}
+    app.state.login_lock = threading.Lock()
+    app.state.export_lock = threading.Lock()
+    app.state.export_active = 0
     app.state.sync_lock = threading.Lock()
     app.state.audit = AuditLog(settings.audit_log)
     app.state.auto_sync_task = None
@@ -281,13 +284,34 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
 
     @app.middleware("http")
     async def security_headers(request: Request, call_next):
-        response = await call_next(request)
+        path = request.url.path
+        if path in {"/excel", "/admin/login"} and request.method == "POST":
+            try:
+                size = int(request.headers.get("content-length", "0"))
+            except ValueError:
+                return JSONResponse({"detail": "Tamanho da requisição inválido."}, status_code=400)
+            maximum = settings.max_upload_bytes + 65536 if path == "/excel" else 8192
+            if size > maximum:
+                return JSONResponse({"detail": "Requisição excede o limite."}, status_code=413)
+
+        export_request = path in {"/excel", "/consulta/exportar"}
+        if export_request:
+            with app.state.export_lock:
+                if app.state.export_active >= 2:
+                    return JSONResponse({"detail": "Há exportações em andamento. Tente novamente."}, status_code=429)
+                app.state.export_active += 1
+        try:
+            response = await call_next(request)
+        finally:
+            if export_request:
+                with app.state.export_lock:
+                    app.state.export_active -= 1
 
         if (
             request.url.path != "/admin/logout"
             and admin_session_active(request)
         ):
-            set_admin_cookie(response, settings, app.state.admin_accounts, current_user(request).username)
+            set_admin_cookie(response, settings, request.cookies[settings.admin_cookie_name])
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
         response.headers.setdefault("X-Frame-Options", "DENY")
         response.headers.setdefault("Referrer-Policy", "no-referrer")
@@ -310,7 +334,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                 "Strict-Transport-Security",
                 "max-age=31536000; includeSubDomains",
             )
-        if response.headers.get("content-type", "").startswith("text/html"):
+        if not path.startswith("/static/"):
             response.headers.setdefault("Cache-Control", "no-store")
         return response
 
@@ -376,6 +400,9 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         password: str = Form(...),
     ):
         validate_csrf(csrf, user, settings)
+        if len(username) > 64 or len(password) > 1024:
+            return _render(request, "login.html", user, status_code=400,
+                           admin_configured=True, error="Usuário ou senha inválidos.")
 
         if not app.state.admin_accounts.configured():
             return _render(
@@ -387,17 +414,30 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                 error="Login de administrador ainda não configurado no servidor.",
             )
 
-        attempts = app.state.login_attempts
         address = request.client.host if request.client else "unknown"
-        key = (address, username.strip().casefold())
-        recent = [when for when in attempts.get(key, []) if time.monotonic() - when < 300]
-        if len(recent) >= 10:
+        key = ("account", username.strip().casefold())
+        ip_key = ("ip", address)
+        now = time.monotonic()
+        with app.state.login_lock:
+            attempts = app.state.login_attempts
+            if len(attempts) > 2000:
+                for old_key in list(attempts):
+                    attempts[old_key] = [t for t in attempts[old_key] if now - t < 300]
+                    if not attempts[old_key]:
+                        del attempts[old_key]
+            recent = [t for t in attempts.get(key, ()) if now - t < 300]
+            recent_ip = [t for t in attempts.get(ip_key, ()) if now - t < 300]
+            blocked = (len(recent) >= 10 or len(recent_ip) >= 30
+                       or (len(attempts) >= 5000 and key not in attempts))
+            if not blocked:
+                attempts[key] = recent + [now]
+                attempts[ip_key] = recent_ip + [now]
+        if blocked:
             return _render(request, "login.html", user, status_code=429,
                            admin_configured=True, error="Muitas tentativas. Tente novamente em alguns minutos.")
 
         logged_username = await run_in_threadpool(app.state.admin_accounts.authenticate, username, password)
         if not logged_username:
-            attempts[key] = recent + [time.monotonic()]
             app.state.audit.write(
                 request,
                 PUBLIC_USER,
@@ -414,7 +454,8 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                 error="Usuário ou senha inválidos.",
             )
 
-        attempts.pop(key, None)
+        with app.state.login_lock:
+            app.state.login_attempts.pop(key, None)
         admin_user = WebUser(
             username=logged_username,
             display_name=logged_username,
@@ -431,7 +472,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             url=request.url_for("atualizar_page"),
             status_code=303,
         )
-        set_admin_cookie(response, settings, app.state.admin_accounts, logged_username)
+        set_admin_cookie(response, settings, app.state.admin_accounts.new_session(logged_username))
         return response
 
     @app.post("/admin/logout")
@@ -441,6 +482,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         csrf: str = Form(...),
     ):
         validate_csrf(csrf, user, settings)
+        app.state.admin_accounts.revoke_session(user.session_token)
         app.state.audit.write(
             request,
             user,
@@ -898,6 +940,12 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             status_web = WebStatus(False, None, None, None, None, None, None, None)
             erro = _database_error_message(exc, settings, user)
 
+        try:
+            email_recipients = "\n".join(carregar_destinatarios(settings.email_recipients_file))
+        except (ValueError, OSError):
+            email_recipients = ""
+            erro = "Lista de destinatários inválida. Salve novamente os endereços para corrigir."
+
         return _render(
             request,
             "sefaz.html",
@@ -917,7 +965,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             certificate_web=_certificado_web(settings),
             database_web=_database_web(settings),
             cooldown_minutes=settings.sync_cooldown_minutes,
-            email_recipients="\n".join(carregar_destinatarios(settings.email_recipients_file)),
+            email_recipients=email_recipients,
             smtp_ready=smtp_pronto(settings),
             email_pending=await run_in_threadpool(contar_pendentes, settings) if status_web.database_ready else None,
         )
@@ -934,6 +982,10 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             emails = salvar_destinatarios(settings.email_recipients_file, recipients)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+        try:
+            await run_in_threadpool(cancelar_pendentes_removidos, settings, emails)
+        except (OSError, RuntimeError) as exc:
+            app.state.audit.write(request, user, "email_recipients_cleanup", "erro", reason=type(exc).__name__)
         app.state.audit.write(request, user, "email_recipients", "ok", count=len(emails))
         return RedirectResponse(
             url=request.url_for("atualizar_page").include_query_params(email_ok="1"),

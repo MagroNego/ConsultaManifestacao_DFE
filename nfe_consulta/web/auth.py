@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-import time
 from dataclasses import dataclass
 
 from fastapi import HTTPException, Request, Response, status
@@ -18,6 +17,7 @@ class WebUser:
     username: str
     display_name: str
     is_admin: bool
+    session_token: str = ""
 
 
 PUBLIC_USER = WebUser(
@@ -27,47 +27,8 @@ PUBLIC_USER = WebUser(
 )
 
 
-def _session_key(settings: WebSettings, password_hash: str) -> bytes:
-    return hmac.new(
-        settings.csrf_secret.encode("utf-8"),
-        password_hash.encode("utf-8"),
-        hashlib.sha256,
-    ).digest()
-
-
-def _session_signature(payload: str, settings: WebSettings, password_hash: str) -> str:
-    return hmac.new(
-        _session_key(settings, password_hash),
-        payload.encode("utf-8"),
-        hashlib.sha256,
-    ).hexdigest()
-
-
-def _new_session_token(settings: WebSettings, username: str, password_hash: str) -> str:
-    expires_at = int(time.time()) + settings.admin_session_minutes * 60
-    payload = f"{username}|{expires_at}"
-    return f"{payload}|{_session_signature(payload, settings, password_hash)}"
-
-
 def _session_username(token: str, settings: WebSettings, accounts: AdminAccounts) -> str | None:
-    if not token:
-        return None
-
-    try:
-        username, expires_raw, signature = token.rsplit("|", 2)
-        expires_at = int(expires_raw)
-    except (ValueError, TypeError):
-        return None
-
-    if expires_at <= int(time.time()):
-        return None
-
-    account = accounts.account(username)
-    if account is None:
-        return None
-    payload = f"{username}|{expires_at}"
-    esperado = _session_signature(payload, settings, account[1])
-    return account[0] if hmac.compare_digest(signature, esperado) else None
+    return accounts.session_username(token, settings.admin_session_minutes * 60)
 
 
 def admin_session_active(request: Request) -> bool:
@@ -88,6 +49,7 @@ def current_user(request: Request) -> WebUser:
             username=username,
             display_name=username,
             is_admin=True,
+            session_token=request.cookies.get(settings.admin_cookie_name, ""),
         )
 
     return PUBLIC_USER
@@ -103,13 +65,10 @@ def require_admin(request: Request) -> WebUser:
     return user
 
 
-def set_admin_cookie(response: Response, settings: WebSettings, accounts: AdminAccounts, username: str) -> None:
-    account = accounts.account(username)
-    if account is None:
-        return
+def set_admin_cookie(response: Response, settings: WebSettings, token: str) -> None:
     response.set_cookie(
         key=settings.admin_cookie_name,
-        value=_new_session_token(settings, account[0], account[1]),
+        value=token,
         max_age=settings.admin_session_minutes * 60,
         httponly=True,
         secure=settings.production,
@@ -129,7 +88,10 @@ def clear_admin_cookie(response: Response, settings: WebSettings) -> None:
 
 
 def csrf_token(user: WebUser, settings: WebSettings) -> str:
-    mensagem = f"{user.username.casefold()}|nfe-web-v2".encode("utf-8")
+    # A área pública usa um token de origem; a área administrativa vincula
+    # cada formulário à sessão concreta, revogada no logout.
+    identidade = user.session_token if user.is_admin else "publico"
+    mensagem = f"{user.username.casefold()}|{identidade}|nfe-web-v3".encode("utf-8")
     return hmac.new(
         settings.csrf_secret.encode("utf-8"),
         mensagem,

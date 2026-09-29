@@ -90,7 +90,7 @@ def _garantir_tabela_agendamento(conexao) -> None:
 
 
 def ultima_execucao_agendada(settings) -> date | None:
-    """Lê do banco a última data local em que o agendador foi disparado."""
+    """Lê do banco a última data local em que a sincronização terminou."""
     banco = caminho_banco_configurado(settings)
     if not banco.is_file():
         return None
@@ -115,7 +115,7 @@ def ultima_execucao_agendada(settings) -> date | None:
 
 
 def registrar_execucao_agendada(settings, dia_local: date) -> None:
-    """Marca o disparo antes de acessar a SEFAZ para evitar repetição em reinícios."""
+    """Marca uma sincronização concluída para evitar repetição em reinícios."""
     banco = caminho_banco_configurado(settings)
     if not banco.is_file():
         raise FileNotFoundError(f"Banco configurado não encontrado: {banco}")
@@ -149,20 +149,6 @@ async def executar_sincronizacao_automatica(
     """Executa uma sincronização automática respeitando lock, cooldown e persistência."""
     settings = app.state.settings
     dia = dia_agendado or datetime.now().astimezone().date()
-
-    try:
-        await asyncio.to_thread(
-            registrar_execucao_agendada,
-            settings,
-            dia,
-        )
-    except Exception as exc:
-        app.state.audit.write_system(
-            "sefaz_sync_auto",
-            "erro",
-            reason=f"schedule_state_{type(exc).__name__}",
-        )
-        return
 
     lock = app.state.sync_lock
     if not lock.acquire(blocking=False):
@@ -200,6 +186,15 @@ async def executar_sincronizacao_automatica(
                 "sefaz_sync_auto",
                 "erro",
                 reason=type(exc).__name__,
+            )
+            return
+
+        try:
+            await asyncio.to_thread(registrar_execucao_agendada, settings, dia)
+        except Exception as exc:
+            app.state.audit.write_system(
+                "sefaz_sync_auto", "erro",
+                reason=f"schedule_state_{type(exc).__name__}",
             )
             return
 
@@ -263,9 +258,19 @@ async def loop_sincronizacao_automatica(app) -> None:
         )
         app.state.auto_sync_next_at = proxima
 
-        espera = max(1.0, (proxima - agora).total_seconds())
+        # Falhas no dia agendado podem ser tentadas novamente a cada hora,
+        # sempre respeitando o cooldown persistido pelo serviço fiscal.
+        espera = max(1.0, min(3600.0, (proxima - agora).total_seconds()))
         await asyncio.sleep(espera)
-        await executar_sincronizacao_automatica(
-            app,
-            dia_agendado=proxima.date(),
-        )
+        agora = datetime.now().astimezone()
+        try:
+            ultima = await asyncio.to_thread(ultima_execucao_agendada, settings)
+        except Exception as exc:
+            app.state.audit.write_system("sefaz_scheduler", "erro",
+                                         reason=f"schedule_state_{type(exc).__name__}")
+            continue
+        if deve_recuperar_execucao(
+            agora, ultima, hora=settings.auto_sync_hour,
+            minuto=settings.auto_sync_minute, dias_semana=settings.auto_sync_weekdays,
+        ):
+            await executar_sincronizacao_automatica(app, dia_agendado=agora.date())

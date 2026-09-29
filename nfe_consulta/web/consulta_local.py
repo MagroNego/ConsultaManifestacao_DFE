@@ -221,7 +221,7 @@ def _evento_da_linha(linha) -> EventoNota:
         protocolo=protocolo,
         nsu=nsu,
         recebido_em=recebido_em,
-        emitente=emitente or "",
+        emitente=emitente or (chave[6:20] if len(chave) == 44 and chave.isdigit() else ""),
         cancelada=bool(cancelada),
     )
 

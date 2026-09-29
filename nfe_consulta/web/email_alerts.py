@@ -74,6 +74,19 @@ def contar_pendentes(settings) -> int | None:
         banco.fechar()
 
 
+def cancelar_pendentes_removidos(settings, destinatarios: tuple[str, ...]) -> int:
+    from nfe_consulta.web.sync_runtime import caminho_banco_configurado
+
+    caminho = caminho_banco_configurado(settings)
+    if not caminho.is_file():
+        return 0
+    banco = BancoManifestacoes(str(caminho), senha=settings.current_database_password())
+    try:
+        return banco.cancelar_destinatarios_removidos(destinatarios)
+    finally:
+        banco.fechar()
+
+
 def _enviar(settings, destinatario: str, chave: str, data: str, protocolo: str) -> None:
     mensagem = EmailMessage()
     mensagem["Subject"] = "NF-e: nova Operação não Realizada"
@@ -120,17 +133,32 @@ def _enviar_pendentes_sem_lock(settings, audit, *, limite: int) -> int:
     caminho = caminho_banco_configurado(settings)
     if not caminho.is_file():
         return 0
+    try:
+        ativos = set(carregar_destinatarios(settings.email_recipients_file))
+    except (ValueError, OSError, json.JSONDecodeError) as exc:
+        audit.write_system("email_alert", "erro", reason=type(exc).__name__)
+        return 0
     banco = BancoManifestacoes(str(caminho), senha=settings.current_database_password())
     enviados = 0
     try:
+        banco.cancelar_destinatarios_removidos(tuple(ativos))
         for id_, destinatario, chave, data, protocolo in banco.notificacoes_pendentes(limite):
             try:
                 _enviar(settings, destinatario, chave, data, protocolo)
             except Exception as exc:
                 # O log não inclui endereço nem conteúdo fiscal.
-                banco.registrar_envio_email(id_, type(exc).__name__)
+                permanente = isinstance(exc, smtplib.SMTPRecipientsRefused) or (
+                    isinstance(exc, smtplib.SMTPResponseException)
+                    and not isinstance(exc, smtplib.SMTPAuthenticationError)
+                    and 500 <= exc.smtp_code < 600
+                )
+                if permanente:
+                    banco.cancelar_notificacao(id_, type(exc).__name__)
+                else:
+                    banco.registrar_envio_email(id_, type(exc).__name__)
                 audit.write_system("email_alert", "erro", reason=type(exc).__name__)
-                break  # Evita insistir no servidor SMTP indisponível.
+                if not permanente:
+                    break  # Evita insistir no servidor SMTP indisponível.
             else:
                 banco.registrar_envio_email(id_)
                 enviados += 1
