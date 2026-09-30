@@ -1,78 +1,51 @@
-# Manual de uso — Consulta de Manifestação NF-e
+# Manual de uso — v2.2.0
 
 ## Consulta
 
-A tela **Consulta** trabalha exclusivamente com o histórico salvo no banco central. Ela não acessa a SEFAZ.
+A tela **Consulta** pesquisa o histórico armazenado no banco. Os filtros são data inicial e final do evento, número da NF, chave de acesso e tipo de manifestação. A data final inclui todo o dia informado. Os resultados aparecem em páginas de até 100 registros.
 
-Filtros disponíveis:
+A tabela mostra número e série da nota, emitente, manifestação, data, protocolo, chave, NSU e recebimento no banco. Quando o documento recebido não informa a razão social, o emitente aparece pelo CNPJ extraído da chave.
 
-- data inicial e final do evento;
-- número da NF;
-- série;
-- chave de acesso;
-- tipo de manifestação.
-
-Os resultados são exibidos em páginas de até 100 registros.
+A ausência de registro significa que o evento não foi localizado no histórico disponível. A consulta não verifica a situação atual da NF-e na SEFAZ.
 
 ## Exportar Excel
 
-Após executar uma consulta, use **Exportar Excel**.
+Use **Exportar Excel** após a consulta. A planilha inclui todos os registros dos mesmos filtros, inclusive os que estão em outras páginas. Chaves, protocolos e NSUs são preservados como texto.
 
-A planilha contém exatamente os registros correspondentes aos filtros aplicados na tela, com:
-
-- número da NF;
-- série;
-- chave;
-- código e descrição da manifestação;
-- data do evento;
-- protocolo;
-- NSU;
-- data de recebimento no banco.
+Colunas: Número NF, Série, Chave NF-e, Código, Manifestação, Data do evento, Protocolo, NSU, Recebido no banco (UTC) e Emitente. Para consultas acima de 200 mil eventos, refine os filtros antes de exportar.
 
 ## Consulta por arquivo
 
-Para trabalhar com uma lista específica de NF-e, use a seção **Consulta por arquivo** e selecione um `CHAVES.txt` com uma chave de 44 dígitos por linha.
-
-Esse fluxo também utiliza somente o banco central.
+Selecione um TXT com uma chave de 44 dígitos por linha e use **Gerar Excel por chaves**. O arquivo serve para recortar o histórico do banco; não dispara uma consulta pontual à SEFAZ. O limite é de 10 mil chaves e 2 MB por upload.
 
 ## Status
 
-A tela **Status** apresenta:
+Apresenta última gravação, `ultNSU`, `maxNSU`, disponibilidade da sincronização e as últimas dez execuções. `ultNSU` é o cursor local; `maxNSU` é o limite informado no retorno recebido.
 
-- data da última gravação;
-- `ultNSU`;
-- `maxNSU`;
-- estado da sincronização;
-- próxima sincronização permitida.
+**Completo** indica que a última distribuição alcançou o limite disponível. **Parcial** indica que ainda há distribuição a processar. O bloqueio e a próxima tentativa permitida são mostrados quando houver cooldown.
 
 ## Atualizar
 
-A área **Atualizar** exige login administrativo.
+A área exige login administrativo e reúne:
 
-Ela permite:
+- Configuração do banco e certificado A1.
+- Sincronização manual e estado do agendamento automático.
+- Contas individuais e troca de senha/desativação.
+- Destinatários e fila dos alertas por e-mail.
+- Histórico administrativo.
 
-- configurar o banco central;
-- configurar o certificado A1;
-- sincronizar o banco com o serviço `NFeDistribuicaoDFe`.
-
-Após uma tentativa válida, o sistema aplica o cooldown configurado. A rejeição
-656 registra uma pausa e mostra o NSU enviado e, quando houver, o NSU indicado
-pela SEFAZ. Não altere o NSU salvo com base apenas nessa rejeição.
+Use **Sair** para encerrar e revogar a sessão. Trocar a senha ou alterar o estado de uma conta também encerra suas sessões. Mantenha ao menos um administrador ativo.
 
 ## Sincronização automática
 
-Em produção, com o agendador habilitado, a aplicação tenta sincronizar com a
-SEFAZ às **08:00 de segunda a sexta-feira**, desde que o serviço Web esteja em
-execução. Na instalação de desenvolvimento o agendador fica desativado por
-padrão; a aba **Atualizar** mostra seu estado.
+A rotina executa a cada **8 horas**, às **00:00, 08:00 e 16:00 (Brasília)**, todos os dias. Usa o mesmo banco, certificado, cursor e cooldown da rotina manual. O aplicativo precisa permanecer em execução.
 
-A rotina utiliza o mesmo banco, certificado e cooldown da área **Atualizar**. Se uma sincronização manual estiver em andamento ou o cooldown ainda estiver ativo, a execução automática é ignorada.
+Uma janela concluída não é repetida após reiniciar. Falhas e distribuições parciais podem ser retomadas a cada hora, respeitando o bloqueio vigente. A rejeição 656 registra uma pausa; não altere o NSU para tentar eliminar esse bloqueio.
 
-O resultado é registrado no log de auditoria com a ação `sefaz_sync_auto`.
+## Alertas de Operação não Realizada
 
-## Observações
+Em **Atualizar → Alertas por e-mail**, cadastre até 20 endereços, separados por linha ou vírgula. Novos eventos **210240** geram avisos para os destinatários cadastrados. Reprocessar um evento já gravado não cria uma nova mensagem.
 
-- ausência de evento no banco não comprova que a NF-e nunca recebeu manifestação;
-- a consulta Web nunca chama a SEFAZ;
-- banco, certificado e senhas permanecem no servidor;
-- a interface pública da aplicação é exclusivamente Web.
+Os envios dependem da configuração SMTP do servidor. Falhas temporárias mantêm os avisos na fila. Após corrigir o SMTP, use **Tentar enviar pendentes**; isso não refaz a sincronização da SEFAZ. Remover um destinatário cancela seus avisos ainda pendentes.
+
+Uma interrupção após a aceitação pelo SMTP e antes da confirmação no banco pode provocar um segundo envio. A entrega efetiva também depende das regras do servidor de e-mail.

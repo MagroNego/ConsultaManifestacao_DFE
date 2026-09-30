@@ -1,4 +1,4 @@
-"""Configuração central da aplicação v1."""
+"""Configuração central da aplicação."""
 
 from dataclasses import dataclass
 from pathlib import Path
@@ -50,3 +50,4 @@ def resolver_caminhos(
     # em Downloads. Isso evita espalhar novos arquivos pelo perfil do usuário.
     saida = raiz / "saidas" / NOME_PLANILHA
     return CaminhosApp(raiz=raiz, chaves=chaves, banco=banco, saida=saida)
+

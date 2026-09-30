@@ -7,6 +7,7 @@ import contextlib
 import shutil
 import tempfile
 import threading
+import time
 from datetime import date
 from pathlib import Path
 from typing import Annotated
@@ -33,7 +34,10 @@ from nfe_consulta.servico import (
     ParametrosConsulta,
     executar_consulta,
 )
+from nfe_consulta.seguranca_banco import criptografado
 from nfe_consulta.web.status_view import WebStatus, read_web_status
+from nfe_consulta.web.sync_history import read_sync_history
+from nfe_consulta.web.admin_history import read_admin_history
 from nfe_consulta.web.audit import AuditLog
 from nfe_consulta.web.consulta_local import (
     TIPOS_MANIFESTACAO,
@@ -45,7 +49,6 @@ from nfe_consulta.web.auth import (
     PUBLIC_USER,
     WebUser,
     admin_session_active,
-    authenticate_admin,
     clear_admin_cookie,
     csrf_token,
     current_user,
@@ -53,8 +56,13 @@ from nfe_consulta.web.auth import (
     set_admin_cookie,
     validate_csrf,
 )
+from nfe_consulta.web.admin_accounts import AdminAccounts
 from nfe_consulta.web.scheduler import loop_sincronizacao_automatica
 from nfe_consulta.web.settings import WebSettings, get_settings
+from nfe_consulta.web.email_alerts import (
+    carregar_destinatarios, salvar_destinatarios, smtp_pronto,
+    contar_pendentes, enviar_pendentes, cancelar_pendentes_removidos,
+)
 from nfe_consulta.web.sync_runtime import sincronizar_configurado
 from nfe_consulta.web.uploads import consolidar_txts
 
@@ -159,6 +167,7 @@ def _database_web(settings: WebSettings) -> dict:
         "path": str(caminho),
         "name": caminho.name,
         "ready": caminho.is_file(),
+        "encrypted": criptografado(caminho) if caminho.is_file() else None,
         "configured": bool(
             settings.database_path_file
             and settings.database_path_file.is_file()
@@ -232,6 +241,15 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         redoc_url=None,
     )
     app.state.settings = settings
+    app.state.admin_accounts = AdminAccounts(
+        settings.admin_accounts_path or settings.database_path.parent / "admin_accounts.db",
+        bootstrap_username=settings.admin_username,
+        bootstrap_password=settings.admin_password,
+    )
+    app.state.login_attempts = {}
+    app.state.login_lock = threading.Lock()
+    app.state.export_lock = threading.Lock()
+    app.state.export_active = 0
     app.state.sync_lock = threading.Lock()
     app.state.audit = AuditLog(settings.audit_log)
     app.state.auto_sync_task = None
@@ -247,9 +265,11 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         app.state.audit.write_system(
             "sefaz_scheduler",
             "iniciado",
+            intervalo_horas=settings.auto_sync_interval_hours,
             hora=settings.auto_sync_hour,
             minuto=settings.auto_sync_minute,
             dias=list(settings.auto_sync_weekdays),
+            data_unica=settings.auto_sync_once_date.isoformat() if settings.auto_sync_once_date else None,
             max_lotes=settings.auto_sync_max_lotes,
         )
 
@@ -268,13 +288,34 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
 
     @app.middleware("http")
     async def security_headers(request: Request, call_next):
-        response = await call_next(request)
+        path = request.url.path
+        if path in {"/excel", "/admin/login"} and request.method == "POST":
+            try:
+                size = int(request.headers.get("content-length", "0"))
+            except ValueError:
+                return JSONResponse({"detail": "Tamanho da requisição inválido."}, status_code=400)
+            maximum = settings.max_upload_bytes + 65536 if path == "/excel" else 8192
+            if size > maximum:
+                return JSONResponse({"detail": "Requisição excede o limite."}, status_code=413)
+
+        export_request = path in {"/excel", "/consulta/exportar"}
+        if export_request:
+            with app.state.export_lock:
+                if app.state.export_active >= 2:
+                    return JSONResponse({"detail": "Há exportações em andamento. Tente novamente."}, status_code=429)
+                app.state.export_active += 1
+        try:
+            response = await call_next(request)
+        finally:
+            if export_request:
+                with app.state.export_lock:
+                    app.state.export_active -= 1
 
         if (
             request.url.path != "/admin/logout"
             and admin_session_active(request)
         ):
-            set_admin_cookie(response, settings)
+            set_admin_cookie(response, settings, request.cookies[settings.admin_cookie_name])
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
         response.headers.setdefault("X-Frame-Options", "DENY")
         response.headers.setdefault("Referrer-Policy", "no-referrer")
@@ -297,7 +338,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                 "Strict-Transport-Security",
                 "max-age=31536000; includeSubDomains",
             )
-        if response.headers.get("content-type", "").startswith("text/html"):
+        if not path.startswith("/static/"):
             response.headers.setdefault("Cache-Control", "no-store")
         return response
 
@@ -351,8 +392,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             request,
             "login.html",
             user,
-            admin_username=settings.admin_username,
-            admin_configured=bool(settings.admin_password),
+            admin_configured=app.state.admin_accounts.configured(),
         )
 
     @app.post("/admin/login")
@@ -364,19 +404,44 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         password: str = Form(...),
     ):
         validate_csrf(csrf, user, settings)
+        if len(username) > 64 or len(password) > 1024:
+            return _render(request, "login.html", user, status_code=400,
+                           admin_configured=True, error="Usuário ou senha inválidos.")
 
-        if not settings.admin_password:
+        if not app.state.admin_accounts.configured():
             return _render(
                 request,
                 "login.html",
                 user,
                 status_code=503,
-                admin_username=settings.admin_username,
                 admin_configured=False,
                 error="Login de administrador ainda não configurado no servidor.",
             )
 
-        if not authenticate_admin(username, password, settings):
+        address = request.client.host if request.client else "unknown"
+        key = ("account", username.strip().casefold())
+        ip_key = ("ip", address)
+        now = time.monotonic()
+        with app.state.login_lock:
+            attempts = app.state.login_attempts
+            if len(attempts) > 2000:
+                for old_key in list(attempts):
+                    attempts[old_key] = [t for t in attempts[old_key] if now - t < 300]
+                    if not attempts[old_key]:
+                        del attempts[old_key]
+            recent = [t for t in attempts.get(key, ()) if now - t < 300]
+            recent_ip = [t for t in attempts.get(ip_key, ()) if now - t < 300]
+            blocked = (len(recent) >= 10 or len(recent_ip) >= 30
+                       or (len(attempts) >= 5000 and key not in attempts))
+            if not blocked:
+                attempts[key] = recent + [now]
+                attempts[ip_key] = recent_ip + [now]
+        if blocked:
+            return _render(request, "login.html", user, status_code=429,
+                           admin_configured=True, error="Muitas tentativas. Tente novamente em alguns minutos.")
+
+        logged_username = await run_in_threadpool(app.state.admin_accounts.authenticate, username, password)
+        if not logged_username:
             app.state.audit.write(
                 request,
                 PUBLIC_USER,
@@ -389,14 +454,15 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                 "login.html",
                 user,
                 status_code=401,
-                admin_username=settings.admin_username,
                 admin_configured=True,
                 error="Usuário ou senha inválidos.",
             )
 
+        with app.state.login_lock:
+            app.state.login_attempts.pop(key, None)
         admin_user = WebUser(
-            username=settings.admin_username,
-            display_name="Administrador",
+            username=logged_username,
+            display_name=logged_username,
             is_admin=True,
         )
         app.state.audit.write(
@@ -410,7 +476,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             url=request.url_for("atualizar_page"),
             status_code=303,
         )
-        set_admin_cookie(response, settings)
+        set_admin_cookie(response, settings, app.state.admin_accounts.new_session(logged_username))
         return response
 
     @app.post("/admin/logout")
@@ -420,6 +486,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         csrf: str = Form(...),
     ):
         validate_csrf(csrf, user, settings)
+        app.state.admin_accounts.revoke_session(user.session_token)
         app.state.audit.write(
             request,
             user,
@@ -431,6 +498,60 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             status_code=303,
         )
         clear_admin_cookie(response, settings)
+        return response
+
+    @app.get("/admin/contas", response_class=HTMLResponse)
+    async def admin_accounts_page(
+        request: Request,
+        user: Annotated[WebUser, Depends(require_admin)],
+        ok: str | None = None,
+    ):
+        return _render(request, "admin_accounts.html", user,
+                       accounts=app.state.admin_accounts.list_accounts(),
+                       success="Acesso atualizado." if ok else None)
+
+    @app.get("/admin/historico", response_class=HTMLResponse)
+    async def admin_history_page(
+        request: Request,
+        user: Annotated[WebUser, Depends(require_admin)],
+    ):
+        try:
+            history = await run_in_threadpool(read_admin_history, settings.audit_log)
+            error = None
+        except OSError:
+            history = ()
+            error = "Histórico temporariamente indisponível."
+        return _render(request, "admin_history.html", user, history=history, error=error)
+
+    @app.post("/admin/contas")
+    async def admin_accounts_update(
+        request: Request,
+        user: Annotated[WebUser, Depends(require_admin)],
+        csrf: str = Form(...),
+        action: str = Form(...),
+        username: str = Form(...),
+        password: str = Form(""),
+    ):
+        validate_csrf(csrf, user, settings)
+        accounts = app.state.admin_accounts
+        try:
+            if action == "create":
+                await run_in_threadpool(accounts.create, username, password)
+            elif action == "reset":
+                await run_in_threadpool(accounts.reset_password, username, password)
+            elif action in {"activate", "deactivate"}:
+                await run_in_threadpool(accounts.set_active, username, action == "activate")
+            else:
+                raise ValueError("Ação inválida.")
+        except ValueError as exc:
+            app.state.audit.write(request, user, "admin_accounts", "erro", target=username, operation=action)
+            return _render(request, "admin_accounts.html", user, status_code=400,
+                           accounts=accounts.list_accounts(), error=str(exc))
+        app.state.audit.write(request, user, "admin_accounts", "ok", target=username, operation=action)
+        response = RedirectResponse(url=request.url_for("admin_accounts_page").include_query_params(ok="1"), status_code=303)
+        if action == "deactivate" and username.casefold() == user.username.casefold():
+            clear_admin_cookie(response, settings)
+            response.headers["location"] = str(request.url_for("admin_login_page"))
         return response
 
     @app.get("/", response_class=HTMLResponse)
@@ -788,11 +909,17 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             status_web = WebStatus(False, None, None, None, None, None, None, None)
             erro = _database_error_message(exc, settings, user)
 
+        try:
+            history = await run_in_threadpool(read_sync_history, settings.audit_log)
+        except OSError:
+            history = ()
+
         return _render(
             request,
             "status.html",
             user,
             status_web=status_web,
+            sync_history=history,
             error=erro,
         )
 
@@ -803,6 +930,8 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         ok: str | None = None,
         cert_ok: str | None = None,
         db_ok: str | None = None,
+        email_ok: str | None = None,
+        email_sent: str | None = None,
     ):
         try:
             status_web = await run_in_threadpool(_status_web, settings)
@@ -810,6 +939,12 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         except Exception as exc:
             status_web = WebStatus(False, None, None, None, None, None, None, None)
             erro = _database_error_message(exc, settings, user)
+
+        try:
+            email_recipients = "\n".join(carregar_destinatarios(settings.email_recipients_file))
+        except (ValueError, OSError):
+            email_recipients = ""
+            erro = "Lista de destinatários inválida. Salve novamente os endereços para corrigir."
 
         return _render(
             request,
@@ -820,6 +955,8 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                 "Sincronização concluída." if ok == "1"
                 else "Certificado validado e configurado." if cert_ok == "1"
                 else "Banco validado e configurado." if db_ok == "1"
+                else "Destinatários dos alertas salvos." if email_ok == "1"
+                else f"{email_sent} aviso(s) enviado(s)." if email_sent and email_sent.isdigit()
                 else None
             ),
             error=erro,
@@ -828,6 +965,47 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             certificate_web=_certificado_web(settings),
             database_web=_database_web(settings),
             cooldown_minutes=settings.sync_cooldown_minutes,
+            email_recipients=email_recipients,
+            smtp_ready=smtp_pronto(settings),
+            email_pending=await run_in_threadpool(contar_pendentes, settings) if status_web.database_ready else None,
+        )
+
+    @app.post("/atualizar/alertas-email")
+    async def atualizar_alertas_email(
+        request: Request,
+        user: Annotated[WebUser, Depends(require_admin)],
+        csrf: str = Form(...),
+        recipients: str = Form(""),
+    ):
+        validate_csrf(csrf, user, settings)
+        try:
+            emails = salvar_destinatarios(settings.email_recipients_file, recipients)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        try:
+            await run_in_threadpool(cancelar_pendentes_removidos, settings, emails)
+        except (OSError, RuntimeError) as exc:
+            app.state.audit.write(request, user, "email_recipients_cleanup", "erro", reason=type(exc).__name__)
+        app.state.audit.write(request, user, "email_recipients", "ok", count=len(emails))
+        return RedirectResponse(
+            url=request.url_for("atualizar_page").include_query_params(email_ok="1"),
+            status_code=303,
+        )
+
+    @app.post("/atualizar/alertas-email/enviar-pendentes")
+    async def atualizar_enviar_pendentes(
+        request: Request,
+        user: Annotated[WebUser, Depends(require_admin)],
+        csrf: str = Form(...),
+    ):
+        validate_csrf(csrf, user, settings)
+        if not smtp_pronto(settings):
+            raise HTTPException(status_code=400, detail="Configure o SMTP antes de enviar.")
+        enviados = await run_in_threadpool(enviar_pendentes, settings, app.state.audit)
+        app.state.audit.write(request, user, "email_retry", "ok", sent=enviados)
+        return RedirectResponse(
+            url=request.url_for("atualizar_page").include_query_params(email_sent=str(enviados)),
+            status_code=303,
         )
 
     @app.post("/atualizar/banco")
@@ -1047,6 +1225,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                 sincronizar_configurado,
                 settings,
                 max_lotes=max_lotes,
+                audit=app.state.audit,
             )
             app.state.audit.write(
                 request,
@@ -1118,3 +1297,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

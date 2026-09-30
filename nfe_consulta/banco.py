@@ -49,6 +49,14 @@ class BancoManifestacoes:
             CREATE INDEX IF NOT EXISTS idx_manifestacoes_chave
                 ON manifestacoes(chave);
 
+            CREATE TABLE IF NOT EXISTS informacoes_nfe (
+                cnpj TEXT NOT NULL,
+                chave TEXT NOT NULL,
+                emitente TEXT NOT NULL DEFAULT '',
+                cancelada INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (cnpj, chave)
+            );
+
             CREATE INDEX IF NOT EXISTS idx_manifestacoes_cnpj_data
                 ON manifestacoes(cnpj, data_evento);
 
@@ -79,8 +87,23 @@ class BancoManifestacoes:
                 ultima_execucao_local TEXT NOT NULL,
                 atualizado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
+
+            CREATE TABLE IF NOT EXISTS notificacoes_email (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                manifestacao_id INTEGER NOT NULL REFERENCES manifestacoes(id),
+                destinatario TEXT NOT NULL,
+                criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                enviado_em TEXT,
+                cancelado_em TEXT,
+                tentativas INTEGER NOT NULL DEFAULT 0,
+                ultimo_erro TEXT,
+                UNIQUE(manifestacao_id, destinatario)
+            );
             """
         )
+        colunas_email = {row[1] for row in self.conexao.execute("PRAGMA table_info(notificacoes_email)")}
+        if "cancelado_em" not in colunas_email:
+            self.conexao.execute("ALTER TABLE notificacoes_email ADD COLUMN cancelado_em TEXT")
         self.conexao.commit()
 
     def fechar(self) -> None:
@@ -176,6 +199,15 @@ class BancoManifestacoes:
     def salvar_manifestacoes(self, cnpj: str, retorno: RetornoDistribuicao) -> int:
         inseridos = 0
         with self.conexao:
+            for info in retorno.informacoes_notas:
+                self.conexao.execute(
+                    """INSERT INTO informacoes_nfe(cnpj, chave, emitente, cancelada)
+                    VALUES (?, ?, ?, ?)
+                    ON CONFLICT(cnpj, chave) DO UPDATE SET
+                        emitente = CASE WHEN excluded.emitente != '' THEN excluded.emitente ELSE informacoes_nfe.emitente END,
+                        cancelada = MAX(informacoes_nfe.cancelada, excluded.cancelada)""",
+                    (cnpj, info.chave, info.emitente, int(info.cancelada)),
+                )
             for chave, evento in retorno.manifestacoes:
                 cursor = self.conexao.execute(
                     """
@@ -197,7 +229,10 @@ class BancoManifestacoes:
                 inseridos += cursor.rowcount
         return inseridos
 
-    def salvar_retorno(self, cnpj: str, retorno: RetornoDistribuicao) -> int:
+    def salvar_retorno(
+        self, cnpj: str, retorno: RetornoDistribuicao,
+        destinatarios_alerta: tuple[str, ...] = (),
+    ) -> int:
         anterior, _ = self.obter_estado(cnpj)
         if (not retorno.ult_nsu.isdigit() or not retorno.max_nsu.isdigit()
                 or int(retorno.ult_nsu) < int(anterior)
@@ -205,6 +240,15 @@ class BancoManifestacoes:
             raise NfeErroResposta("Cursor NSU invalido ou anterior ao ja salvo; lote nao gravado")
         inseridos = 0
         with self.conexao:
+            for info in retorno.informacoes_notas:
+                self.conexao.execute(
+                    """INSERT INTO informacoes_nfe(cnpj, chave, emitente, cancelada)
+                    VALUES (?, ?, ?, ?)
+                    ON CONFLICT(cnpj, chave) DO UPDATE SET
+                        emitente = CASE WHEN excluded.emitente != '' THEN excluded.emitente ELSE informacoes_nfe.emitente END,
+                        cancelada = MAX(informacoes_nfe.cancelada, excluded.cancelada)""",
+                    (cnpj, info.chave, info.emitente, int(info.cancelada)),
+                )
             for chave, evento in retorno.manifestacoes:
                 cursor = self.conexao.execute(
                     """INSERT OR IGNORE INTO manifestacoes
@@ -214,6 +258,13 @@ class BancoManifestacoes:
                      evento.protocolo, evento.nsu, evento.schema),
                 )
                 inseridos += cursor.rowcount
+                if cursor.rowcount and evento.codigo == "210240":
+                    for destinatario in destinatarios_alerta:
+                        self.conexao.execute(
+                            "INSERT OR IGNORE INTO notificacoes_email(manifestacao_id, destinatario) "
+                            "VALUES (?, ?)",
+                            (cursor.lastrowid, destinatario),
+                        )
             self.conexao.execute(
                 """
                 INSERT INTO estado_distribuicao(cnpj, ult_nsu, max_nsu)
@@ -226,6 +277,47 @@ class BancoManifestacoes:
                 (cnpj, retorno.ult_nsu, retorno.max_nsu),
             )
         return inseridos
+
+    def notificacoes_pendentes(self, limite: int = 100) -> list[tuple]:
+        return self.conexao.execute(
+            "SELECT n.id, n.destinatario, m.chave, m.data_evento, m.protocolo "
+            "FROM notificacoes_email n JOIN manifestacoes m ON m.id = n.manifestacao_id "
+            "WHERE n.enviado_em IS NULL AND n.cancelado_em IS NULL ORDER BY n.id LIMIT ?",
+            (limite,),
+        ).fetchall()
+
+    def contar_notificacoes_pendentes(self) -> int:
+        return self.conexao.execute(
+            "SELECT COUNT(*) FROM notificacoes_email WHERE enviado_em IS NULL AND cancelado_em IS NULL"
+        ).fetchone()[0]
+
+    def registrar_envio_email(self, id_notificacao: int, erro: str | None = None) -> None:
+        with self.conexao:
+            self.conexao.execute(
+                "UPDATE notificacoes_email SET tentativas = tentativas + 1, "
+                "enviado_em = CASE WHEN ? IS NULL THEN CURRENT_TIMESTAMP ELSE enviado_em END, "
+                "ultimo_erro = ? WHERE id = ? AND enviado_em IS NULL AND cancelado_em IS NULL",
+                (erro, erro, id_notificacao),
+            )
+
+    def cancelar_notificacao(self, id_notificacao: int, motivo: str) -> None:
+        with self.conexao:
+            self.conexao.execute(
+                "UPDATE notificacoes_email SET cancelado_em=CURRENT_TIMESTAMP, ultimo_erro=? "
+                "WHERE id=? AND enviado_em IS NULL AND cancelado_em IS NULL",
+                (motivo, id_notificacao),
+            )
+
+    def cancelar_destinatarios_removidos(self, destinatarios: tuple[str, ...]) -> int:
+        with self.conexao:
+            placeholders = ",".join("?" for _ in destinatarios)
+            condicao = f" AND destinatario NOT IN ({placeholders})" if destinatarios else ""
+            cursor = self.conexao.execute(
+                "UPDATE notificacoes_email SET cancelado_em=CURRENT_TIMESTAMP, ultimo_erro='destinatario_removido' "
+                "WHERE enviado_em IS NULL AND cancelado_em IS NULL" + condicao,
+                destinatarios,
+            )
+        return cursor.rowcount
 
     def consultas_na_ultima_hora(self, cnpj: str) -> int:
         linha = self.conexao.execute(

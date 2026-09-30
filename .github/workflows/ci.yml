@@ -12,6 +12,10 @@ on:
       - web/v2.0
       - web/v2.1
   workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
 
 jobs:
   test-linux:
@@ -66,3 +70,4 @@ jobs:
       - name: Executar testes
         shell: pwsh
         run: python -m pytest -q
+

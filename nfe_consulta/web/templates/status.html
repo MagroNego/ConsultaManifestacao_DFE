@@ -10,7 +10,6 @@
     {{ "Banco disponível" if status_web.database_ready else "Banco indisponível" }}
   </span>
 </section>
-
 {% if error %}
 <div class="alert error">{{ error }}</div>
 {% endif %}
@@ -61,5 +60,25 @@
     {{ status_web.pause_reason }}
   </div>
   {% endif %}
+</section>
+<section class="card status-summary">
+  <div class="card-title"><h2>Últimas sincronizações</h2></div>
+  {% if sync_history %}
+  <div class="table-wrap">
+    <table class="query-table">
+      <thead><tr><th>Quando (servidor)</th><th>Origem</th><th>Resultado</th><th>Lotes</th><th>Manifestações novas</th><th>Detalhe</th></tr></thead>
+      <tbody>
+      {% for item in sync_history %}
+        <tr>
+          <td>{{ item.when }}</td><td>{{ item.origin }}</td><td>{{ item.result }}</td>
+          <td>{{ item.lots if item.lots is not none else '—' }}</td>
+          <td>{{ item.new_events if item.new_events is not none else '—' }}</td>
+          <td>{{ item.detail or '—' }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}<p class="muted">Nenhuma sincronização registrada no histórico.</p>{% endif %}
 </section>
 {% endblock %}

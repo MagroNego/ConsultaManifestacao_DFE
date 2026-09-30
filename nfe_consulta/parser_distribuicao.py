@@ -6,6 +6,7 @@ from defusedxml import ElementTree as ET
 from defusedxml.common import DefusedXmlException
 
 from nfe_consulta.modelos import (
+    InformacaoNota,
     Manifestacao,
     NfeErroResposta,
     RetornoDistribuicao,
@@ -74,6 +75,31 @@ def parse_documento_distribuido(
     return chave, manifestacao
 
 
+def _informacao_nota(xml_bytes: bytes) -> InformacaoNota | None:
+    """Aproveita só emitente e cancelamento dos documentos distribuídos."""
+    root = ET.fromstring(xml_bytes)
+    tipo = _nome_local(root.tag)
+    if tipo == "resNFe":
+        chave = _primeiro_texto(root, "chNFe")
+        emitente = _primeiro_texto(root, "xNome")[:100]
+        cancelada = _primeiro_texto(root, "cSitNFe") == "3"
+    elif tipo == "nfeProc":
+        inf_nfe = next((e for e in root.iter() if _nome_local(e.tag) == "infNFe"), None)
+        chave = inf_nfe.attrib.get("Id", "").removeprefix("NFe") if inf_nfe is not None else ""
+        emit = next((e for e in root.iter() if _nome_local(e.tag) == "emit"), None)
+        emitente = _primeiro_texto(emit, "xNome")[:100] if emit is not None else ""
+        cancelada = False
+    elif tipo in {"resEvento", "procEventoNFe"} and _primeiro_texto(root, "tpEvento") == "110111":
+        chave = _primeiro_texto(root, "chNFe")
+        emitente = ""
+        cancelada = True
+    else:
+        return None
+    if len(chave) != 44 or not chave.isdigit():
+        return None
+    return InformacaoNota(chave, emitente, cancelada)
+
+
 def parse_retorno_distribuicao(xml_str: str) -> RetornoDistribuicao:
     if len(xml_str.encode("utf-8")) > MAX_SOAP_BYTES:
         raise NfeErroResposta("Resposta da SEFAZ excede limite de tamanho")
@@ -90,11 +116,14 @@ def parse_retorno_distribuicao(xml_str: str) -> RetornoDistribuicao:
         raise NfeErroResposta(f"cStat invalido na resposta: {status_texto}") from exc
 
     manifestacoes = []
+    informacoes_notas = []
     ignorados = 0
+    total_documentos = 0
     for doc_zip in root.iter():
         if _nome_local(doc_zip.tag) != "docZip":
             continue
-        if ignorados + len(manifestacoes) >= 50:
+        total_documentos += 1
+        if total_documentos > 50:
             raise NfeErroResposta("Resposta da SEFAZ com mais de 50 documentos")
         nsu = doc_zip.attrib.get("NSU", "")
         schema = doc_zip.attrib.get("schema", "")
@@ -111,8 +140,12 @@ def parse_retorno_distribuicao(xml_str: str) -> RetornoDistribuicao:
             raise NfeErroResposta(f"docZip invalido no NSU {nsu}: {exc}") from exc
 
         evento = parse_documento_distribuido(xml_documento, nsu, schema)
+        info = _informacao_nota(xml_documento)
+        if info is not None:
+            informacoes_notas.append(info)
         if evento is None:
-            ignorados += 1
+            if info is None:
+                ignorados += 1
         else:
             manifestacoes.append(evento)
 
@@ -128,4 +161,5 @@ def parse_retorno_distribuicao(xml_str: str) -> RetornoDistribuicao:
         manifestacoes=tuple(manifestacoes),
         documentos_ignorados=ignorados,
         ult_nsu_informado=bool(ult_nsu and ult_nsu.isdigit()),
+        informacoes_notas=tuple(informacoes_notas),
     )

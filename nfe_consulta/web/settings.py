@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import secrets
 from dataclasses import dataclass
+from datetime import date
 from functools import lru_cache
 from pathlib import Path
 
@@ -14,9 +15,12 @@ SECRETS_DIR = RAIZ_PROJETO / "secrets"
 DATABASE_PASSWORD_FILE = SECRETS_DIR / "db-password.txt"
 ADMIN_USER_FILE = SECRETS_DIR / "admin-user.txt"
 ADMIN_PASSWORD_FILE = SECRETS_DIR / "admin-password.txt"
+CSRF_SECRET_FILE = SECRETS_DIR / "web-csrf-secret.txt"
 CERT_PATH_FILE = SECRETS_DIR / "cert-path.txt"
 CERT_PASSWORD_FILE = SECRETS_DIR / "cert-password.txt"
 DATABASE_PATH_FILE = SECRETS_DIR / "db-path.txt"
+EMAIL_RECIPIENTS_FILE = SECRETS_DIR / "email-recipients.json"
+SMTP_PASSWORD_FILE = SECRETS_DIR / "smtp-password.txt"
 
 
 def _lista(valor: str | None) -> frozenset[str]:
@@ -96,15 +100,25 @@ class WebSettings:
     admin_password: str | None = None
     admin_session_minutes: int = 30
     admin_cookie_name: str = "nfe_admin_session"
+    admin_accounts_path: Path | None = None
     certificate_path_file: Path | None = None
     certificate_password_file: Path | None = None
     database_path_file: Path | None = None
     database_password_file: Path | None = None
     auto_sync_enabled: bool = False
+    auto_sync_interval_hours: int = 8
     auto_sync_hour: int = 8
     auto_sync_minute: int = 0
-    auto_sync_weekdays: tuple[int, ...] = (0, 1, 2, 3, 4)
+    auto_sync_weekdays: tuple[int, ...] = (0, 1, 2, 3, 4, 5, 6)
     auto_sync_max_lotes: int = 50
+    auto_sync_once_date: date | None = None
+    email_recipients_file: Path = EMAIL_RECIPIENTS_FILE
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_from: str = ""
+    smtp_user: str = ""
+    smtp_security: str = "starttls"
+    smtp_password_file: Path = SMTP_PASSWORD_FILE
 
     @property
     def production(self) -> bool:
@@ -136,8 +150,10 @@ def get_settings() -> WebSettings:
 
     csrf_secret = os.getenv("NFE_WEB_CSRF_SECRET")
     if ambiente == "production":
+        if not csrf_secret:
+            csrf_secret = _ler_segredo(CSRF_SECRET_FILE, rotulo="segredo da sessão Web")
         if not csrf_secret or len(csrf_secret) < 32:
-            raise RuntimeError("Defina NFE_WEB_CSRF_SECRET com pelo menos 32 caracteres.")
+            raise RuntimeError("Defina NFE_WEB_CSRF_SECRET ou secrets/web-csrf-secret.txt com pelo menos 32 caracteres.")
     elif not csrf_secret:
         csrf_secret = secrets.token_urlsafe(32)
 
@@ -145,9 +161,10 @@ def get_settings() -> WebSettings:
     admin_username = _usuario_admin()
     if admin_password and len(admin_password) < 12:
         raise RuntimeError("A senha do administrador deve ter pelo menos 12 caracteres.")
-    if ambiente == "production" and not admin_password:
+    accounts_path = Path(os.getenv("NFE_ADMIN_ACCOUNTS_PATH", str(RAIZ_PROJETO / "dados" / "admin_accounts.db"))).expanduser()
+    if ambiente == "production" and not admin_password and not accounts_path.is_file():
         raise RuntimeError(
-            f"Configure {ADMIN_PASSWORD_FILE} para proteger a área Atualizar."
+            f"Configure {ADMIN_PASSWORD_FILE} para o primeiro acesso administrativo."
         )
 
     admin_session_minutes = int(os.getenv("NFE_ADMIN_SESSION_MINUTES", "30"))
@@ -174,14 +191,33 @@ def get_settings() -> WebSettings:
 
     auto_sync_enabled = os.getenv(
         "NFE_AUTO_SYNC_ENABLED",
-        "1" if ambiente == "production" else "0",
+        "0",
     ).strip() == "1"
+    once_raw = os.getenv("NFE_AUTO_SYNC_ONCE_DATE", "").strip()
+    try:
+        auto_sync_once_date = date.fromisoformat(once_raw) if once_raw else None
+    except ValueError as exc:
+        raise RuntimeError("NFE_AUTO_SYNC_ONCE_DATE deve ter formato AAAA-MM-DD.") from exc
+    if auto_sync_once_date is not None:
+        auto_sync_enabled = True
+    auto_sync_interval_hours = int(os.getenv("NFE_AUTO_SYNC_INTERVAL_HOURS", "8"))
+    if auto_sync_interval_hours not in (1, 2, 3, 4, 6, 8, 12, 24):
+        raise RuntimeError("NFE_AUTO_SYNC_INTERVAL_HOURS deve dividir 24 horas.")
     auto_sync_hour = int(os.getenv("NFE_AUTO_SYNC_HOUR", "8"))
     auto_sync_minute = int(os.getenv("NFE_AUTO_SYNC_MINUTE", "0"))
     auto_sync_max_lotes = int(os.getenv("NFE_AUTO_SYNC_MAX_LOTES", "50"))
     auto_sync_weekdays = _dias_semana(
-        os.getenv("NFE_AUTO_SYNC_WEEKDAYS", "0,1,2,3,4")
+        os.getenv("NFE_AUTO_SYNC_WEEKDAYS", "0,1,2,3,4,5,6")
     )
+    smtp_security = os.getenv("NFE_SMTP_SECURITY", "starttls").strip().lower()
+    if smtp_security not in {"starttls", "ssl"}:
+        raise RuntimeError("NFE_SMTP_SECURITY deve ser starttls ou ssl.")
+    smtp_port = int(os.getenv("NFE_SMTP_PORT", "587"))
+    if not 1 <= smtp_port <= 65535:
+        raise RuntimeError("NFE_SMTP_PORT inválida.")
+    smtp_from = os.getenv("NFE_SMTP_FROM", "").strip()
+    if any(c in smtp_from for c in "\r\n"):
+        raise RuntimeError("NFE_SMTP_FROM inválido.")
 
     if not 0 <= auto_sync_hour <= 23:
         raise RuntimeError("NFE_AUTO_SYNC_HOUR deve estar entre 0 e 23.")
@@ -220,6 +256,7 @@ def get_settings() -> WebSettings:
         sync_cooldown_minutes=int(os.getenv("NFE_SEFAZ_COOLDOWN_MINUTES", "120")),
         admin_username=admin_username,
         admin_password=admin_password,
+        admin_accounts_path=accounts_path,
         admin_session_minutes=admin_session_minutes,
         admin_cookie_name=os.getenv(
             "NFE_ADMIN_COOKIE_NAME", "nfe_admin_session"
@@ -229,8 +266,16 @@ def get_settings() -> WebSettings:
         database_path_file=DATABASE_PATH_FILE,
         database_password_file=DATABASE_PASSWORD_FILE,
         auto_sync_enabled=auto_sync_enabled,
+        auto_sync_interval_hours=auto_sync_interval_hours,
         auto_sync_hour=auto_sync_hour,
         auto_sync_minute=auto_sync_minute,
         auto_sync_weekdays=auto_sync_weekdays,
         auto_sync_max_lotes=auto_sync_max_lotes,
+        auto_sync_once_date=auto_sync_once_date,
+        smtp_host=os.getenv("NFE_SMTP_HOST", "").strip(),
+        smtp_port=smtp_port,
+        smtp_from=smtp_from,
+        smtp_user=os.getenv("NFE_SMTP_USER", "").strip(),
+        smtp_security=smtp_security,
     )
+

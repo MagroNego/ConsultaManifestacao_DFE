@@ -1,11 +1,14 @@
 from io import BytesIO
 from types import SimpleNamespace
+import asyncio
+import time
 
 from fastapi.testclient import TestClient
+import httpx
 from openpyxl import load_workbook
 
 from nfe_consulta.banco import BancoManifestacoes
-from nfe_consulta.modelos import Manifestacao, RetornoDistribuicao
+from nfe_consulta.modelos import InformacaoNota, Manifestacao, RetornoDistribuicao
 from nfe_consulta.web.app import create_app
 from nfe_consulta.web.auth import PUBLIC_USER, WebUser, csrf_token
 from nfe_consulta.web.settings import WebSettings
@@ -44,6 +47,8 @@ def settings_web(tmp_path, *, admin=False, auth_mode="dev", admin_users=frozense
         certificate_path_file=tmp_path / "secrets" / "cert-path.txt",
         certificate_password_file=tmp_path / "secrets" / "cert-password.txt",
         database_path_file=tmp_path / "secrets" / "db-path.txt",
+        email_recipients_file=tmp_path / "secrets" / "email-recipients.json",
+        smtp_password_file=tmp_path / "secrets" / "smtp-password.txt",
     )
 
 
@@ -51,6 +56,171 @@ def criar_banco(caminho):
     caminho.parent.mkdir(parents=True, exist_ok=True)
     banco = BancoManifestacoes(str(caminho))
     banco.fechar()
+
+
+def test_logout_revoga_cookie_antigo_e_reativacao_nao_o_recupera(tmp_path):
+    cfg = settings_web(tmp_path)
+    app = create_app(cfg)
+    with TestClient(app) as admin, TestClient(app) as outro:
+        admin.post("/admin/login", data={
+            "csrf": csrf_token(PUBLIC_USER, cfg), "username": "admin", "password": cfg.admin_password,
+        })
+        cookie = admin.cookies[cfg.admin_cookie_name]
+        token = csrf_token(WebUser("admin", "admin", True, cookie), cfg)
+        assert admin.post("/admin/logout", data={"csrf": token}, follow_redirects=False).status_code == 303
+        outro.cookies.set(cfg.admin_cookie_name, cookie)
+        assert outro.get("/admin/contas").status_code == 401
+
+        admin.post("/admin/login", data={
+            "csrf": csrf_token(PUBLIC_USER, cfg), "username": "admin", "password": cfg.admin_password,
+        })
+        antigo = admin.cookies[cfg.admin_cookie_name]
+        app.state.admin_accounts.create("ana", "Senha-da-Ana-123!")
+        app.state.admin_accounts.set_active("admin", False)
+        app.state.admin_accounts.set_active("admin", True)
+        outro.cookies.set(cfg.admin_cookie_name, antigo)
+        assert outro.get("/admin/contas").status_code == 401
+
+
+def test_csrf_da_sessao_anterior_nao_serve_apos_novo_login(tmp_path):
+    cfg = settings_web(tmp_path)
+    app = create_app(cfg)
+    with TestClient(app) as client:
+        dados = {"csrf": csrf_token(PUBLIC_USER, cfg), "username": "admin", "password": cfg.admin_password}
+        client.post("/admin/login", data=dados)
+        antigo = csrf_token(WebUser("admin", "admin", True, client.cookies[cfg.admin_cookie_name]), cfg)
+        client.post("/admin/logout", data={"csrf": antigo})
+        client.post("/admin/login", data=dados)
+        assert client.post("/admin/contas", data={
+            "csrf": antigo, "action": "create", "username": "teste", "password": "Senha-teste-123!",
+        }).status_code == 403
+
+
+def test_limite_de_login_resiste_a_tentativas_simultaneas(tmp_path, monkeypatch):
+    cfg = settings_web(tmp_path)
+    app = create_app(cfg)
+    monkeypatch.setattr(app.state.admin_accounts, "authenticate",
+                        lambda *args: (time.sleep(0.03), None)[1])
+
+    async def enviar():
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),
+                                     base_url="http://testserver") as client:
+            data = {"csrf": csrf_token(PUBLIC_USER, cfg),
+                    "username": "admin", "password": "senha-errada"}
+            return await asyncio.gather(*(client.post("/admin/login", data=data) for _ in range(12)))
+
+    respostas = asyncio.run(enviar())
+    assert sum(r.status_code == 429 for r in respostas) == 2
+    assert sum(r.status_code == 401 for r in respostas) == 10
+
+
+def test_nome_legado_com_espaco_permanece_utilizavel(tmp_path):
+    cfg = settings_web(tmp_path)
+    from dataclasses import replace
+    cfg = replace(cfg, admin_username="Fiscal Yorozu")
+    app = create_app(cfg)
+    with TestClient(app) as client:
+        resposta = client.post("/admin/login", data={
+            "csrf": csrf_token(PUBLIC_USER, cfg),
+            "username": "Fiscal Yorozu",
+            "password": cfg.admin_password,
+        })
+        assert resposta.status_code == 200
+        assert client.get("/admin/contas").status_code == 200
+
+
+def test_contas_admin_pessoais_e_revogacao_de_sessoes(tmp_path):
+    cfg = settings_web(tmp_path)
+    app = create_app(cfg)
+    path = cfg.database_path.parent / "admin_accounts.db"
+    assert path.exists()
+    assert b"Senha-Admin-123!" not in path.read_bytes()
+
+    with TestClient(app) as shared:
+        assert shared.get("/admin/contas").status_code == 401
+        assert shared.get("/consulta").status_code == 200
+        assert shared.get("/status").status_code == 200
+        shared.post("/admin/login", data={
+            "csrf": csrf_token(PUBLIC_USER, cfg), "username": "admin", "password": cfg.admin_password,
+        })
+        admin_csrf = csrf_token(WebUser("admin", "Administrador", True, shared.cookies[cfg.admin_cookie_name]), cfg)
+        create = shared.post("/admin/contas", data={
+            "csrf": admin_csrf, "action": "create", "username": "ana@empresa.com", "password": "Senha-da-Ana-123!",
+        }, follow_redirects=False)
+        assert create.status_code == 303
+        assert "ana@empresa.com" in shared.get("/admin/contas").text
+        assert b"Senha-da-Ana-123!" not in path.read_bytes()
+
+        with TestClient(app) as ana:
+            ana.post("/admin/login", data={
+                "csrf": csrf_token(PUBLIC_USER, cfg), "username": "ana@empresa.com", "password": "Senha-da-Ana-123!",
+            })
+            assert ana.get("/atualizar").status_code == 200
+            assert ana.get("/admin/contas").status_code == 200
+            reset = shared.post("/admin/contas", data={
+                "csrf": admin_csrf, "action": "reset", "username": "ana@empresa.com", "password": "Senha-nova-da-Ana-123!",
+            })
+            assert reset.status_code == 200
+            assert ana.get("/atualizar", follow_redirects=False).status_code == 303
+
+        deactivate = shared.post("/admin/contas", data={
+            "csrf": admin_csrf, "action": "deactivate", "username": "admin",
+        }, follow_redirects=False)
+        assert deactivate.status_code == 303
+        assert shared.get("/atualizar", follow_redirects=False).status_code == 303
+        assert shared.post("/admin/login", data={
+            "csrf": csrf_token(PUBLIC_USER, cfg), "username": "admin", "password": cfg.admin_password,
+        }).status_code == 401
+
+    # Reabrir a aplicação não importa novamente a senha antiga do arquivo.
+    restarted = create_app(cfg)
+    with TestClient(restarted) as client:
+        assert client.post("/admin/login", data={
+            "csrf": csrf_token(PUBLIC_USER, cfg), "username": "admin", "password": cfg.admin_password,
+        }).status_code == 401
+        client.post("/admin/login", data={
+            "csrf": csrf_token(PUBLIC_USER, cfg), "username": "ana@empresa.com", "password": "Senha-nova-da-Ana-123!",
+        })
+        ana_csrf = csrf_token(WebUser("ana@empresa.com", "Administrador", True, client.cookies[cfg.admin_cookie_name]), cfg)
+        last = client.post("/admin/contas", data={
+            "csrf": ana_csrf, "action": "deactivate", "username": "ana@empresa.com",
+        })
+        assert last.status_code == 400
+        assert "pelo menos um" in last.text
+        assert client.get("/atualizar").status_code == 200
+
+
+def test_admin_cadastra_alertas_sem_liberar_configuracao_ao_usuario(tmp_path):
+    cfg = settings_web(tmp_path)
+    criar_banco(cfg.database_path)
+    app = create_app(cfg)
+    with TestClient(app) as client:
+        publico = client.post(
+            "/atualizar/alertas-email",
+            data={"csrf": csrf_token(PUBLIC_USER, cfg), "recipients": "a@empresa.com.br"},
+            follow_redirects=False,
+        )
+        assert publico.status_code == 303
+        assert not cfg.email_recipients_file.exists()
+
+        client.post("/admin/login", data={
+            "csrf": csrf_token(PUBLIC_USER, cfg),
+            "username": "admin", "password": "Senha-Admin-123!",
+        })
+        pagina = client.get("/atualizar")
+        assert "Alertas por e-mail" in pagina.text
+        assert "Sem criptografia" in pagina.text
+        admin = WebUser("admin", "Administrador", True, client.cookies[cfg.admin_cookie_name])
+        invalido = client.post("/atualizar/alertas-email", data={
+            "csrf": "invalido", "recipients": "a@empresa.com.br",
+        })
+        assert invalido.status_code == 403
+        salvo = client.post("/atualizar/alertas-email", data={
+            "csrf": csrf_token(admin, cfg),
+            "recipients": "a@empresa.com.br\nb@empresa.com.br",
+        }, follow_redirects=False)
+        assert salvo.status_code == 303
+        assert "a@empresa.com.br" in client.get("/atualizar").text
 
 
 def test_usuario_comum_acessa_excel_status_e_login_do_atualizar(tmp_path):
@@ -102,7 +272,7 @@ def test_login_admin_libera_atualizar_e_logout_bloqueia_novamente(tmp_path):
         assert "2 horas" in pagina.text
         assert "Administrador" in pagina.text
 
-        admin = WebUser(cfg.admin_username, "Administrador", True)
+        admin = WebUser(cfg.admin_username, "Administrador", True, client.cookies[cfg.admin_cookie_name])
         logout = client.post(
             "/admin/logout",
             data={"csrf": csrf_token(admin, cfg)},
@@ -205,14 +375,19 @@ def test_admin_pode_disparar_atualizacao_sefaz(tmp_path, monkeypatch):
         )
         assert login.status_code == 303
 
-        admin = WebUser(cfg.admin_username, "Administrador", True)
+        admin = WebUser(cfg.admin_username, "Administrador", True, client.cookies[cfg.admin_cookie_name])
         resposta = client.post(
             "/atualizar/sincronizar",
             data={"csrf": csrf_token(admin, cfg), "max_lotes": "25"},
             follow_redirects=False,
         )
+        history = client.get("/status")
 
     assert resposta.status_code == 303
+    assert "Últimas sincronizações" in history.text
+    assert "Manual" in history.text
+    assert "Concluída" in history.text
+    assert ">2</td>" in history.text
     assert chamadas[0].max_lotes == 25
     assert chamadas[0].cooldown_minutos == 120
 
@@ -376,7 +551,7 @@ def test_admin_configura_certificado_por_caminho_no_servidor(tmp_path, monkeypat
         )
         assert login.status_code == 303
 
-        admin = WebUser(cfg.admin_username, "Administrador", True)
+        admin = WebUser(cfg.admin_username, "Administrador", True, client.cookies[cfg.admin_cookie_name])
         resposta = client.post(
             "/atualizar/certificado",
             data={
@@ -438,7 +613,7 @@ def test_sincronizacao_web_usa_certificado_configurado_em_arquivo(tmp_path, monk
             },
             follow_redirects=False,
         )
-        admin = WebUser(cfg.admin_username, "Administrador", True)
+        admin = WebUser(cfg.admin_username, "Administrador", True, client.cookies[cfg.admin_cookie_name])
         resposta = client.post(
             "/atualizar/sincronizar",
             data={"csrf": csrf_token(admin, cfg), "max_lotes": "5"},
@@ -492,7 +667,7 @@ def test_admin_configura_banco_por_caminho_e_aplicacao_passa_a_usar(tmp_path):
         )
         assert login.status_code == 303
 
-        admin = WebUser(cfg.admin_username, "Administrador", True)
+        admin = WebUser(cfg.admin_username, "Administrador", True, client.cookies[cfg.admin_cookie_name])
         resposta = client.post(
             "/atualizar/banco",
             data={
@@ -528,7 +703,7 @@ def test_admin_rejeita_arquivo_que_nao_e_banco_de_manifestacoes(tmp_path):
             },
             follow_redirects=False,
         )
-        admin = WebUser(cfg.admin_username, "Administrador", True)
+        admin = WebUser(cfg.admin_username, "Administrador", True, client.cookies[cfg.admin_cookie_name])
         resposta = client.post(
             "/atualizar/banco",
             data={
@@ -579,6 +754,7 @@ def test_consulta_completa_filtra_por_data_e_manifestacao(tmp_path):
             ult_nsu="563702".zfill(15),
             max_nsu="563702".zfill(15),
             manifestacoes=eventos,
+            informacoes_notas=(InformacaoNota(chave_2, "Fornecedor Teste", True),),
         ),
     )
     banco.fechar()
@@ -597,6 +773,10 @@ def test_consulta_completa_filtra_por_data_e_manifestacao(tmp_path):
 
     assert resposta.status_code == 200
     assert "Operação não Realizada" in resposta.text
+    assert "Fornecedor Teste" in resposta.text
+    assert "Cancelada" not in resposta.text
+    assert 'name="canceladas"' not in resposta.text
+    assert 'name="serie"' not in resposta.text
     assert "91780" in resposta.text
     assert "135260000000101" not in resposta.text
     assert ">91779<" not in resposta.text
@@ -638,6 +818,7 @@ def test_exportacao_da_consulta_respeita_os_mesmos_filtros(tmp_path):
                     ),
                 ),
             ),
+            informacoes_notas=(InformacaoNota(chave_2, "Fornecedor Teste", True),),
         ),
     )
     banco.fechar()
@@ -659,7 +840,37 @@ def test_exportacao_da_consulta_respeita_os_mesmos_filtros(tmp_path):
     ws = wb["Manifestacoes"]
     assert ws["A5"].value == 91780
     assert ws["E5"].value == "Operação não Realizada"
+    assert ws["J5"].value == "Fornecedor Teste"
+    assert ws.max_column == 10
+    assert "Cancelamento" not in [c.value for c in ws[4]]
     assert ws["A6"].value is None
+
+
+
+def test_historico_administrativo_restrito_e_sem_destinatarios(tmp_path):
+    cfg = settings_web(tmp_path)
+    criar_banco(cfg.database_path)
+    app = create_app(cfg)
+    with TestClient(app) as client:
+        assert client.get("/admin/historico").status_code == 401
+        client.post("/admin/login", data={
+            "csrf": csrf_token(PUBLIC_USER, cfg), "username": "admin", "password": cfg.admin_password,
+        })
+        admin_csrf = csrf_token(WebUser("admin", "Administrador", True, client.cookies[cfg.admin_cookie_name]), cfg)
+        client.post("/admin/contas", data={
+            "csrf": admin_csrf, "action": "create", "username": "ana@empresa.com", "password": "Senha-da-Ana-123!",
+        })
+        client.post("/atualizar/alertas-email", data={
+            "csrf": admin_csrf, "recipients": "fiscal@empresa.com",
+        })
+        history = client.get("/admin/historico")
+    assert history.status_code == 200
+    assert "ana@empresa.com" in history.text
+    assert "Conta cadastrada" in history.text
+    assert "Destinatários dos alertas" in history.text
+    assert "admin" in history.text
+    assert "fiscal@empresa.com" not in history.text
+    assert "Senha-da-Ana-123!" not in history.text
 
 
 
@@ -695,3 +906,4 @@ def test_consulta_publica_nao_expoe_erro_de_senha_do_banco(tmp_path, monkeypatch
     assert "Banco não sincronizado" in resposta.text
     assert "informe a senha" not in resposta.text.casefold()
     assert "criptografado" not in resposta.text.casefold()
+

@@ -2,7 +2,7 @@
 # INICIAR_WEB.cmd NÃO carrega este arquivo automaticamente.
 # As senhas do banco, administrador e certificado são lidas de secrets/.
 
-NFE_WEB_ENV=development
+NFE_WEB_ENV=production
 NFE_WEB_HOST=127.0.0.1
 NFE_WEB_PORT=8080
 NFE_WEB_FORWARDED_ALLOW_IPS=127.0.0.1
@@ -10,15 +10,27 @@ NFE_CERT_STORE=CurrentUser
 NFE_SEFAZ_COOLDOWN_MINUTES=120
 
 # O agendador funciona somente enquanto o processo Web estiver ativo.
-NFE_AUTO_SYNC_ENABLED=0
+NFE_AUTO_SYNC_ENABLED=1
+NFE_AUTO_SYNC_INTERVAL_HOURS=8
 NFE_AUTO_SYNC_HOUR=8
 NFE_AUTO_SYNC_MINUTE=0
-NFE_AUTO_SYNC_WEEKDAYS=0,1,2,3,4
+NFE_AUTO_SYNC_WEEKDAYS=0,1,2,3,4,5,6
 NFE_AUTO_SYNC_MAX_LOTES=50
+
+# Avisos de Operação não Realizada (210240).
+# Os destinatários são editados pelo admin em Atualizar e ficam em secrets/email-recipients.json.
+# A senha SMTP, se necessária, fica somente em secrets/smtp-password.txt.
+NFE_SMTP_HOST=
+NFE_SMTP_PORT=587
+NFE_SMTP_SECURITY=starttls
+NFE_SMTP_FROM=
+NFE_SMTP_USER=
 
 # Para um servidor em produção, configurar no ambiente do processo:
 # NFE_WEB_ENV=production
 # NFE_WEB_CSRF_SECRET=<valor aleatório de pelo menos 32 caracteres>
 # NFE_CERT_STORE=LocalMachine
 # NFE_CERT_THUMBPRINT=<impressão digital quando necessário>
-# NFE_AUTO_SYNC_ENABLED=1 após validação da rotina automática
+# Para desativar a rotina automática: NFE_AUTO_SYNC_ENABLED=0
+# Janelas padrão: 00:00, 08:00 e 16:00 (Brasília).
+

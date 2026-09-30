@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 from typing import Iterable
 
 from nfe_consulta.config import CNPJ_PADRAO
@@ -51,6 +51,18 @@ def proxima_execucao(
     raise RuntimeError("Não foi possível calcular a próxima sincronização.")
 
 
+def horario_unico(dia: date, hora: int, minuto: int) -> datetime:
+    """Horário civil de Brasília para o teste de data única."""
+    return datetime.combine(
+        dia, time(hora, minuto),
+        tzinfo=timezone(timedelta(hours=-3)),
+    )
+
+
+def agora_brasilia() -> datetime:
+    return datetime.now(timezone(timedelta(hours=-3)))
+
+
 def deve_recuperar_execucao(
     agora: datetime,
     ultima_execucao_local: date | None,
@@ -90,7 +102,7 @@ def _garantir_tabela_agendamento(conexao) -> None:
 
 
 def ultima_execucao_agendada(settings) -> date | None:
-    """Lê do banco a última data local em que o agendador foi disparado."""
+    """Lê do banco a última data local em que a sincronização terminou."""
     banco = caminho_banco_configurado(settings)
     if not banco.is_file():
         return None
@@ -115,7 +127,7 @@ def ultima_execucao_agendada(settings) -> date | None:
 
 
 def registrar_execucao_agendada(settings, dia_local: date) -> None:
-    """Marca o disparo antes de acessar a SEFAZ para evitar repetição em reinícios."""
+    """Marca uma sincronização concluída para evitar repetição em reinícios."""
     banco = caminho_banco_configurado(settings)
     if not banco.is_file():
         raise FileNotFoundError(f"Banco configurado não encontrado: {banco}")
@@ -145,24 +157,11 @@ async def executar_sincronizacao_automatica(
     app,
     *,
     dia_agendado: date | None = None,
+    janela_agendada: datetime | None = None,
 ) -> None:
     """Executa uma sincronização automática respeitando lock, cooldown e persistência."""
     settings = app.state.settings
     dia = dia_agendado or datetime.now().astimezone().date()
-
-    try:
-        await asyncio.to_thread(
-            registrar_execucao_agendada,
-            settings,
-            dia,
-        )
-    except Exception as exc:
-        app.state.audit.write_system(
-            "sefaz_sync_auto",
-            "erro",
-            reason=f"schedule_state_{type(exc).__name__}",
-        )
-        return
 
     lock = app.state.sync_lock
     if not lock.acquire(blocking=False):
@@ -179,6 +178,7 @@ async def executar_sincronizacao_automatica(
                 sincronizar_configurado,
                 settings,
                 max_lotes=settings.auto_sync_max_lotes,
+                audit=app.state.audit,
             )
         except NfeLimiteConsultaErro:
             app.state.audit.write_system(
@@ -202,6 +202,19 @@ async def executar_sincronizacao_automatica(
             )
             return
 
+        try:
+            if resumo.completo:
+                if janela_agendada is not None:
+                    await asyncio.to_thread(registrar_janela_concluida, settings, janela_agendada)
+                else:
+                    await asyncio.to_thread(registrar_execucao_agendada, settings, dia)
+        except Exception as exc:
+            app.state.audit.write_system(
+                "sefaz_sync_auto", "erro",
+                reason=f"schedule_state_{type(exc).__name__}",
+            )
+            return
+
         app.state.audit.write_system(
             "sefaz_sync_auto",
             "ok",
@@ -217,54 +230,120 @@ async def executar_sincronizacao_automatica(
         lock.release()
 
 
-async def loop_sincronizacao_automatica(app) -> None:
-    """Mantém a rotina diária enquanto o processo Web estiver ativo."""
+async def executar_sincronizacao_unica(app, dia: date) -> None:
+    """Registra a tentativa antes da chamada para não repetir após reinício."""
     settings = app.state.settings
-
-    agora = datetime.now().astimezone()
     try:
-        ultima = await asyncio.to_thread(
-            ultima_execucao_agendada,
-            settings,
-        )
+        if await asyncio.to_thread(ultima_execucao_agendada, settings) == dia:
+            return
+        await asyncio.to_thread(registrar_execucao_agendada, settings, dia)
     except Exception as exc:
-        ultima = None
         app.state.audit.write_system(
-            "sefaz_scheduler",
-            "erro",
+            "sefaz_sync_auto", "erro",
             reason=f"schedule_state_{type(exc).__name__}",
         )
+        return
+    await executar_sincronizacao_automatica(app, dia_agendado=dia)
 
-    if deve_recuperar_execucao(
-        agora,
-        ultima,
-        hora=settings.auto_sync_hour,
-        minuto=settings.auto_sync_minute,
-        dias_semana=settings.auto_sync_weekdays,
-    ):
-        app.state.audit.write_system(
-            "sefaz_scheduler",
-            "recuperacao",
-            dia=agora.date().isoformat(),
+
+async def loop_sincronizacao_automatica(app) -> None:
+    """Executa uma data única ou mantém a rotina diária opcional."""
+    settings = app.state.settings
+    if settings.auto_sync_once_date is not None:
+        # A execução de data única usa o horário de Brasília.
+        alvo = horario_unico(
+            settings.auto_sync_once_date,
+            settings.auto_sync_hour,
+            settings.auto_sync_minute,
         )
-        await executar_sincronizacao_automatica(
-            app,
-            dia_agendado=agora.date(),
-        )
+        app.state.auto_sync_next_at = alvo
+        agora = agora_brasilia()
+        if agora < alvo:
+            await asyncio.sleep((alvo - agora).total_seconds())
+        try:
+            if agora_brasilia().date() == settings.auto_sync_once_date:
+                await executar_sincronizacao_unica(app, settings.auto_sync_once_date)
+        finally:
+            app.state.auto_sync_next_at = None
+        return
 
     while True:
-        agora = datetime.now().astimezone()
-        proxima = proxima_execucao(
-            agora,
-            hora=settings.auto_sync_hour,
-            minuto=settings.auto_sync_minute,
-            dias_semana=settings.auto_sync_weekdays,
+        agora = agora_brasilia()
+        janela, proxima = janelas_intervalo(
+            agora, intervalo_horas=settings.auto_sync_interval_hours,
+            hora=settings.auto_sync_hour, minuto=settings.auto_sync_minute,
         )
         app.state.auto_sync_next_at = proxima
+        if janela.weekday() in settings.auto_sync_weekdays:
+            try:
+                ultima = await asyncio.to_thread(ultima_janela_concluida, settings)
+            except Exception as exc:
+                # Sem o estado persistido, não arrisque repetir uma execução.
+                app.state.audit.write_system(
+                    "sefaz_scheduler", "erro",
+                    reason=f"schedule_state_{type(exc).__name__}",
+                )
+            else:
+                if ultima is None or ultima < janela:
+                    await executar_sincronizacao_automatica(app, janela_agendada=janela)
+        agora = agora_brasilia()
+        # Recupera falhas ou lotes parciais a cada hora, respeitando o cooldown.
+        await asyncio.sleep(max(1.0, min(3600.0, (proxima - agora).total_seconds())))
 
-        espera = max(1.0, (proxima - agora).total_seconds())
-        await asyncio.sleep(espera)
-        await executar_sincronizacao_automatica(
-            app,
-            dia_agendado=proxima.date(),
-        )
+
+def janelas_intervalo(
+    agora: datetime, *, intervalo_horas: int = 8, hora: int = 8, minuto: int = 0,
+) -> tuple[datetime, datetime]:
+    """Janela atual e próxima no horário de Brasília, sem depender do reinício."""
+    if intervalo_horas not in (1, 2, 3, 4, 6, 8, 12, 24):
+        raise ValueError("O intervalo deve dividir 24 horas.")
+    if not 0 <= hora <= 23 or not 0 <= minuto <= 59:
+        raise ValueError("Horário inválido.")
+    if agora.tzinfo is None:
+        raise ValueError("O instante deve ter fuso horário.")
+    agora = agora.astimezone(timezone(timedelta(hours=-3)))
+    ancora = datetime(2000, 1, 1, hora, minuto, tzinfo=agora.tzinfo)
+    intervalo = timedelta(hours=intervalo_horas)
+    janela = ancora + ((agora - ancora) // intervalo) * intervalo
+    return janela, janela + intervalo
+
+
+def _garantir_tabela_intervalo(conexao) -> None:
+    conexao.execute("""CREATE TABLE IF NOT EXISTS controle_agendamento_intervalo (
+        cnpj TEXT PRIMARY KEY, ultima_janela TEXT NOT NULL,
+        atualizado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )""")
+    conexao.commit()
+
+
+def ultima_janela_concluida(settings) -> datetime | None:
+    banco = caminho_banco_configurado(settings)
+    if not banco.is_file():
+        raise FileNotFoundError("Banco da sincronização não encontrado.")
+    conexao = abrir_banco(banco, settings.current_database_password())
+    try:
+        _garantir_tabela_intervalo(conexao)
+        linha = conexao.execute(
+            "SELECT ultima_janela FROM controle_agendamento_intervalo WHERE cnpj=?",
+            (CNPJ_PADRAO,),
+        ).fetchone()
+        return datetime.fromisoformat(linha[0]) if linha else None
+    finally:
+        conexao.close()
+
+
+def registrar_janela_concluida(settings, janela: datetime) -> None:
+    banco = caminho_banco_configurado(settings)
+    if not banco.is_file():
+        raise FileNotFoundError("Banco da sincronização não encontrado.")
+    conexao = abrir_banco(banco, settings.current_database_password())
+    try:
+        _garantir_tabela_intervalo(conexao)
+        with conexao:
+            conexao.execute("""INSERT INTO controle_agendamento_intervalo(cnpj, ultima_janela)
+                VALUES (?, ?) ON CONFLICT(cnpj) DO UPDATE SET
+                ultima_janela=excluded.ultima_janela, atualizado_em=CURRENT_TIMESTAMP""",
+                (CNPJ_PADRAO, janela.isoformat()),
+            )
+    finally:
+        conexao.close()

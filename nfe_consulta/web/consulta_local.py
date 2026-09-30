@@ -55,6 +55,7 @@ class EventoNota:
     protocolo: str
     nsu: str
     recebido_em: str = ""
+    emitente: str = ""
 
     @property
     def data_label(self) -> str:
@@ -192,7 +193,7 @@ def _where_eventos(
 
 
 def _evento_da_linha(linha) -> EventoNota:
-    chave, codigo, descricao, data_evento, protocolo, nsu, recebido_em = linha
+    chave, codigo, descricao, data_evento, protocolo, nsu, recebido_em, emitente = linha
     numero = int(chave[25:34])
     serie = chave[22:25].lstrip("0") or "0"
     return EventoNota(
@@ -205,7 +206,22 @@ def _evento_da_linha(linha) -> EventoNota:
         protocolo=protocolo,
         nsu=nsu,
         recebido_em=recebido_em,
+        emitente=emitente or (chave[6:20] if len(chave) == 44 and chave.isdigit() else ""),
     )
+
+
+def _tem_informacoes_nfe(conexao) -> bool:
+    """Bancos existentes continuam consultáveis antes da próxima sincronização."""
+    return conexao.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='informacoes_nfe'"
+    ).fetchone() is not None
+
+
+def _campos_nota(tem_informacoes: bool) -> str:
+    if not tem_informacoes:
+        return "'' AS emitente"
+    return """COALESCE((SELECT emitente FROM informacoes_nfe
+                        WHERE cnpj=manifestacoes.cnpj AND chave=manifestacoes.chave), '') AS emitente"""
 
 
 def consultar_eventos(
@@ -223,9 +239,11 @@ def consultar_eventos(
     if not 1 <= por_pagina <= 500:
         raise ValueError("Quantidade por página inválida.")
 
-    where, parametros = _where_eventos(cnpj, filtros)
     conexao = abrir_banco(database_path, password, somente_leitura=True)
     try:
+        tem_informacoes = _tem_informacoes_nfe(conexao)
+        where, parametros = _where_eventos(cnpj, filtros)
+        campos_nota = _campos_nota(tem_informacoes)
         total = int(
             conexao.execute(
                 f"SELECT COUNT(*) FROM manifestacoes WHERE {where}",
@@ -246,7 +264,8 @@ def consultar_eventos(
                 data_evento,
                 protocolo,
                 nsu,
-                recebido_em
+                recebido_em,
+                {campos_nota}
             FROM manifestacoes
             WHERE {where}
             ORDER BY data_evento DESC, CAST(nsu AS INTEGER) DESC, id DESC
@@ -274,9 +293,11 @@ def consultar_eventos_exportacao(
     limite: int = 200_000,
 ) -> tuple[EventoNota, ...]:
     """Retorna todos os eventos filtrados para exportação."""
-    where, parametros = _where_eventos(cnpj, filtros)
     conexao = abrir_banco(database_path, password, somente_leitura=True)
     try:
+        tem_informacoes = _tem_informacoes_nfe(conexao)
+        where, parametros = _where_eventos(cnpj, filtros)
+        campos_nota = _campos_nota(tem_informacoes)
         total = int(
             conexao.execute(
                 f"SELECT COUNT(*) FROM manifestacoes WHERE {where}",
@@ -298,7 +319,8 @@ def consultar_eventos_exportacao(
                 data_evento,
                 protocolo,
                 nsu,
-                recebido_em
+                recebido_em,
+                {campos_nota}
             FROM manifestacoes
             WHERE {where}
             ORDER BY data_evento DESC, CAST(nsu AS INTEGER) DESC, id DESC
@@ -330,3 +352,4 @@ def consultar_numero_nota(
         por_pagina=min(max(limite, 1), 500),
     )
     return resultado.eventos
+

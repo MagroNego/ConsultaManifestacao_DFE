@@ -456,6 +456,7 @@ html[data-theme="dark"] .brand-logo-dark {
 }
 
 .field input,
+.field textarea,
 .field select {
   width: 100%;
   border: 1px solid var(--border);
@@ -467,9 +468,12 @@ html[data-theme="dark"] .brand-logo-dark {
 }
 
 .field input:focus,
+.field textarea:focus,
 .field select:focus {
   border-color: var(--muted);
 }
+
+.field textarea { resize: vertical; min-height: 94px; }
 
 .meta-row {
   display: flex;

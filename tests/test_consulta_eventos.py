@@ -1,7 +1,8 @@
 import pytest
+import sqlite3
 
 from nfe_consulta.banco import BancoManifestacoes
-from nfe_consulta.modelos import Manifestacao, RetornoDistribuicao
+from nfe_consulta.modelos import InformacaoNota, Manifestacao, RetornoDistribuicao
 from nfe_consulta.web.consulta_local import (
     consultar_eventos,
     normalizar_filtros,
@@ -54,6 +55,7 @@ def _criar_banco(caminho):
             ult_nsu="600003".zfill(15),
             max_nsu="600003".zfill(15),
             manifestacoes=tuple(manifestacoes),
+            informacoes_notas=(InformacaoNota(_chave(91780), "Fornecedor Teste", True),),
         ),
     )
     banco.fechar()
@@ -83,6 +85,7 @@ def test_filtra_periodo_serie_e_manifestacao(tmp_path):
     assert resultado.eventos[0].numero == 91781
     assert resultado.eventos[0].serie == "2"
     assert resultado.eventos[0].codigo == "210200"
+    assert resultado.eventos[0].emitente == _chave(91781, 2)[6:20]
 
 
 def test_paginacao_preserva_total(tmp_path):
@@ -115,3 +118,11 @@ def test_paginacao_preserva_total(tmp_path):
     assert len(segunda.eventos) == 1
     assert segunda.primeiro == 3
     assert segunda.ultimo == 3
+
+
+def test_consulta_em_banco_antigo_sem_tabela(tmp_path):
+    caminho = tmp_path / "antigo.db"
+    _criar_banco(caminho)
+    with sqlite3.connect(caminho) as db:
+        db.execute("DROP TABLE informacoes_nfe")
+    assert consultar_eventos(caminho, CNPJ, normalizar_filtros()).total == 3

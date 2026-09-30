@@ -9,6 +9,10 @@
   </div>
   <span class="admin-badge">Administrador</span>
 </section>
+<div class="actions">
+  <a class="button secondary" href="{{ url_for('admin_accounts_page') }}">Gerenciar acessos</a>
+  <a class="button secondary" href="{{ url_for('admin_history_page') }}">Histórico administrativo</a>
+</div>
 
 {% if success %}
 <div class="alert success">{{ success }}</div>
@@ -76,7 +80,16 @@
         <span>Sincronização automática</span>
         <strong>
           {% if request.app.state.settings.auto_sync_enabled %}
-            Ativa · {{ "%02d:%02d"|format(request.app.state.settings.auto_sync_hour, request.app.state.settings.auto_sync_minute) }}
+            {% if request.app.state.settings.auto_sync_once_date %}
+              {% if request.app.state.auto_sync_next_at %}
+                Teste único · {{ request.app.state.settings.auto_sync_once_date.strftime("%d/%m/%Y") }}
+                às {{ "%02d:%02d"|format(request.app.state.settings.auto_sync_hour, request.app.state.settings.auto_sync_minute) }} (Brasília)
+              {% else %}
+                Tentativa única encerrada · confira o Status
+              {% endif %}
+            {% else %}
+              Ativa · a cada {{ request.app.state.settings.auto_sync_interval_hours }} horas (Brasília)
+            {% endif %}
           {% else %}
             Desativada
           {% endif %}
@@ -84,13 +97,49 @@
       </div>
       {% if request.app.state.auto_sync_next_at %}
       <div>
-        <span>Próxima automática</span>
+        <span>Próxima automática (Brasília)</span>
         <strong>{{ request.app.state.auto_sync_next_at.strftime("%d/%m/%Y %H:%M") }}</strong>
       </div>
       {% endif %}
     </div>
   </section>
 </div>
+
+  <section class="card certificate-card">
+  <div class="card-title">
+    <div>
+      <h2>Alertas por e-mail</h2>
+      <span class="muted">Novo evento de Operação não Realizada</span>
+    </div>
+    <span class="status-dot {{ 'ok' if smtp_ready else 'bad' }}">
+      {{ 'Envio configurado' if smtp_ready else 'SMTP pendente' }}
+    </span>
+  </div>
+  <form action="{{ url_for('atualizar_alertas_email') }}" method="post">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label class="field">
+      <span>Destinatários</span>
+      <textarea name="recipients" rows="4" maxlength="4000" placeholder="fiscal@empresa.com.br&#10;responsavel@empresa.com.br">{{ email_recipients }}</textarea>
+    </label>
+    <div class="actions">
+      <button class="button primary" type="submit">Salvar destinatários</button>
+    </div>
+  </form>
+  <p class="cooldown-note">
+    Um endereço por linha ou separados por vírgula, até 20. Ao remover um endereço, avisos ainda pendentes para ele são cancelados. Deixe vazio para não gerar novos avisos.
+    O aviso é criado somente quando um evento 210240 novo entra no banco; eventos antigos não são reenviados.
+    {% if not smtp_ready %}Configure o servidor SMTP para realizar os envios.{% endif %}
+  </p>
+  {% if email_pending is not none %}
+  <div class="meta-row"><span>Avisos pendentes</span><strong>{{ email_pending }}</strong></div>
+  {% endif %}
+  {% if email_pending and smtp_ready %}
+  <form action="{{ url_for('atualizar_enviar_pendentes') }}" method="post">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button class="button" type="submit">Tentar enviar pendentes</button>
+  </form>
+  {% endif %}
+</section>
 
 <section class="card certificate-card">
   <div class="card-title">
@@ -144,6 +193,10 @@
       <span>Estado</span>
       <strong>{{ "Pronto" if database_web.ready else "Arquivo não encontrado" }}</strong>
     </div>
+    <div>
+      <span>Proteção do arquivo</span>
+      <strong>{{ "SQLCipher" if database_web.encrypted else "Sem criptografia — restrinja o acesso ao arquivo" if database_web.ready else "—" }}</strong>
+    </div>
   </div>
 
   <p class="cooldown-note">
@@ -174,7 +227,7 @@
         type="text"
         name="certificate_path"
         value="{{ certificate_web.path }}"
-        placeholder="Ex.: C:\TI\Certificados\Yorozu.pfx"
+        placeholder="Ex.: C:\Certificados\certificado.pfx"
         autocomplete="off"
         required
       >
@@ -232,3 +285,4 @@
   </p>
 </section>
 {% endblock %}
+

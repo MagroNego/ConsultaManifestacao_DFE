@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Acessos · Consulta de Manifestação{% endblock %}
+{% block content %}
+<section class="page-heading">
+  <div><h1>Acessos autorizados</h1><p>Administradores que podem entrar em Atualizar.</p></div>
+  <a href="{{ url_for('atualizar_page') }}">Voltar para Atualizar</a>
+</section>
+{% if success %}<div class="alert success">{{ success }}</div>{% endif %}
+{% if error %}<div class="alert error">{{ error }}</div>{% endif %}
+
+<section class="card certificate-card">
+  <h2>Cadastrar administrador</h2>
+  <form action="{{ url_for('admin_accounts_update') }}" method="post">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="hidden" name="action" value="create">
+    <label class="field"><span>Usuário</span><input name="username" required minlength="3" maxlength="64" autocomplete="off"></label>
+    <label class="field"><span>Senha inicial (mínimo 12 caracteres)</span><input type="password" name="password" required minlength="12" autocomplete="new-password"></label>
+    <button class="button danger" type="submit">Cadastrar</button>
+  </form>
+</section>
+
+<section class="card certificate-card">
+  <h2>Administradores</h2>
+  {% for account in accounts %}
+  <div class="meta-row"><span>{{ account.username }}</span><strong>{{ 'Ativo' if account.active else 'Desativado' }}</strong></div>
+  <div class="actions">
+    <form action="{{ url_for('admin_accounts_update') }}" method="post">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="username" value="{{ account.username }}">
+      <input type="hidden" name="action" value="{{ 'deactivate' if account.active else 'activate' }}">
+      <button class="button secondary" type="submit">{{ 'Desativar' if account.active else 'Ativar' }}</button>
+    </form>
+    {% if account.active %}
+    <form action="{{ url_for('admin_accounts_update') }}" method="post">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="username" value="{{ account.username }}">
+      <input type="hidden" name="action" value="reset">
+      <label class="field"><span>Nova senha</span><input type="password" name="password" required minlength="12" autocomplete="new-password"></label>
+      <button class="button secondary" type="submit">Trocar senha</button>
+    </form>
+    {% endif %}
+  </div>
+  {% else %}<p>Nenhum administrador cadastrado.</p>{% endfor %}
+  <p class="muted">Após cadastrar um administrador pessoal, desative a conta compartilhada inicial. Guarde uma cópia de segurança de dados/admin_accounts.db.</p>
+</section>
+{% endblock %}
