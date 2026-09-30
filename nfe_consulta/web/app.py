@@ -265,6 +265,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         app.state.audit.write_system(
             "sefaz_scheduler",
             "iniciado",
+            intervalo_horas=settings.auto_sync_interval_hours,
             hora=settings.auto_sync_hour,
             minuto=settings.auto_sync_minute,
             dias=list(settings.auto_sync_weekdays),
@@ -574,13 +575,12 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         serie: str = "",
         chave: str = "",
         codigo: str = "",
-        canceladas: str = "",
         pagina: int = 1,
     ):
         consultou = consultar == "1" or any(
             valor.strip()
             for valor in (data_inicial, data_final, numero, serie, chave, codigo)
-        ) or bool(canceladas)
+        )
 
         if consultou:
             try:
@@ -591,7 +591,6 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                     serie=serie,
                     chave=chave,
                     codigo=codigo,
-                    canceladas=canceladas,
                 )
             except ValueError as exc:
                 return _render(
@@ -664,7 +663,6 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         serie: str = "",
         chave: str = "",
         codigo: str = "",
-        canceladas: str = "",
     ):
         banco = _database_path(settings)
         database_state = _consulta_database_state(settings)
@@ -682,7 +680,6 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                 serie=serie,
                 chave=chave,
                 codigo=codigo,
-                canceladas=canceladas,
             )
             eventos = await run_in_threadpool(
                 consultar_eventos_exportacao,
@@ -1300,3 +1297,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

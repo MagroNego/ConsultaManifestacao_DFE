@@ -106,9 +106,10 @@ class WebSettings:
     database_path_file: Path | None = None
     database_password_file: Path | None = None
     auto_sync_enabled: bool = False
+    auto_sync_interval_hours: int = 8
     auto_sync_hour: int = 8
     auto_sync_minute: int = 0
-    auto_sync_weekdays: tuple[int, ...] = (0, 1, 2, 3, 4)
+    auto_sync_weekdays: tuple[int, ...] = (0, 1, 2, 3, 4, 5, 6)
     auto_sync_max_lotes: int = 50
     auto_sync_once_date: date | None = None
     email_recipients_file: Path = EMAIL_RECIPIENTS_FILE
@@ -199,11 +200,14 @@ def get_settings() -> WebSettings:
         raise RuntimeError("NFE_AUTO_SYNC_ONCE_DATE deve ter formato AAAA-MM-DD.") from exc
     if auto_sync_once_date is not None:
         auto_sync_enabled = True
+    auto_sync_interval_hours = int(os.getenv("NFE_AUTO_SYNC_INTERVAL_HOURS", "8"))
+    if auto_sync_interval_hours not in (1, 2, 3, 4, 6, 8, 12, 24):
+        raise RuntimeError("NFE_AUTO_SYNC_INTERVAL_HOURS deve dividir 24 horas.")
     auto_sync_hour = int(os.getenv("NFE_AUTO_SYNC_HOUR", "8"))
     auto_sync_minute = int(os.getenv("NFE_AUTO_SYNC_MINUTE", "0"))
     auto_sync_max_lotes = int(os.getenv("NFE_AUTO_SYNC_MAX_LOTES", "50"))
     auto_sync_weekdays = _dias_semana(
-        os.getenv("NFE_AUTO_SYNC_WEEKDAYS", "0,1,2,3,4")
+        os.getenv("NFE_AUTO_SYNC_WEEKDAYS", "0,1,2,3,4,5,6")
     )
     smtp_security = os.getenv("NFE_SMTP_SECURITY", "starttls").strip().lower()
     if smtp_security not in {"starttls", "ssl"}:
@@ -262,6 +266,7 @@ def get_settings() -> WebSettings:
         database_path_file=DATABASE_PATH_FILE,
         database_password_file=DATABASE_PASSWORD_FILE,
         auto_sync_enabled=auto_sync_enabled,
+        auto_sync_interval_hours=auto_sync_interval_hours,
         auto_sync_hour=auto_sync_hour,
         auto_sync_minute=auto_sync_minute,
         auto_sync_weekdays=auto_sync_weekdays,
@@ -273,3 +278,4 @@ def get_settings() -> WebSettings:
         smtp_user=os.getenv("NFE_SMTP_USER", "").strip(),
         smtp_security=smtp_security,
     )
+

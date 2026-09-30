@@ -224,3 +224,89 @@ def test_nao_recupera_antes_do_horario():
         minuto=0,
         dias_semana=(0, 1, 2, 3, 4),
     )
+
+
+
+def test_janelas_oito_horas_usam_brasilia_em_fins_de_semana():
+    # 19:00 UTC = 16:00 Brasília; sábado também tem janela.
+    agora = datetime(2026, 10, 3, 19, tzinfo=timezone.utc)
+    atual, proxima = scheduler.janelas_intervalo(agora)
+    assert atual.isoformat() == "2026-10-03T16:00:00-03:00"
+    assert proxima.isoformat() == "2026-10-04T00:00:00-03:00"
+    atual, proxima = scheduler.janelas_intervalo(agora.replace(hour=18, minute=59))
+    assert atual.hour == 8
+    assert proxima.hour == 16
+
+
+def test_persistencia_distingue_tres_janelas_e_sobrevive_a_reinicio(tmp_path):
+    from nfe_consulta.banco import BancoManifestacoes
+    caminho = tmp_path / "banco.db"
+    BancoManifestacoes(str(caminho)).fechar()
+    cfg = SimpleNamespace(database_path=caminho, database_path_file=None,
+                          current_database_password=lambda: None)
+    assert scheduler.ultima_janela_concluida(cfg) is None
+    for hora in (0, 8, 16):
+        janela = scheduler.horario_unico(date(2026, 9, 30), hora, 0)
+        scheduler.registrar_janela_concluida(cfg, janela)
+        # A leitura reabre o arquivo; não depende de estado em memória.
+        assert scheduler.ultima_janela_concluida(cfg) == janela
+
+
+def test_loop_nao_repete_janela_concluida_apos_reinicio(monkeypatch):
+    atual = scheduler.horario_unico(date(2026, 9, 30), 8, 0)
+    monkeypatch.setattr(scheduler, "agora_brasilia", lambda: atual.replace(hour=9))
+    monkeypatch.setattr(scheduler, "ultima_janela_concluida", lambda _: atual)
+    chamadas = []
+    async def executar(*args, **kwargs):
+        chamadas.append(kwargs)
+    async def encerrar(_):
+        raise asyncio.CancelledError
+    monkeypatch.setattr(scheduler, "executar_sincronizacao_automatica", executar)
+    monkeypatch.setattr(scheduler.asyncio, "sleep", encerrar)
+    app = SimpleNamespace(state=SimpleNamespace(settings=SimpleNamespace(
+        auto_sync_once_date=None, auto_sync_interval_hours=8,
+        auto_sync_hour=8, auto_sync_minute=0, auto_sync_weekdays=tuple(range(7)),
+    )))
+    try:
+        asyncio.run(scheduler.loop_sincronizacao_automatica(app))
+    except asyncio.CancelledError:
+        pass
+    assert chamadas == []
+    assert app.state.auto_sync_next_at.hour == 16
+
+
+def test_loop_recupera_so_a_janela_mais_recente(monkeypatch):
+    atual = scheduler.horario_unico(date(2026, 10, 4), 16, 0)
+    monkeypatch.setattr(scheduler, "agora_brasilia", lambda: atual.replace(hour=17))
+    monkeypatch.setattr(scheduler, "ultima_janela_concluida", lambda _: atual.replace(day=1))
+    chamadas = []
+    async def executar(*args, **kwargs):
+        chamadas.append(kwargs["janela_agendada"])
+    async def encerrar(_):
+        raise asyncio.CancelledError
+    monkeypatch.setattr(scheduler, "executar_sincronizacao_automatica", executar)
+    monkeypatch.setattr(scheduler.asyncio, "sleep", encerrar)
+    app = SimpleNamespace(state=SimpleNamespace(settings=SimpleNamespace(
+        auto_sync_once_date=None, auto_sync_interval_hours=8,
+        auto_sync_hour=8, auto_sync_minute=0, auto_sync_weekdays=tuple(range(7)),
+    )))
+    try:
+        asyncio.run(scheduler.loop_sincronizacao_automatica(app))
+    except asyncio.CancelledError:
+        pass
+    assert chamadas == [atual]
+
+
+def test_distribuicao_parcial_nao_conclui_janela(monkeypatch):
+    registros = []
+    class Audit:
+        def write_system(self, *args, **kwargs):
+            pass
+    cfg = SimpleNamespace(auto_sync_max_lotes=50, sync_cooldown_minutes=120)
+    app = SimpleNamespace(state=SimpleNamespace(settings=cfg, sync_lock=threading.Lock(), audit=Audit()))
+    monkeypatch.setattr(scheduler, "registrar_janela_concluida", lambda *args: registros.append(args))
+    monkeypatch.setattr(scheduler, "sincronizar_configurado", lambda *args, **kwargs: SimpleNamespace(
+        lotes=50, eventos_novos=1, ult_nsu="1", max_nsu="2", completo=False, cache=False))
+    asyncio.run(scheduler.executar_sincronizacao_automatica(
+        app, janela_agendada=scheduler.horario_unico(date(2026, 9, 30), 8, 0)))
+    assert registros == []

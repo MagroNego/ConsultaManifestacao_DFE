@@ -26,7 +26,6 @@ class FiltrosEventos:
     serie: int | None = None
     chave: str | None = None
     codigo: str | None = None
-    canceladas: bool = False
 
     @property
     def data_inicial_texto(self) -> str:
@@ -57,7 +56,6 @@ class EventoNota:
     nsu: str
     recebido_em: str = ""
     emitente: str = ""
-    cancelada: bool = False
 
     @property
     def data_label(self) -> str:
@@ -118,7 +116,6 @@ def normalizar_filtros(
     serie: str = "",
     chave: str = "",
     codigo: str = "",
-    canceladas: str = "",
 ) -> FiltrosEventos:
     inicio = _parse_data(data_inicial, "Data inicial")
     fim = _parse_data(data_final, "Data final")
@@ -150,9 +147,6 @@ def normalizar_filtros(
     if codigo_limpo and codigo_limpo not in TIPOS_MANIFESTACAO:
         raise ValueError("Tipo de manifestação inválido.")
 
-    if canceladas not in {"", "0", "1"}:
-        raise ValueError("Filtro de cancelamento inválido.")
-
     return FiltrosEventos(
         data_inicial=inicio,
         data_final=fim,
@@ -160,15 +154,12 @@ def normalizar_filtros(
         serie=serie_valor,
         chave=chave_limpa,
         codigo=codigo_limpo or None,
-        canceladas=canceladas == "1",
     )
 
 
 def _where_eventos(
     cnpj: str,
     filtros: FiltrosEventos,
-    *,
-    tem_informacoes: bool = True,
 ) -> tuple[str, list[object]]:
     clausulas = ["cnpj = ?"]
     parametros: list[object] = [cnpj]
@@ -198,17 +189,11 @@ def _where_eventos(
         clausulas.append("codigo = ?")
         parametros.append(filtros.codigo)
 
-    if filtros.canceladas:
-        if tem_informacoes:
-            clausulas.append("EXISTS (SELECT 1 FROM informacoes_nfe info WHERE info.cnpj=manifestacoes.cnpj AND info.chave=manifestacoes.chave AND info.cancelada=1)")
-        else:
-            clausulas.append("0=1")
-
     return " AND ".join(clausulas), parametros
 
 
 def _evento_da_linha(linha) -> EventoNota:
-    chave, codigo, descricao, data_evento, protocolo, nsu, recebido_em, emitente, cancelada = linha
+    chave, codigo, descricao, data_evento, protocolo, nsu, recebido_em, emitente = linha
     numero = int(chave[25:34])
     serie = chave[22:25].lstrip("0") or "0"
     return EventoNota(
@@ -222,7 +207,6 @@ def _evento_da_linha(linha) -> EventoNota:
         nsu=nsu,
         recebido_em=recebido_em,
         emitente=emitente or (chave[6:20] if len(chave) == 44 and chave.isdigit() else ""),
-        cancelada=bool(cancelada),
     )
 
 
@@ -235,11 +219,9 @@ def _tem_informacoes_nfe(conexao) -> bool:
 
 def _campos_nota(tem_informacoes: bool) -> str:
     if not tem_informacoes:
-        return "'' AS emitente, 0 AS cancelada"
+        return "'' AS emitente"
     return """COALESCE((SELECT emitente FROM informacoes_nfe
-                        WHERE cnpj=manifestacoes.cnpj AND chave=manifestacoes.chave), '') AS emitente,
-              COALESCE((SELECT cancelada FROM informacoes_nfe
-                        WHERE cnpj=manifestacoes.cnpj AND chave=manifestacoes.chave), 0) AS cancelada"""
+                        WHERE cnpj=manifestacoes.cnpj AND chave=manifestacoes.chave), '') AS emitente"""
 
 
 def consultar_eventos(
@@ -260,7 +242,7 @@ def consultar_eventos(
     conexao = abrir_banco(database_path, password, somente_leitura=True)
     try:
         tem_informacoes = _tem_informacoes_nfe(conexao)
-        where, parametros = _where_eventos(cnpj, filtros, tem_informacoes=tem_informacoes)
+        where, parametros = _where_eventos(cnpj, filtros)
         campos_nota = _campos_nota(tem_informacoes)
         total = int(
             conexao.execute(
@@ -314,7 +296,7 @@ def consultar_eventos_exportacao(
     conexao = abrir_banco(database_path, password, somente_leitura=True)
     try:
         tem_informacoes = _tem_informacoes_nfe(conexao)
-        where, parametros = _where_eventos(cnpj, filtros, tem_informacoes=tem_informacoes)
+        where, parametros = _where_eventos(cnpj, filtros)
         campos_nota = _campos_nota(tem_informacoes)
         total = int(
             conexao.execute(
@@ -370,3 +352,4 @@ def consultar_numero_nota(
         por_pagina=min(max(limite, 1), 500),
     )
     return resultado.eventos
+

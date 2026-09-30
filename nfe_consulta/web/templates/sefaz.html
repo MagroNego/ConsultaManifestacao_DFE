@@ -88,7 +88,7 @@
                 Tentativa única encerrada · confira o Status
               {% endif %}
             {% else %}
-              Ativa · {{ "%02d:%02d"|format(request.app.state.settings.auto_sync_hour, request.app.state.settings.auto_sync_minute) }}
+              Ativa · a cada {{ request.app.state.settings.auto_sync_interval_hours }} horas (Brasília)
             {% endif %}
           {% else %}
             Desativada
@@ -97,7 +97,7 @@
       </div>
       {% if request.app.state.auto_sync_next_at %}
       <div>
-        <span>Próxima automática</span>
+        <span>Próxima automática (Brasília)</span>
         <strong>{{ request.app.state.auto_sync_next_at.strftime("%d/%m/%Y %H:%M") }}</strong>
       </div>
       {% endif %}
@@ -128,7 +128,7 @@
   <p class="cooldown-note">
     Um endereço por linha ou separados por vírgula, até 20. Ao remover um endereço, avisos ainda pendentes para ele são cancelados. Deixe vazio para não gerar novos avisos.
     O aviso é criado somente quando um evento 210240 novo entra no banco; eventos antigos não são reenviados.
-    {% if not smtp_ready %}A TI precisa configurar o servidor SMTP para realizar os envios.{% endif %}
+    {% if not smtp_ready %}Configure o servidor SMTP para realizar os envios.{% endif %}
   </p>
   {% if email_pending is not none %}
   <div class="meta-row"><span>Avisos pendentes</span><strong>{{ email_pending }}</strong></div>
@@ -227,7 +227,7 @@
         type="text"
         name="certificate_path"
         value="{{ certificate_web.path }}"
-        placeholder="Ex.: C:\TI\Certificados\Yorozu.pfx"
+        placeholder="Ex.: C:\Certificados\certificado.pfx"
         autocomplete="off"
         required
       >
@@ -285,3 +285,4 @@
   </p>
 </section>
 {% endblock %}
+

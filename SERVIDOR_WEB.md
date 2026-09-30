@@ -1,279 +1,100 @@
-# Implantação Web — v2.1.1
+# Implantação Web — v2.2.0
 
-A v2 foi desenhada para rodar dentro da rede da empresa com **um único processo da aplicação** enquanto o banco for SQLite/SQLCipher.
+## Processo e rede
 
-## Arquitetura recomendada
+Execute **um único processo com um worker** e mantenha o banco preferencialmente no disco local. O comando `nfe-consulta-web` e o lançador Windows iniciam com um worker.
 
-```text
-Usuário
-  ↓ HTTPS
-IIS / reverse proxy corporativo
-  ↓
-Consulta de Manifestação (FastAPI)
-  ↓
-SQLite/SQLCipher + certificado Windows + SEFAZ
-```
-
-Não exponha o Uvicorn diretamente aos usuários em produção. O padrão do aplicativo é escutar apenas em `127.0.0.1:8080`.
-
-## Perfis
-
-### Usuário
-
-Pode acessar:
-
-- **Consulta**: pesquisa o histórico do banco por período, NF, série, chave e manifestação, com exportação para Excel.
-- **Status**: consulta a última gravação do banco e o estado do NSU.
-
-Ao abrir **Atualizar**, o sistema solicita o login administrativo.
-
-### Administrador
-
-Após autenticar com uma conta administrativa autorizada, pode usar:
-
-- **Atualizar**: sincroniza o banco com `NFeDistribuicaoDFe`.
-
-Após uma tentativa válida de sincronização, a aplicação grava um cooldown padrão de **120 minutos** no banco. O bloqueio sobrevive a reinícios do serviço.
-
-## Instalação
-
-Use Python 3.11 ou superior:
-
-```powershell
-py -m pip install -e .
-nfe-consulta-web
-```
-
-Para validação antes de produção:
-
-```powershell
-py -m pip install -e ".[dev]"
-py -m pytest -q
-```
-
-## Configuração de produção
-
-As senhas não são fornecidas por variável de ambiente. A aplicação lê exclusivamente os arquivos locais da pasta `secrets`:
-
-```text
-C:\ConsultaManifestacao\secrets\admin-user.txt
-C:\ConsultaManifestacao\secrets\admin-password.txt
-C:\ConsultaManifestacao\secrets\db-password.txt
-C:\ConsultaManifestacao\secrets\cert-path.txt
-C:\ConsultaManifestacao\secrets\cert-password.txt
-C:\ConsultaManifestacao\secrets\db-path.txt
-```
-
-Variáveis como `NFE_ADMIN_PASSWORD`, `NFE_DATABASE_PASSWORD` e `NFE_CERT_PASSWORD` não são usadas como fallback.
-
-As variáveis de ambiente continuam disponíveis apenas para configuração não sensível ou operacional, por exemplo:
+A aplicação escuta em `127.0.0.1:8080`. Publique o acesso interno por HTTPS em IIS ou outro reverse proxy. Configure o serviço para iniciar com o sistema operacional e reiniciar após falhas. A conta do serviço precisa acessar o banco, o certificado e as pastas `dados`, `secrets` e `logs`.
 
 ```text
 NFE_WEB_ENV=production
-NFE_WEB_CSRF_SECRET=<segredo aleatório com pelo menos 32 caracteres>
-NFE_ADMIN_SESSION_MINUTES=30
-NFE_CERT_STORE=LocalMachine
-NFE_CERT_THUMBPRINT=<thumbprint, se usar Windows Certificate Store>
-NFE_SEFAZ_COOLDOWN_MINUTES=120
-```
-
-Os arquivos em `secrets` devem ter ACL restrita à conta que executa a aplicação. Rode `CONFIGURAR_ADMIN.cmd` para criar o primeiro login administrativo. O arquivo `db-password.txt` deve conter somente a senha do SQLCipher. Depois, gerencie as contas em **Atualizar → Gerenciar acessos**. O `INICIAR_WEB.cmd` inicia em modo produção e cria `secrets\web-csrf-secret.txt` na primeira execução; preserve esse arquivo e sua ACL restrita. Com outro serviço de inicialização, defina `NFE_WEB_ENV=production` e o segredo pela variável `NFE_WEB_CSRF_SECRET` ou por esse arquivo.
-
-O reverse proxy continua recomendado para HTTPS e publicação na rede interna, mas não precisa autenticar cada funcionário. A autenticação adicional existe apenas na aba **Atualizar**.
-
-## Certificado no Windows Server
-
-### Arquivo PFX/P12 protegido
-
-O cenário preferido desta versão é manter o A1 na pasta restrita definida pela TI e configurar o caminho pela aba **Atualizar**.
-
-Exemplo:
-
-```text
-C:\TI\Certificados\Yorozu\certificado.pfx
-```
-
-O arquivo permanece nesse local. A aplicação salva apenas:
-
-```text
-secrets\cert-path.txt
-secrets\cert-password.txt
-```
-
-A conta do serviço precisa ter leitura no PFX. Restrinja também a ACL da pasta `secrets`.
-
-A sincronização automática usa a mesma configuração feita na área administrativa.
-
-### Windows Certificate Store
-
-
-
-Para serviço corporativo é recomendado:
-
-```text
-NFE_CERT_STORE=LocalMachine
-```
-
-Instale o certificado A1 em:
-
-```text
-Cert:\LocalMachine\My
-```
-
-A conta que executa a aplicação precisa ter permissão de leitura sobre a chave privada do certificado.
-
-O certificado pode ser fixado por thumbprint usando `NFE_CERT_THUMBPRINT`. Isso evita seleção ambígua caso o servidor possua vários certificados.
-
-## Cooldown SEFAZ
-
-O padrão é 120 minutos:
-
-```text
-NFE_SEFAZ_COOLDOWN_MINUTES=120
-```
-
-O cooldown é validado no backend e gravado no banco. Alterar HTML, chamar a rota manualmente ou reiniciar a aplicação não elimina o bloqueio.
-
-A rejeição 656 registra uma pausa no banco e, quando a resposta o informa,
-mostra o último NSU indicado pela SEFAZ. O cursor local não é avançado na
-rejeição.
-
-## Rede
-
-### E-mail de alertas
-
-Configure no ambiente do processo Web `NFE_SMTP_HOST`, `NFE_SMTP_PORT` (587
-para STARTTLS ou porta correspondente ao servidor), `NFE_SMTP_SECURITY`
-(`starttls` ou `ssl`), `NFE_SMTP_FROM` e, se exigido, `NFE_SMTP_USER`.
-Grave a senha em `secrets\\smtp-password.txt`, com ACL restrita à conta do
-serviço. Reinicie o processo após alterar as variáveis. O administrador define
-os destinatários na interface; o arquivo local
-`secrets\\email-recipients.json` não deve ser editado manualmente.
-
-Os avisos aguardam em `notificacoes_email` no banco, com uma linha por evento e
-destinatário. Não inclua banco nem `secrets` no pacote de distribuição. A
-entrega exige conectividade com o SMTP e deve ser testada com um destino de
-homologação. A fila persiste nas falhas temporárias. Endereços removidos e rejeições permanentes são cancelados. A confirmação SMTP e a marcação no
-banco não formam uma transação única, portanto uma falha entre as duas etapas
-pode causar um segundo envio.
-
-A aplicação deve escutar apenas na interface usada pelo reverse proxy. Padrão:
-
-```text
 NFE_WEB_HOST=127.0.0.1
 NFE_WEB_PORT=8080
 NFE_WEB_FORWARDED_ALLOW_IPS=127.0.0.1
+NFE_ADMIN_SESSION_MINUTES=30
+NFE_SEFAZ_COOLDOWN_MINUTES=120
 ```
 
-Se o proxy estiver em outra máquina, `NFE_WEB_FORWARDED_ALLOW_IPS` deve conter apenas os endereços confiáveis do proxy.
+Se o proxy estiver em outra máquina, informe somente os endereços confiáveis em `NFE_WEB_FORWARDED_ALLOW_IPS`. O endpoint `GET /healthz` retorna estado básico, versão e disponibilidade do arquivo do banco.
 
-## Banco
+## Credenciais e contas
 
-Enquanto SQLite/SQLCipher for usado, execute **1 worker** da aplicação. O comando `nfe-consulta-web` já inicia dessa forma.
+O primeiro acesso é configurado por `CONFIGURAR_ADMIN.cmd` no Windows ou por `secrets/admin-user.txt` e `secrets/admin-password.txt`. Após criar contas individuais em **Atualizar → Gerenciar acessos**, desative a conta compartilhada e remova o arquivo da senha inicial. As contas existentes não são recriadas a partir desses arquivos.
 
-Se a aplicação precisar de múltiplas instâncias, alta disponibilidade ou grande concorrência, migre a persistência para SQL Server/PostgreSQL antes de aumentar a quantidade de workers.
+Contas e sessões ficam em `dados/admin_accounts.db`. A aplicação armazena hashes de senhas e de tokens. Sessões expiram por inatividade, com limite absoluto de oito horas, e são revogadas no logout, troca de senha ou alteração do estado da conta.
 
-## Auditoria
+`INICIAR_WEB.cmd` cria `secrets/web-csrf-secret.txt` na primeira execução e preserva o arquivo nos reinícios. Em outro método de inicialização, configure esse arquivo com pelo menos 32 caracteres aleatórios ou defina `NFE_WEB_CSRF_SECRET` no ambiente do serviço.
 
-O log padrão fica em:
+As senhas do banco, certificado e SMTP são lidas dos arquivos de `secrets`; `NFE_DATABASE_PASSWORD`, `NFE_CERT_PASSWORD` e `NFE_ADMIN_PASSWORD` não são fontes de senha.
+
+Restrinja as permissões NTFS ou Unix das pastas operacionais à conta do processo e aos administradores autorizados. O banco de contas administrativas é SQLite e depende dessas permissões e da proteção dos backups.
+
+## Banco fiscal
+
+Em **Atualizar**, selecione o banco existente. A configuração é salva em `secrets/db-path.txt`; a senha SQLCipher fica em `secrets/db-password.txt`. A tela administrativa identifica se o arquivo usa SQLite ou SQLCipher.
+
+SQLCipher é opcional e protege o banco fiscal em repouso. Não criptografa automaticamente exportações, logs, o banco de contas ou arquivos de segredo. Consulte [SEGURANCA_BANCO.md](SEGURANCA_BANCO.md) para continuidade e restauração.
+
+## Certificado A1
+
+### Arquivo PFX/P12
+
+Armazene o certificado em pasta protegida, por exemplo `C:\Certificados\certificado.pfx`, e configure-o em **Atualizar**. A conta do serviço precisa ler o arquivo. O aplicativo guarda o caminho em `secrets/cert-path.txt` e a senha em `secrets/cert-password.txt`; não copia o certificado para o projeto.
+
+### Windows Certificate Store
+
+O repositório pode ser `CurrentUser` ou `LocalMachine`. Para uma conta de serviço, instale o A1 em `Cert:\LocalMachine\My` e conceda acesso à chave privada para essa conta.
 
 ```text
-logs\web_audit.log
+NFE_CERT_STORE=LocalMachine
+NFE_CERT_THUMBPRINT=<impressão digital do certificado selecionado>
 ```
 
-Pode ser alterado por:
+No Linux, use certificado por arquivo. O certificado e o banco usados pela rotina automática são os mesmos configurados na administração.
 
-```text
-NFE_WEB_AUDIT_LOG
-```
-
-O log registra usuário, ação, resultado e informações operacionais. Ele não grava as chaves de acesso enviadas.
-
-## Tema
-
-A interface possui modo claro e escuro. A preferência é salva no próprio navegador e não precisa ser armazenada no servidor.
-
-## Health check
-
-```text
-GET /healthz
-```
-
-Retorna somente estado básico, versão e disponibilidade do arquivo de banco.
-
-## Antes de produção
-
-A TI ainda deve validar:
-
-- HTTPS e publicação interna no reverse proxy;
-- ACL da pasta de dados e de secrets;
-- permissão da chave privada do A1;
-- backup do banco;
-- acesso de saída ao Ambiente Nacional da NF-e;
-- proxy/firewall corporativo;
-- teste integrado controlado com SEFAZ;
-- restauração de backup;
-- rotação da senha administrativa e do segredo CSRF.
-
-
-## Sincronização automática
-
-A v2.1 executa a rotina matinal dentro do próprio processo Web. Não existe CLI pública, BAT de atualização nem dependência do Agendador de Tarefas do Windows.
-
-Quando ativada explicitamente, a rotina usa por padrão:
-
-```text
-segunda a sexta-feira
-08:00
-50 lotes no máximo
-```
-
-Configuração:
+## Sincronização a cada oito horas
 
 ```text
 NFE_AUTO_SYNC_ENABLED=1
+NFE_AUTO_SYNC_INTERVAL_HOURS=8
 NFE_AUTO_SYNC_HOUR=8
 NFE_AUTO_SYNC_MINUTE=0
-NFE_AUTO_SYNC_WEEKDAYS=0,1,2,3,4
+NFE_AUTO_SYNC_WEEKDAYS=0,1,2,3,4,5,6
 NFE_AUTO_SYNC_MAX_LOTES=50
 ```
 
-Segunda-feira é `0` e domingo é `6`.
+As janelas são **00:00, 08:00 e 16:00, horário de Brasília, todos os dias**, independentemente do fuso do sistema operacional. O horário configurado é a âncora do intervalo. Segunda-feira corresponde a `0` e domingo a `6`.
 
-A rotina automática usa:
+O lançador Windows ativa a rotina se `NFE_AUTO_SYNC_ENABLED` não estiver definida. Defina `0` para desativar. No Linux ou em um serviço configurado diretamente, defina as variáveis no ambiente do processo. `WEB_CONFIG.example` é apenas referência e não é carregado automaticamente.
 
-- o banco selecionado pela área administrativa;
-- a senha SQLCipher em `secrets\db-password.txt`;
-- o PFX/P12 configurado em `secrets\cert-path.txt` e `secrets\cert-password.txt`, ou o Windows Certificate Store;
-- o mesmo cooldown persistente da sincronização manual;
-- o mesmo lock de processo da rota administrativa.
+O aplicativo precisa permanecer ativo. A conclusão fica em `controle_agendamento_intervalo`. Ao reiniciar, uma janela já concluída não se repete. Se houver atraso, apenas a janela mais recente é recuperada. Falhas e resultados parciais são retomados a cada hora, sempre respeitando cooldown e trava. Não execute outra instância contra o mesmo banco.
 
-Se uma sincronização manual já estiver em andamento, a execução automática é ignorada. Se o cooldown ainda estiver ativo, a rotina também é ignorada sem tentar contornar o bloqueio.
+Remova a variável legada `NFE_AUTO_SYNC_ONCE_DATE` caso tenha sido usada no teste; ela seleciona execução única e substitui a rotina recorrente.
 
-As execuções são registradas em:
+## Cooldown e rejeição 656
 
-```text
-logs\web_audit.log
-```
+O bloqueio padrão é de **120 minutos**, persistido no banco e validado no backend. Reiniciar o aplicativo não o remove. A rejeição 656 preserva o cursor local, registra a pausa e permite consultar o NSU enviado e o informado no retorno, quando disponível.
 
-com a ação `sefaz_sync_auto`.
+Não avance o cursor com base na rejeição e não alterne entre cópias de banco para tentar contornar o bloqueio. Outros sistemas de distribuição do mesmo CNPJ também podem afetar a sequência e o consumo do serviço.
 
-O agendador fica desligado por padrão em todos os ambientes. Defina `NFE_AUTO_SYNC_ENABLED=1` para ativá-lo.
+## Alertas SMTP
 
-Se o serviço estiver indisponível às 08:00 e voltar depois desse horário no mesmo dia útil, a aplicação tenta recuperar a execução perdida. Uma falha pode ser tentada novamente a cada hora, sempre respeitando o cooldown. A conclusão diária fica persistida na tabela `controle_agendamento`.
-
-## Banco central configurado pela área administrativa
-
-Na aba **Atualizar**, o administrador informa o caminho do banco SQLite/SQLCipher existente no servidor. A aplicação valida o arquivo antes de ativá-lo e persiste somente o caminho em:
+Configure no ambiente do processo:
 
 ```text
-secrets\db-path.txt
+NFE_SMTP_HOST=<servidor SMTP>
+NFE_SMTP_PORT=587
+NFE_SMTP_SECURITY=starttls
+NFE_SMTP_FROM=<remetente autorizado>
+NFE_SMTP_USER=<usuário, quando necessário>
 ```
 
-A senha permanece em:
+Use `ssl` e a porta correspondente quando o servidor exigir TLS direto. Grave a senha em `secrets/smtp-password.txt`. Reinicie após alterar variáveis. Cadastre os destinatários pela interface; não edite manualmente `secrets/email-recipients.json`.
 
-```text
-secrets\db-password.txt
-```
+Sem host e remetente configurados, não há envio. A fila `notificacoes_email` persiste no banco fiscal. Falhas temporárias permanecem pendentes; destinatários removidos e rejeições permanentes encerram os avisos correspondentes. A sincronização não é repetida para reenviar e-mails. Uma interrupção após a aceitação SMTP pode causar duplicidade.
 
-O mesmo caminho é utilizado pelas telas Web e pela sincronização automática interna. A conta do serviço precisa ter leitura e escrita no banco. Para SQLite/SQLCipher, mantenha o arquivo em disco local do servidor sempre que possível.
+## Auditoria e backup
+
+O log fica em `logs/web_audit.log`, com rotação. Registra responsável, ação, resultado e dados operacionais; não registra senhas ou chaves de NF-e. `NFE_WEB_AUDIT_LOG` permite mudar o caminho.
+
+Faça backup do banco fiscal, `dados/admin_accounts.db`, `secrets`, certificado e logs em local protegido. Pare o processo antes de copiar os bancos para um backup consistente ou restaurá-los. Após restauração, confira versão, acesso administrativo, caminho do banco e cursores em **Status** antes de retomar a operação.

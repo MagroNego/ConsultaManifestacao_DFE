@@ -1,117 +1,80 @@
-# Instalação no Windows — Consulta de Manifestação NF-e
-
-A aplicação é distribuída como serviço Web interno. A interface de uso é acessada pelo navegador.
+# Manual de instalação — v2.2.0
 
 ## Requisitos
 
-- Windows 10/11 ou Windows Server;
-- Python 3.11 ou superior;
-- acesso HTTPS ao Ambiente Nacional da NF-e para a rotina de sincronização;
-- certificado A1 válido;
-- banco SQLite/SQLCipher existente;
-- permissão de leitura e escrita nas pastas da aplicação.
+- Python 3.11 ou superior e acesso às dependências Python.
+- Windows 10/11, Windows Server ou Linux.
+- Banco de manifestações existente e acesso de leitura/escrita para a conta do processo.
+- Certificado A1 válido para a sincronização: PFX/P12 ou Windows Certificate Store.
+- Acesso HTTPS ao Ambiente Nacional da NF-e.
 
-## Instalação
+## Windows
 
-Extraia o pacote em uma pasta definitiva, por exemplo:
-
-```text
-C:\ConsultaManifestacao
-```
-
-Execute:
+Extraia `ConsultaManifestacao_DFE-v2.2.0.zip`, por exemplo em `C:\ConsultaManifestacao`.
 
 ```powershell
-INSTALAR.cmd
+.\INSTALAR.cmd
+.\CONFIGURAR_ADMIN.cmd
+.\INICIAR_WEB.cmd
 ```
 
-O instalador:
+O instalador cria `.venv`, instala as dependências e prepara as pastas operacionais. O configurador cria as credenciais da primeira conta. O lançador inicia em modo produção, cria o segredo Web persistente quando necessário e habilita a rotina de oito horas.
 
-1. cria o ambiente virtual `.venv`;
-2. instala as dependências;
-3. cria as pastas `dados`, `secrets` e `logs`;
-4. valida o runtime Web.
+Abra http://127.0.0.1:8080. Em **Atualizar**, autentique-se, selecione o banco e configure o certificado. Para SQLCipher, coloque a senha em `secrets\db-password.txt`. Usuários comuns não informam essa senha na consulta.
 
-## Configuração inicial
+## Linux
 
-Configure o acesso administrativo:
+Na pasta extraída:
 
-```powershell
-CONFIGURAR_ADMIN.cmd
+```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install -e .
+mkdir -p secrets dados logs
+chmod 700 secrets dados logs
 ```
 
-Depois inicie a aplicação:
+Crie `secrets/admin-user.txt` e `secrets/admin-password.txt` em um editor local. A senha inicial deve ter pelo menos 12 caracteres. Gere o segredo Web:
 
-```powershell
-INICIAR_WEB.cmd
+```bash
+.venv/bin/python -c "from pathlib import Path; import secrets; p=Path('secrets/web-csrf-secret.txt'); p.exists() or p.write_text(secrets.token_urlsafe(48), encoding='utf-8')"
+chmod 600 secrets/*
 ```
 
-Acesse a área **Atualizar** para configurar o banco central e o certificado A1.
+Inicie com:
+
+```bash
+NFE_WEB_ENV=production NFE_AUTO_SYNC_ENABLED=1 NFE_AUTO_SYNC_INTERVAL_HOURS=8 .venv/bin/python -m nfe_consulta.web.app
+```
+
+Em fish:
+
+```fish
+env NFE_WEB_ENV=production NFE_AUTO_SYNC_ENABLED=1 NFE_AUTO_SYNC_INTERVAL_HOURS=8 .venv/bin/python -m nfe_consulta.web.app
+```
+
+Configure o certificado por arquivo PFX/P12 em **Atualizar**. O Windows Certificate Store está disponível somente no Windows.
 
 ## Atualizar uma instalação existente
 
-Pare o processo Web e faça backup da pasta atual, principalmente do banco e
-dos arquivos em `secrets`. Extraia a nova release em outra pasta e copie o
-código `nfe_consulta` para a instalação existente. Não substitua `dados`,
-`secrets` ou a configuração do certificado. Reinicie por `INICIAR_WEB.cmd`,
-confirme a versão no cabeçalho e compare os NSUs na tela **Status**.
+1. Pare o processo Web e faça backup da instalação e do banco configurado, inclusive se estiver fora da pasta do projeto.
+2. Extraia a release em uma pasta temporária.
+3. Substitua `nfe_consulta` por inteiro e atualize `pyproject.toml`, os arquivos `.cmd`, `WEB_CONFIG.example` e os manuais.
+4. Preserve `dados`, `secrets`, `logs`, arquivos de entrada/saída e o certificado. Preserve também `.venv`; as dependências serão atualizadas pelo instalador.
+5. Remova o antigo `TESTAR_SYNC_30-09_09H.cmd` e qualquer variável `NFE_AUTO_SYNC_ONCE_DATE` do processo de inicialização.
+6. Execute `INSTALAR.cmd` no Windows ou `.venv/bin/python -m pip install -e .` no Linux.
+7. Reinicie, confirme a versão **2.2.0** e compare `ultNSU`, `maxNSU` e última gravação em **Status** com os dados anteriores.
 
-## Segredos
+As tabelas adicionais são criadas pelo aplicativo sem apagar o histórico existente. Não avance nem zere o cursor NSU manualmente durante a atualização.
 
-As credenciais de runtime são lidas da pasta:
+## Configuração operacional
 
-```text
-secrets\
-```
-
-Arquivos principais:
-
-```text
-admin-user.txt
-admin-password.txt
-db-path.txt
-db-password.txt
-cert-path.txt
-cert-password.txt
-```
-
-A pasta deve ter ACL NTFS restrita à conta que executa a aplicação e aos administradores autorizados.
-
-## Produção
-
-Em ambiente corporativo, publique a aplicação atrás de IIS/HTTPS e mantenha o Uvicorn em `127.0.0.1:8080`.
-
-A sincronização automática fica desativada até a TI configurá-la. Para ativar a rotina recorrente, o padrão é segunda a sexta-feira às 08:00:
-
-```text
-NFE_AUTO_SYNC_ENABLED=1
-NFE_AUTO_SYNC_HOUR=8
-NFE_AUTO_SYNC_MINUTE=0
-NFE_AUTO_SYNC_WEEKDAYS=0,1,2,3,4
-NFE_AUTO_SYNC_MAX_LOTES=50
-```
-
-O serviço Web precisa permanecer ativo no horário programado. Em qualquer
-ambiente, o agendador permanece desligado até configurar
-`NFE_AUTO_SYNC_ENABLED=1` no ambiente do processo antes de iniciá-lo.
-`WEB_CONFIG.example` serve como referência e não é carregado por
-`INICIAR_WEB.cmd`.
-
-Para o teste único de 30/09/2026 às 09:00 (horário de Brasília), use
-`TESTAR_SYNC_30-09_09H.cmd` no servidor antes do horário. Ele configura
-`NFE_AUTO_SYNC_ONCE_DATE=2026-09-30`, inicia o aplicativo e registra a
-tentativa no banco antes de consultar a SEFAZ, desde que o banco esteja disponível. Não execute outra instância
-em paralelo nem faça sincronização manual dentro do cooldown de 120 minutos.
-
-Consulte `SERVIDOR_WEB.md` para detalhes de implantação.
-
-## Validação
-
-Para executar a suíte automatizada:
+A rotina final usa **00:00, 08:00 e 16:00, horário de Brasília, todos os dias**. `INICIAR_WEB.cmd` aplica a ativação se `NFE_AUTO_SYNC_ENABLED` não estiver definida. Para desativar no PowerShell antes de iniciar:
 
 ```powershell
-py -m pip install -e ".[dev]"
-py -m pytest -q
+$env:NFE_AUTO_SYNC_ENABLED = "0"
+.\INICIAR_WEB.cmd
 ```
 
-Os testes automatizados não acessam a SEFAZ real nem utilizam certificado de produção.
+No Linux, a ativação é definida no ambiente do serviço conforme o comando acima. `WEB_CONFIG.example` é uma referência; não é carregado automaticamente.
+
+Execute uma única instância. O processo precisa permanecer ativo; feche-o de forma controlada antes de substituir código ou restaurar backups. Consulte [SERVIDOR_WEB.md](SERVIDOR_WEB.md) para HTTPS e execução como serviço.

@@ -25,7 +25,6 @@ HEADERS = [
     "NSU",
     "Recebido no banco (UTC)",
     "Emitente",
-    "Cancelamento",
 ]
 
 
@@ -55,8 +54,6 @@ def _resumo_filtros(filtros: FiltrosEventos) -> str:
         itens.append(f"Chave: {filtros.chave}")
     if filtros.codigo:
         itens.append(TIPOS_MANIFESTACAO.get(filtros.codigo, filtros.codigo))
-    if filtros.canceladas:
-        itens.append("Somente canceladas")
     return "  |  ".join(itens) if itens else "Todos os eventos do banco"
 
 
@@ -94,7 +91,6 @@ def gravar_eventos_xlsx(
             evento.nsu,
             _excel_datetime(evento.recebido_em),
             evento.emitente,
-            "Cancelada" if evento.cancelada else "",
         ]
 
         for coluna, valor in enumerate(valores, 1):
@@ -110,11 +106,11 @@ def gravar_eventos_xlsx(
             if isinstance(ws.cell(indice, coluna).value, datetime):
                 ws.cell(indice, coluna).number_format = "dd/mm/yyyy hh:mm:ss"
 
-    larguras = [13, 9, 49, 12, 31, 22, 22, 17, 22, 42, 16]
+    larguras = [13, 9, 49, 12, 31, 22, 22, 17, 22, 42]
     for coluna, largura in enumerate(larguras, 1):
         ws.column_dimensions[get_column_letter(coluna)].width = largura
 
-    ws.auto_filter.ref = f"A4:K{max(4, 4 + len(eventos))}"
+    ws.auto_filter.ref = f"A4:J{max(4, 4 + len(eventos))}"
     ws.print_options.horizontalCentered = False
     ws.sheet_properties.pageSetUpPr.fitToPage = True
     ws.page_setup.fitToWidth = 1
@@ -133,3 +129,4 @@ def gravar_eventos_xlsx(
         os.replace(temporario, destino)
     finally:
         Path(temporario).unlink(missing_ok=True)
+

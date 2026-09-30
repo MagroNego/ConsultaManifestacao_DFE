@@ -1,36 +1,19 @@
-# Consulta de Manifestação NF-e — v2.2.0-dev
+# Consulta de Manifestação NF-e — v2.2.0
 
-Esta versão usa uma interface Web para consultar manifestações, exportar Excel,
-ver o estado do banco e sincronizar com a SEFAZ. A consulta e as exportações
-usam somente o banco local; a sincronização exige login administrativo.
-
-## Primeira instalação no Windows
+## Primeira instalação
 
 1. Extraia o pacote em uma pasta definitiva.
-2. Execute `INSTALAR.cmd` e depois `CONFIGURAR_ADMIN.cmd`.
-3. Execute `INICIAR_WEB.cmd` e abra `http://127.0.0.1:8080` no navegador.
-4. Configure o banco existente e o certificado na aba **Atualizar**.
+2. Execute `INSTALAR.cmd` e `CONFIGURAR_ADMIN.cmd`.
+3. Execute `INICIAR_WEB.cmd` e abra http://127.0.0.1:8080.
+4. Em **Atualizar**, configure o banco existente e o certificado A1.
+5. Consulte o histórico em **Consulta** e acompanhe a sincronização em **Status**.
 
-Leia `MANUAL_DE_INSTALACAO.md` antes de instalar no servidor e
-`MANUAL_DE_USO.md` para usar a interface.
+O lançador habilita a sincronização às **00:00, 08:00 e 16:00 (Brasília)**. Mantenha o processo em execução. Para desativar, configure `NFE_AUTO_SYNC_ENABLED=0` antes de iniciar.
 
-## Atualização de uma instalação existente
+## Atualização
 
-Feche o aplicativo, faça backup da pasta atual e instale o novo código na
-mesma pasta. Preserve `dados`, `secrets`, logs e os caminhos já configurados.
-Reinicie o aplicativo e confirme `v2.2.0-dev` no cabeçalho. Não altere manualmente
-o `ultNSU` do banco.
+Pare a instalação, faça backup e substitua o código e os lançadores pela nova versão. Preserve `dados`, `secrets`, logs, certificado e os caminhos configurados. Execute `INSTALAR.cmd` para atualizar as dependências e reinicie por `INICIAR_WEB.cmd`. Confirme **2.2.0** no cabeçalho e confira o cursor NSU em **Status**.
 
-O pacote não inclui banco real, senha ou certificado. A instalação em rede
-interna e o agendamento estão descritos em `SERVIDOR_WEB.md`.
+O lançador de teste de data única foi retirado. Remova `NFE_AUTO_SYNC_ONCE_DATE` do ambiente, caso tenha sido configurada; a rotina final é recorrente a cada oito horas.
 
-## Teste único em 30/09/2026 às 09:00
-
-No computador que executa o aplicativo, pare a instância atual e abra
-`TESTAR_SYNC_30-09_09H.cmd` antes das 09:00. Deixe a janela aberta e confirme
-em **Atualizar** o aviso “Teste único · 30/09/2026 às 09:00 (Brasília)”.
-O teste faz apenas uma tentativa nessa data e não ativa a rotina diária.
-Se o aplicativo só iniciar depois das 09:00 no mesmo dia, ele tenta
-imediatamente; a partir de 01/10 não executa esse agendamento.
-Evite uma sincronização manual após 07:00, pois o cooldown pode impedir
-a tentativa das 09:00. Depois confira **Status → Últimas sincronizações**.
+Leia o [manual de instalação](MANUAL_DE_INSTALACAO.md) para o procedimento completo e o [manual de uso](MANUAL_DE_USO.md) para operar a aplicação.

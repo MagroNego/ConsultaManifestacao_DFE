@@ -120,22 +120,9 @@ def test_paginacao_preserva_total(tmp_path):
     assert segunda.ultimo == 3
 
 
-def test_somente_canceladas_combina_com_outros_filtros(tmp_path):
-    caminho = tmp_path / "manifestacoes.db"
-    _criar_banco(caminho)
-    resultado = consultar_eventos(caminho, CNPJ, normalizar_filtros(canceladas="1"))
-    assert resultado.total == 1
-    assert resultado.eventos[0].numero == 91780
-    assert resultado.eventos[0].cancelada
-    assert consultar_eventos(caminho, CNPJ, normalizar_filtros(canceladas="1", codigo="210200")).total == 0
-    with pytest.raises(ValueError, match="cancelamento"):
-        normalizar_filtros(canceladas="qualquer")
-
-
-def test_filtro_canceladas_em_banco_antigo_sem_tabela(tmp_path):
+def test_consulta_em_banco_antigo_sem_tabela(tmp_path):
     caminho = tmp_path / "antigo.db"
     _criar_banco(caminho)
     with sqlite3.connect(caminho) as db:
         db.execute("DROP TABLE informacoes_nfe")
     assert consultar_eventos(caminho, CNPJ, normalizar_filtros()).total == 3
-    assert consultar_eventos(caminho, CNPJ, normalizar_filtros(canceladas="1")).total == 0

@@ -25,3 +25,6 @@ adotá-lo como banco ativo.
 SQLCipher protege o arquivo do banco, mas não criptografa automaticamente TXT,
 planilhas exportadas, logs e backups. Restrinja o acesso a esses arquivos e à
 pasta `secrets` conforme a política da empresa.
+
+
+Inclua também `dados/admin_accounts.db` no backup: ele guarda contas e sessões administrativas. Esse arquivo usa SQLite; SQLCipher protege apenas o banco fiscal configurado. Pare o processo antes de copiar ou restaurar os bancos.

@@ -774,7 +774,8 @@ def test_consulta_completa_filtra_por_data_e_manifestacao(tmp_path):
     assert resposta.status_code == 200
     assert "Operação não Realizada" in resposta.text
     assert "Fornecedor Teste" in resposta.text
-    assert "Cancelada" in resposta.text
+    assert "Cancelada" not in resposta.text
+    assert 'name="canceladas"' not in resposta.text
     assert 'name="serie"' not in resposta.text
     assert "91780" in resposta.text
     assert "135260000000101" not in resposta.text
@@ -840,19 +841,10 @@ def test_exportacao_da_consulta_respeita_os_mesmos_filtros(tmp_path):
     assert ws["A5"].value == 91780
     assert ws["E5"].value == "Operação não Realizada"
     assert ws["J5"].value == "Fornecedor Teste"
-    assert ws["K5"].value == "Cancelada"
+    assert ws.max_column == 10
+    assert "Cancelamento" not in [c.value for c in ws[4]]
     assert ws["A6"].value is None
 
-    with TestClient(app) as client:
-        filtrado = client.get("/consulta", params={"consultar": "1", "canceladas": "1"})
-        exportado = client.get("/consulta/exportar", params={"canceladas": "1"})
-    assert filtrado.status_code == 200
-    assert "Com cancelamento informado" in filtrado.text
-    assert ">91780<" in filtrado.text
-    assert ">91779<" not in filtrado.text
-    filtrado_xlsx = load_workbook(BytesIO(exportado.content), read_only=True)["Manifestacoes"]
-    assert filtrado_xlsx["A5"].value == 91780
-    assert filtrado_xlsx["A6"].value is None
 
 
 def test_historico_administrativo_restrito_e_sem_destinatarios(tmp_path):
@@ -914,3 +906,4 @@ def test_consulta_publica_nao_expoe_erro_de_senha_do_banco(tmp_path, monkeypatch
     assert "Banco não sincronizado" in resposta.text
     assert "informe a senha" not in resposta.text.casefold()
     assert "criptografado" not in resposta.text.casefold()
+

@@ -76,15 +76,8 @@
           {% endfor %}
         </select>
       </label>
-      <label class="field">
-        <span>Cancelamento informado pelo NSU</span>
-        <select name="canceladas">
-          <option value="">Todas</option>
-          <option value="1" {% if filtros.canceladas %}selected{% endif %}>Com cancelamento informado</option>
-        </select>
-      </label>
     </div>
-    <p class="muted">Esta lista mostra manifestações recebidas. Quando a razão social não vem pelo NSU, o emitente aparece pelo CNPJ da chave. O cancelamento só aparece quando essa informação também consta no banco; o filtro não consulta a situação de todas as notas emitidas.</p>
+    <p class="muted">Esta lista mostra manifestações recebidas. Quando a razão social não vem pelo NSU, o emitente aparece pelo CNPJ da chave.</p>
 
     <div class="filter-actions">
       <a class="button secondary" href="{{ url_for('consulta_page') }}">Limpar</a>
@@ -118,7 +111,6 @@
       <input type="hidden" name="numero" value="{{ filtros.numero_texto }}">
       <input type="hidden" name="chave" value="{{ filtros.chave or '' }}">
       <input type="hidden" name="codigo" value="{{ filtros.codigo or '' }}">
-      <input type="hidden" name="canceladas" value="{{ '1' if filtros.canceladas else '' }}">
       <button class="button secondary export-button" type="submit">Exportar Excel</button>
     </form>
     {% endif %}
@@ -133,7 +125,6 @@
           <th>Série</th>
           <th>Emitente (nome/CNPJ)</th>
           <th>Manifestação</th>
-          <th>Cancelamento informado</th>
           <th>Data do evento</th>
           <th>Protocolo</th>
           <th>Chave NF-e</th>
@@ -151,7 +142,6 @@
             <strong>{{ evento.descricao }}</strong>
             <small>{{ evento.codigo }}</small>
           </td>
-          <td>{{ "Cancelada" if evento.cancelada else "—" }}</td>
           <td>{{ evento.data_label }}</td>
           <td class="mono">{{ evento.protocolo or "—" }}</td>
           <td class="mono access-key">{{ evento.chave }}</td>
@@ -216,3 +206,4 @@
   </form>
 </section>
 {% endblock %}
+
