@@ -1142,3 +1142,12 @@ html[data-theme="dark"] .brand-logo-dark {
   white-space: nowrap;
   min-width: 145px;
 }
+
+
+.manifestation-cell {
+  min-width: 170px;
+}
+
+.manifestation-cell strong {
+  white-space: nowrap;
+}
