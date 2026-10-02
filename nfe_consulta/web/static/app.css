@@ -1136,3 +1136,9 @@ html[data-theme="dark"] .brand-logo-dark {
     width: 100%;
   }
 }
+
+
+.event-date {
+  white-space: nowrap;
+  min-width: 145px;
+}
