@@ -45,6 +45,22 @@
 
     inputs.forEach((input) => input.addEventListener("change", updateSelection));
 
+    const formatDateInput = (input) => {
+      const digits = input.value.replace(/\D/g, "").slice(0, 8);
+      if (digits.length <= 2) {
+        input.value = digits;
+      } else if (digits.length <= 4) {
+        input.value = digits.slice(0, 2) + "/" + digits.slice(2);
+      } else {
+        input.value = digits.slice(0, 2) + "/" + digits.slice(2, 4) + "/" + digits.slice(4);
+      }
+    };
+
+    document.querySelectorAll("[data-date-input]").forEach((input) => {
+      input.addEventListener("input", () => formatDateInput(input));
+      input.addEventListener("blur", () => formatDateInput(input));
+    });
+
     document.querySelectorAll("[data-processing-form]").forEach((form) => {
       form.addEventListener("submit", () => {
         form.classList.add("busy");
