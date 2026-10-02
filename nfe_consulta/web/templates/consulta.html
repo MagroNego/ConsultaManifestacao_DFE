@@ -31,12 +31,30 @@
     <div class="filters-grid">
       <label class="field">
         <span>Data inicial do evento</span>
-        <input type="date" name="data_inicial" value="{{ filtros.data_inicial_texto }}">
+        <input
+          type="text"
+          name="data_inicial"
+          value="{{ filtros.data_inicial_br }}"
+          placeholder="dd/mm/aaaa"
+          inputmode="numeric"
+          maxlength="10"
+          autocomplete="off"
+          data-date-input
+        >
       </label>
 
       <label class="field">
         <span>Data final do evento</span>
-        <input type="date" name="data_final" value="{{ filtros.data_final_texto }}">
+        <input
+          type="text"
+          name="data_final"
+          value="{{ filtros.data_final_br }}"
+          placeholder="dd/mm/aaaa"
+          inputmode="numeric"
+          maxlength="10"
+          autocomplete="off"
+          data-date-input
+        >
       </label>
 
       <label class="field">
@@ -77,8 +95,6 @@
         </select>
       </label>
     </div>
-    <p class="muted">Esta lista mostra manifestações recebidas. Quando a razão social não vem pelo NSU, o emitente aparece pelo CNPJ da chave.</p>
-
     <div class="filter-actions">
       <a class="button secondary" href="{{ url_for('consulta_page') }}">Limpar</a>
       <button class="button primary" type="submit" {% if not database_ready %}disabled{% endif %}>
