@@ -36,6 +36,14 @@ class FiltrosEventos:
         return self.data_final.isoformat() if self.data_final else ""
 
     @property
+    def data_inicial_br(self) -> str:
+        return self.data_inicial.strftime("%d/%m/%Y") if self.data_inicial else ""
+
+    @property
+    def data_final_br(self) -> str:
+        return self.data_final.strftime("%d/%m/%Y") if self.data_final else ""
+
+    @property
     def numero_texto(self) -> str:
         return str(self.numero) if self.numero is not None else ""
 
@@ -102,10 +110,15 @@ def _parse_data(valor: str, rotulo: str) -> date | None:
     valor = valor.strip()
     if not valor:
         return None
-    try:
-        return date.fromisoformat(valor)
-    except ValueError as exc:
-        raise ValueError(f"{rotulo} inválida.") from exc
+
+    formatos = ("%Y-%m-%d", "%d/%m/%Y", "%d%m%Y")
+    for formato in formatos:
+        try:
+            return datetime.strptime(valor, formato).date()
+        except ValueError:
+            pass
+
+    raise ValueError(f"{rotulo} inválida. Use DD/MM/AAAA.")
 
 
 def normalizar_filtros(
