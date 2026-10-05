@@ -1,4 +1,18 @@
-# Manual de uso — v2.3.0
+# Manual de uso — v2.4.0
+
+## Entrar e perfis
+
+O aplicativo exige conta individual e senha para acessar qualquer dado fiscal. Abra o endereço do app e faça login. As contas administrativas existentes continuam com as mesmas senhas; na primeira atualização para v2.4.0, as sessões antigas são encerradas. O administrador cadastra as demais contas em **Atualizar → Gerenciar acessos**.
+
+| Perfil | Acesso |
+| --- | --- |
+| Consulta | Visualizar notas, itens, impostos, retenções, manifestações e Status |
+| Fiscal | Tudo de Consulta, mais download de XML e exportações Excel/CSV/TXT por chaves |
+| Administrador | Tudo de Fiscal, mais importação mensal, sincronização, configuração e gestão de contas |
+
+A seleção de perfil aparece no cadastro e em cada conta existente. Novas contas são Consulta por padrão. Somente Administradores criam contas, alteram perfis, ativam/desativam e trocam senhas; não existe cadastro público. Nenhuma informação fiscal, exportação ou download é liberada sem sessão válida, mesmo por link direto. O último administrador ativo não pode ser desativado nem perder esse perfil.
+
+Use **Sair** para encerrar a sessão. Trocar senha, alterar perfil ou ativar/desativar a conta revoga todas as sessões dela. Uma conta desativada não faz login e reativá-la não restaura os cookies antigos. As sessões expiram por inatividade e têm limite absoluto de oito horas. O log administrativo identifica o usuário das consultas, importações, exportações e downloads, sem gravar o conteúdo dos XMLs ou senhas.
 
 ## Consulta
 
@@ -29,7 +43,7 @@ O período do leitor filtra a **emissão da nota**. A consulta de manifestaçõe
 
 Na tela **Consulta**, uma nota com XML importado mostra **Baixar XML** e **Ver itens**. Na aba XMLs, cada nota oferece XML, Itens e Manifestações. Notas sem evento de manifestação também podem ser arquivadas. O download entrega os bytes originais do documento.
 
-Somente administradores importam e acessam os registros dos lotes. Usuários da rede interna podem consultar, exportar e baixar XMLs, conforme a política existente de acesso às consultas. Não há chamadas à SEFAZ na importação, leitura ou download; o certificado não é necessário. A importação não altera NSU, cooldown, agendamento ou manifestações.
+Somente administradores importam e acessam os registros dos lotes. Todos os usuários precisam de login. Consulta pode visualizar os relatórios; Fiscal e Administrador podem exportar e baixar XMLs. Não há chamadas à SEFAZ na importação, leitura ou download; o certificado não é necessário. A importação não altera NSU, cooldown, agendamento ou manifestações.
 
 Limites: 100 MiB de arquivos por envio, 250 MiB descompactados no lote, 5.000 entradas por ZIP/documentos no lote e 8 MiB por XML. ZIPs podem ter subpastas, mas não devem ser protegidos por senha. Arquivos que não sejam XML, eventos, resumos e documentos de outro emitente são recusados com registro. Se houver ZIP estruturalmente inválido ou excesso de limite do lote, nenhuma nova nota daquele envio é gravada; divida ou corrija o lote. Erros em XMLs individuais permitem importar os demais arquivos válidos.
 

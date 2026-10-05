@@ -23,7 +23,7 @@
   </form>
 </details>
 {% else %}
-<p class="muted">A importação dos lotes é feita pelo administrador. Consulte e baixe os documentos já arquivados abaixo.</p>
+<p class="muted">A importação dos lotes é feita pelo administrador. Downloads e exportações exigem perfil Fiscal ou Administrador.</p>
 {% endif %}
 <section class="card consultation-card">
   <div class="card-title"><h2>Leitor XML</h2><span class="muted">Busca e relatórios usam o arquivo local.</span></div>
@@ -45,7 +45,7 @@
 <section class="card">
   <div class="results-heading">
     <div><strong>{{ result.total }} registro(s)</strong><span> {{ result.page }} de {{ result.pages or 1 }} página(s)</span></div>
-    {% if result.total %}
+    {% if result.total and user.can_export %}
     <form action="{{ url_for('xml_export') }}" method="get">
       <input type="hidden" name="tipo" value="{{ tipo }}"><input type="hidden" name="q" value="{{ q }}">
       <input type="hidden" name="data_inicial" value="{{ inicio }}"><input type="hidden" name="data_final" value="{{ fim }}">
@@ -60,7 +60,7 @@
     {% for column in result.columns %}<th>{{ column }}</th>{% endfor %}
   </tr></thead><tbody>
     {% for row in result.rows %}<tr>
-      {% if tipo == 'notas' %}<td><div class="actions xml-row-actions"><a class="button secondary" href="{{ url_for('xml_download', chave=row['Chave Acesso']) }}">XML</a><a href="{{ url_for('xml_page').include_query_params(tipo='itens', q=row['Chave Acesso']) }}">Itens</a><a href="{{ url_for('consulta_page').include_query_params(chave=row['Chave Acesso']) }}">Manifestações</a></div></td>{% endif %}
+      {% if tipo == 'notas' %}<td><div class="actions xml-row-actions">{% if user.can_export %}<a class="button secondary" href="{{ url_for('xml_download', chave=row['Chave Acesso']) }}">XML</a>{% endif %}<a href="{{ url_for('xml_page').include_query_params(tipo='itens', q=row['Chave Acesso']) }}">Itens</a><a href="{{ url_for('consulta_page').include_query_params(chave=row['Chave Acesso']) }}">Manifestações</a></div></td>{% endif %}
       {% for column in result.columns %}<td {% if column == 'Chave Acesso' %}class="mono access-key"{% endif %}>{{ row.get(column, '') }}</td>{% endfor %}
     </tr>{% endfor %}
   </tbody></table></div>

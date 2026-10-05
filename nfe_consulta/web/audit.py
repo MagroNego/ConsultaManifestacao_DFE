@@ -45,6 +45,7 @@ class AuditLog:
             {
                 "user": user.username,
                 "admin": user.is_admin,
+                "role": "admin" if user.is_admin else user.role,
                 "action": action,
                 "result": result,
                 "client": request.client.host if request.client else None,

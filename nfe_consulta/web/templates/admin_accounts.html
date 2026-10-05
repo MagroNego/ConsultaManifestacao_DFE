@@ -2,28 +2,44 @@
 {% block title %}Acessos · Consulta de Manifestação{% endblock %}
 {% block content %}
 <section class="page-heading">
-  <div><h1>Acessos autorizados</h1><p>Administradores que podem entrar em Atualizar.</p></div>
+  <div><h1>Acessos autorizados</h1><p>Contas individuais e permissões de acesso aos dados fiscais.</p></div>
   <a href="{{ url_for('atualizar_page') }}">Voltar para Atualizar</a>
 </section>
 {% if success %}<div class="alert success">{{ success }}</div>{% endif %}
 {% if error %}<div class="alert error">{{ error }}</div>{% endif %}
 
 <section class="card certificate-card">
-  <h2>Cadastrar administrador</h2>
+  <h2>Cadastrar usuário</h2>
   <form action="{{ url_for('admin_accounts_update') }}" method="post">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <input type="hidden" name="action" value="create">
     <label class="field"><span>Usuário</span><input name="username" required minlength="3" maxlength="64" autocomplete="off"></label>
     <label class="field"><span>Senha inicial (mínimo 12 caracteres)</span><input type="password" name="password" required minlength="12" autocomplete="new-password"></label>
+    <label class="field"><span>Perfil</span><select name="role" required>
+      <option value="consulta" selected>Consulta — visualizar dados</option>
+      <option value="fiscal">Fiscal — consultar, baixar e exportar</option>
+      <option value="admin">Administrador — acesso completo</option>
+    </select></label>
     <button class="button danger" type="submit">Cadastrar</button>
   </form>
 </section>
 
 <section class="card certificate-card">
-  <h2>Administradores</h2>
+  <h2>Usuários</h2>
   {% for account in accounts %}
-  <div class="meta-row"><span>{{ account.username }}</span><strong>{{ 'Ativo' if account.active else 'Desativado' }}</strong></div>
+  <div class="meta-row"><span>{{ account.username }}</span><strong>{{ "Administrador" if account.role == "admin" else "Fiscal" if account.role == "fiscal" else "Consulta" }} · {{ 'Ativo' if account.active else 'Desativado' }}</strong></div>
   <div class="actions">
+    <form action="{{ url_for('admin_accounts_update') }}" method="post">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="username" value="{{ account.username }}">
+      <input type="hidden" name="action" value="role">
+      <label class="field"><span>Perfil</span><select name="role" required>
+        {% for value, label in [('consulta', 'Consulta'), ('fiscal', 'Fiscal'), ('admin', 'Administrador')] %}
+        <option value="{{ value }}" {% if account.role == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select></label>
+      <button class="button secondary" type="submit">Alterar perfil</button>
+    </form>
     <form action="{{ url_for('admin_accounts_update') }}" method="post">
       <input type="hidden" name="csrf" value="{{ csrf }}">
       <input type="hidden" name="username" value="{{ account.username }}">
@@ -40,7 +56,8 @@
     </form>
     {% endif %}
   </div>
-  {% else %}<p>Nenhum administrador cadastrado.</p>{% endfor %}
+  {% else %}<p>Nenhum usuário cadastrado.</p>{% endfor %}
+  <p class="muted">Alterar perfil, trocar senha ou desativar uma conta encerra suas sessões. O último administrador ativo não pode ser desativado nem perder esse perfil.</p>
   <p class="muted">Após cadastrar um administrador pessoal, desative a conta compartilhada inicial. Guarde uma cópia de segurança de dados/admin_accounts.db.</p>
 </section>
 {% endblock %}

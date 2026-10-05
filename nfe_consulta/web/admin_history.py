@@ -14,12 +14,18 @@ LABELS = {
     "sefaz_sync": "Sincronização SEFAZ",
     "admin_accounts": "Acesso administrativo",
     "email_recipients": "Destinatários dos alertas",
+    "xml_import": "Importação de XML",
+    "xml_download": "Download de XML",
+    "xml_export": "Exportação do leitor XML",
+    "excel_chaves": "Exportação por chaves",
+    "export_eventos_excel": "Exportação de manifestações",
 }
 OPERATIONS = {
     "create": "Conta cadastrada",
     "reset": "Senha alterada",
     "activate": "Conta ativada",
     "deactivate": "Conta desativada",
+    "role": "Perfil alterado",
 }
 
 

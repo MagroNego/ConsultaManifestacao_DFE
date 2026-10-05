@@ -1,17 +1,18 @@
-# Consulta de Manifestação NF-e v2.3.0
+# Consulta de Manifestação NF-e v2.4.0
 
-- Nova aba XMLs com o leitor de saída integrado: importe ZIPs mensais ou XMLs completos.
-- Arquivo cumulativo no banco fiscal, deduplicado pela chave, com XML original preservado.
-- Relatórios de notas, itens/impostos e PIS/COFINS retidos, busca, período da emissão e exportação Excel/CSV.
-- Baixar XML e Ver itens disponíveis na consulta de manifestações para arquivos importados.
-- Importação e registros de lote restritos ao administrador; operações locais, sem chamadas à SEFAZ.
-- Os XMLs seguem a criptografia SQLCipher do banco, quando habilitada.
-- Agendamento às 08:00 e 15:00 de Brasília, proteção do botão e cooldown de 60 minutos preservados.
+- Login obrigatório para consultas, Status, leitor XML, exportações e downloads, inclusive por URL direta.
+- Perfis Consulta (visualização), Fiscal (visualização, XML e exportações) e Administrador (acesso completo).
+- Gerenciamento de contas/perfis em Atualizar → Gerenciar acessos, com Consulta como padrão para novas contas.
+- Alterações de senha, perfil e estado da conta encerram suas sessões; último administrador ativo protegido.
+- Administradores e senhas existentes preservados na migração, sem recriar contas a partir de secrets. Sessões antigas são revogadas na primeira atualização.
+- Auditoria identifica usuários e perfis sem conteúdo fiscal dos XMLs ou senhas.
 
 ## Atualização
 
-Pare o app, faça backup do banco fiscal, substitua código e lançadores e execute INSTALAR.cmd. Preserve dados, secrets, banco, logs e certificado; reinicie com INICIAR_WEB.cmd.
+Pare o servidor. Faça backup do banco fiscal, dados/admin_accounts.db e secrets em local protegido. Substitua apenas código/lançadores, execute INSTALAR.cmd e reinicie com INICIAR_WEB.cmd. Preserve dados, secrets, banco, logs e certificado.
 
-Depois, entre como administrador e use XMLs → Importar lote mensal. As tabelas novas são criadas na primeira importação. Importe apenas XMLs completos de NF-e emitidas pelo CNPJ do aplicativo; eventos e resumos não contêm os itens da nota.
+Faça login novamente com o administrador existente. Cadastre as contas pessoais em Atualizar → Gerenciar acessos e escolha os perfis. Não substitua nem exclua o banco de contas existente.
+
+As permissões no app não configuram HTTPS, firewall ou proteção dos backups: mantenha o reverse proxy HTTPS e as permissões das pastas operacionais descritos em SERVIDOR_WEB.md.
 
 O pacote é publicado após os testes de Linux e Windows passarem.

@@ -10,7 +10,7 @@ from fastapi.responses import RedirectResponse, Response
 from starlette.concurrency import run_in_threadpool
 
 from nfe_consulta.config import CNPJ_PADRAO
-from nfe_consulta.web.auth import WebUser, current_user, require_admin, validate_csrf
+from nfe_consulta.web.auth import WebUser, current_user, require_admin, require_export, require_user, validate_csrf
 from nfe_consulta.web.consulta_local import normalizar_filtros
 from nfe_consulta.web import xml_store as store
 
@@ -20,7 +20,7 @@ def register_xml_routes(app, settings, render, database_path):
         return normalizar_filtros(data_inicial=inicio, data_final=fim)
 
     @app.get("/xml")
-    async def xml_page(request: Request, user: Annotated[WebUser, Depends(current_user)],
+    async def xml_page(request: Request, user: Annotated[WebUser, Depends(require_user)],
                        tipo: str = "notas", q: str = "", data_inicial: str = "",
                        data_final: str = "", pagina: int = 1, lote: int | None = None):
         error = None
@@ -93,7 +93,7 @@ def register_xml_routes(app, settings, render, database_path):
         return RedirectResponse(request.url_for("xml_page").include_query_params(lote=summary["id"]), status_code=303)
 
     @app.get("/xml/arquivo/{chave}")
-    async def xml_download(request: Request, chave: str, user: Annotated[WebUser, Depends(current_user)]):
+    async def xml_download(request: Request, chave: str, user: Annotated[WebUser, Depends(require_export)]):
         if len(chave) != 44 or not chave.isdigit():
             raise HTTPException(400, "Chave de acesso inválida.")
         try:
@@ -108,7 +108,7 @@ def register_xml_routes(app, settings, render, database_path):
             "Content-Disposition": f'attachment; filename="{chave}.xml"', "Cache-Control": "no-store"})
 
     @app.get("/xml/exportar")
-    async def xml_export(request: Request, user: Annotated[WebUser, Depends(current_user)],
+    async def xml_export(request: Request, user: Annotated[WebUser, Depends(require_export)],
                          formato: str = "xlsx", tipo: str = "itens", q: str = "",
                          data_inicial: str = "", data_final: str = "", lote: int | None = None):
         if formato not in ("xlsx", "csv") or tipo not in ("notas", "itens", "retencoes"):

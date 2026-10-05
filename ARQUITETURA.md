@@ -1,4 +1,4 @@
-# Arquitetura — v2.3.0
+# Arquitetura — v2.4.0
 
 ## Componentes
 
@@ -19,11 +19,17 @@
 
 O banco fiscal guarda manifestações, informações do emitente, cursor, cooldown e fila de e-mails. As tabelas `xml_documentos`, `xml_relatorio` e `xml_importacoes` guardam XML original, SHA-256, metadados, itens/retenções e registros dos lotes no mesmo banco fiscal, inclusive SQLCipher. São criadas na primeira importação. O envio usa a trava compartilhada com a sincronização, sem alterar o estado de distribuição. Cada lote é transacional; falhas estruturais de ZIP ou limites desfazem suas novas notas.
 
-Contas e sessões administrativas ficam em `dados/admin_accounts.db`, separado do banco fiscal. As sessões armazenam o hash do token e possuem limite de inatividade e duração absoluta.
+Contas individuais, perfis e sessões ficam em `dados/admin_accounts.db`, separado do banco fiscal. As sessões armazenam o hash do token e possuem limite de inatividade e duração absoluta.
 
 O agendamento recorrente usa `controle_agendamento_intervalo`: registra a última janela concluída por CNPJ em formato ISO com fuso. O controle anterior de execução diária é preservado para compatibilidade. Um reinício recupera somente a janela mais recente, evitando uma sequência de chamadas para todas as janelas perdidas.
 
 A distribuição grava documentos e cursor em transação. Uma rejeição 656 preserva o cursor local e registra a pausa e os dados operacionais do retorno. Distribuições parciais permanecem elegíveis para retomada após o cooldown.
+
+## Autorização
+
+O middleware exige autenticação por padrão em todas as rotas, com exceções explícitas para login, static e healthz. Consultas são liberadas a contas ativas; exportações e download de XML exigem Fiscal/Administrador, incluindo checagens nas dependências de rota. Operações administrativas mantêm require_admin. Usuário e perfil vêm da sessão persistida, nunca de cabeçalhos do cliente. A migração de contas acrescenta role preservando hashes e administradores antigos e revoga as sessões anteriores.
+
+A alteração de perfil ou estado usa transação IMMEDIATE para preservar o último administrador ativo e revoga sessões. Senhas são hashes PBKDF2; tokens de sessão são armazenados como SHA-256. CSRF é vinculado à sessão de todos os perfis.
 
 ## Limites operacionais
 

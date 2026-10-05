@@ -60,6 +60,12 @@ def criar_banco(caminho):
     banco.fechar()
 
 
+def entrar_admin(client, cfg):
+    response = client.post("/admin/login", data={"csrf": csrf_token(PUBLIC_USER,cfg), "username":cfg.admin_username, "password":cfg.admin_password}, follow_redirects=False)
+    assert response.status_code == 303
+    return csrf_token(WebUser(cfg.admin_username,cfg.admin_username,True,client.cookies[cfg.admin_cookie_name]),cfg)
+
+
 def test_logout_revoga_cookie_antigo_e_reativacao_nao_o_recupera(tmp_path):
     cfg = settings_web(tmp_path)
     app = create_app(cfg)
@@ -77,7 +83,7 @@ def test_logout_revoga_cookie_antigo_e_reativacao_nao_o_recupera(tmp_path):
             "csrf": csrf_token(PUBLIC_USER, cfg), "username": "admin", "password": cfg.admin_password,
         })
         antigo = admin.cookies[cfg.admin_cookie_name]
-        app.state.admin_accounts.create("ana", "Senha-da-Ana-123!")
+        app.state.admin_accounts.create("ana", "Senha-da-Ana-123!", "admin")
         app.state.admin_accounts.set_active("admin", False)
         app.state.admin_accounts.set_active("admin", True)
         outro.cookies.set(cfg.admin_cookie_name, antigo)
@@ -140,14 +146,14 @@ def test_contas_admin_pessoais_e_revogacao_de_sessoes(tmp_path):
 
     with TestClient(app) as shared:
         assert shared.get("/admin/contas").status_code == 401
-        assert shared.get("/consulta").status_code == 200
-        assert shared.get("/status").status_code == 200
+        assert shared.get("/consulta", follow_redirects=False).status_code == 303
+        assert shared.get("/status", follow_redirects=False).status_code == 303
         shared.post("/admin/login", data={
             "csrf": csrf_token(PUBLIC_USER, cfg), "username": "admin", "password": cfg.admin_password,
         })
         admin_csrf = csrf_token(WebUser("admin", "Administrador", True, shared.cookies[cfg.admin_cookie_name]), cfg)
         create = shared.post("/admin/contas", data={
-            "csrf": admin_csrf, "action": "create", "username": "ana@empresa.com", "password": "Senha-da-Ana-123!",
+            "csrf": admin_csrf, "action": "create", "username": "ana@empresa.com", "password": "Senha-da-Ana-123!", "role":"admin",
         }, follow_redirects=False)
         assert create.status_code == 303
         assert "ana@empresa.com" in shared.get("/admin/contas").text
@@ -202,7 +208,7 @@ def test_admin_cadastra_alertas_sem_liberar_configuracao_ao_usuario(tmp_path):
             data={"csrf": csrf_token(PUBLIC_USER, cfg), "recipients": "a@empresa.com.br"},
             follow_redirects=False,
         )
-        assert publico.status_code == 303
+        assert publico.status_code == 401
         assert not cfg.email_recipients_file.exists()
 
         client.post("/admin/login", data={
@@ -225,25 +231,18 @@ def test_admin_cadastra_alertas_sem_liberar_configuracao_ao_usuario(tmp_path):
         assert "a@empresa.com.br" in client.get("/atualizar").text
 
 
-def test_usuario_comum_acessa_excel_status_e_login_do_atualizar(tmp_path):
+def test_usuario_anonimo_recebe_login_sem_dados_fiscais(tmp_path):
     cfg = settings_web(tmp_path)
     app = create_app(cfg)
-
     with TestClient(app) as client:
         home = client.get("/")
         assert home.status_code == 200
-        assert ">Consulta<" in home.text
-        assert ">Status<" in home.text
-        assert ">Atualizar<" in home.text
-        assert client.get("/status").status_code == 200
-
-        login = client.get("/admin/login")
-        assert login.status_code == 200
-        assert "Acessar Atualizar" in login.text
-
-        atualizar = client.get("/atualizar", follow_redirects=False)
-        assert atualizar.status_code == 303
-        assert atualizar.headers["location"].endswith("/admin/login")
+        assert "Entrar no aplicativo" in home.text
+        assert ">Consulta<" not in home.text
+        for path in ["/consulta","/status","/atualizar","/xml"]:
+            response=client.get(path,follow_redirects=False)
+            assert response.status_code == 303
+            assert response.headers["location"].endswith("/admin/login")
 
 
 def test_login_admin_libera_atualizar_e_logout_bloqueia_novamente(tmp_path):
@@ -312,6 +311,7 @@ def test_excel_web_gera_xlsx_com_banco_local(tmp_path):
     token = csrf_token(PUBLIC_USER, cfg)
 
     with TestClient(app) as client:
+        token = entrar_admin(client, cfg)
         resposta = client.post(
             "/excel",
             data={"csrf": token},
@@ -336,6 +336,7 @@ def test_excel_web_bloqueia_csrf_invalido(tmp_path):
     app = create_app(cfg)
 
     with TestClient(app) as client:
+        token = entrar_admin(client, cfg)
         resposta = client.post(
             "/excel",
             data={"csrf": "invalido"},
@@ -473,8 +474,7 @@ def test_usuario_sem_login_nao_sincroniza_mesmo_enviando_confirmacao(tmp_path, m
         resposta = client.post("/atualizar/sincronizar", data={
             "csrf": csrf_token(PUBLIC_USER, cfg), "confirmacao": "sincronizar",
         }, follow_redirects=False)
-    assert resposta.status_code == 303
-    assert resposta.headers["location"].endswith("/admin/login")
+    assert resposta.status_code == 401
 
 
 def test_status_mostra_ultima_gravacao_sem_chamar_sefaz(tmp_path):
@@ -483,6 +483,7 @@ def test_status_mostra_ultima_gravacao_sem_chamar_sefaz(tmp_path):
     app = create_app(cfg)
 
     with TestClient(app) as client:
+        token = entrar_admin(client, cfg)
         resposta = client.get("/status")
 
     assert resposta.status_code == 200
@@ -512,6 +513,7 @@ def test_tela_consulta_tem_filtros_e_fluxo_por_txt(tmp_path):
     app = create_app(cfg)
 
     with TestClient(app) as client:
+        token = entrar_admin(client, cfg)
         resposta = client.get("/")
 
     assert resposta.status_code == 200
@@ -556,6 +558,7 @@ def test_consulta_rapida_por_numero_mostra_eventos_do_banco(tmp_path, monkeypatc
 
     app = create_app(cfg)
     with TestClient(app) as client:
+        token = entrar_admin(client, cfg)
         resposta = client.get("/consulta", params={"numero": "91779"})
 
     assert resposta.status_code == 200
@@ -571,6 +574,7 @@ def test_consulta_rapida_nao_aceita_expressao_sql(tmp_path):
     app = create_app(cfg)
 
     with TestClient(app) as client:
+        token = entrar_admin(client, cfg)
         resposta = client.get("/consulta", params={"numero": "91779 OR 1=1"})
 
     assert resposta.status_code == 200
@@ -584,6 +588,7 @@ def test_cabecalho_usa_logos_yorozu_por_tema(tmp_path):
     app = create_app(cfg)
 
     with TestClient(app) as client:
+        token = entrar_admin(client, cfg)
         resposta = client.get("/")
         logo_clara = client.get("/static/img/yorozu-light.png")
         logo_escura = client.get("/static/img/yorozu-dark.png")
@@ -846,6 +851,7 @@ def test_consulta_completa_filtra_por_data_e_manifestacao(tmp_path):
 
     app = create_app(cfg)
     with TestClient(app) as client:
+        token = entrar_admin(client, cfg)
         resposta = client.get(
             "/consulta",
             params={
@@ -910,6 +916,7 @@ def test_exportacao_da_consulta_respeita_os_mesmos_filtros(tmp_path):
 
     app = create_app(cfg)
     with TestClient(app) as client:
+        token = entrar_admin(client, cfg)
         resposta = client.get(
             "/consulta/exportar",
             params={
@@ -965,6 +972,7 @@ def test_consulta_identifica_banco_sem_sincronizacao(tmp_path):
     app = create_app(cfg)
 
     with TestClient(app) as client:
+        token = entrar_admin(client, cfg)
         resposta = client.get("/consulta", params={"numero": "91779"})
 
     assert resposta.status_code == 200
@@ -985,6 +993,7 @@ def test_consulta_publica_nao_expoe_erro_de_senha_do_banco(tmp_path, monkeypatch
 
     app = create_app(cfg)
     with TestClient(app) as client:
+        token = entrar_admin(client, cfg)
         resposta = client.get("/consulta", params={"numero": "91779"})
 
     assert resposta.status_code == 200

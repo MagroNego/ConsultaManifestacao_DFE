@@ -1,12 +1,12 @@
 {% extends "base.html" %}
-{% block title %}Login administrador · Consulta de Manifestação{% endblock %}
+{% block title %}Entrar · Consulta de Manifestação{% endblock %}
 {% block content %}
 <section class="login-shell">
   <div class="card login-card">
     <div class="login-heading">
-      <span class="admin-badge">Administrador</span>
-      <h1>Acessar Atualizar</h1>
-      <p>Use o login administrativo para sincronizar o banco com a SEFAZ.</p>
+      <span class="admin-badge">Acesso individual</span>
+      <h1>Entrar no aplicativo</h1>
+      <p>Use sua conta para consultar os dados fiscais. Solicite seu acesso ao administrador.</p>
     </div>
 
     {% if error %}
@@ -52,7 +52,7 @@
     </form>
 
     <p class="login-note">
-      A sessão administrativa expira após {{ request.app.state.settings.admin_session_minutes }} minutos de inatividade.
+      A sessão expira após {{ request.app.state.settings.admin_session_minutes }} minutos de inatividade.
     </p>
   </div>
 </section>

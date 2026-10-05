@@ -53,6 +53,8 @@ from nfe_consulta.web.auth import (
     csrf_token,
     current_user,
     require_admin,
+    require_user,
+    require_export,
     set_admin_cookie,
     validate_csrf,
 )
@@ -290,6 +292,18 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
     @app.middleware("http")
     async def security_headers(request: Request, call_next):
         path = request.url.path
+        if path not in {"/admin/login", "/healthz"} and not path.startswith("/static/"):
+            user = current_user(request)
+            if not user.authenticated:
+                if request.method == "GET" and path in {"/", "/consulta", "/status", "/xml", "/atualizar"}:
+                    return RedirectResponse(request.url_for("admin_login_page"), status_code=303,
+                        headers={"Cache-Control": "no-store"})
+                return JSONResponse({"detail": "Faça login para acessar o aplicativo."}, status_code=401,
+                    headers={"Cache-Control": "no-store"})
+            if (path in {"/excel", "/consulta/exportar", "/xml/exportar"} or path.startswith("/xml/arquivo/")) and not user.can_export:
+                app.state.audit.write(request, user, "access_denied", "erro", operation="export_download")
+                return JSONResponse({"detail": "Esta ação exige perfil Fiscal ou Administrador."}, status_code=403,
+                    headers={"Cache-Control": "no-store"})
         if path == "/xml/importar" and request.method == "POST" and not current_user(request).is_admin:
             return JSONResponse({"detail": "A importação de XMLs exige login administrativo."}, status_code=403)
         if path in {"/excel", "/admin/login", "/xml/importar"} and request.method == "POST":
@@ -377,7 +391,6 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         return {
             "status": "ok",
             "version": __version__,
-            "database": _database_path(settings).is_file(),
         }
 
     @app.get("/admin/login", response_class=HTMLResponse)
@@ -385,9 +398,9 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         request: Request,
         user: Annotated[WebUser, Depends(current_user)],
     ):
-        if user.is_admin:
+        if user.authenticated:
             return RedirectResponse(
-                url=request.url_for("atualizar_page"),
+                url=request.url_for("atualizar_page" if user.is_admin else "consulta_page"),
                 status_code=303,
             )
 
@@ -466,7 +479,8 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         admin_user = WebUser(
             username=logged_username,
             display_name=logged_username,
-            is_admin=True,
+            is_admin=app.state.admin_accounts.role(logged_username) == "admin",
+            role=app.state.admin_accounts.role(logged_username) or "consulta",
         )
         app.state.audit.write(
             request,
@@ -476,7 +490,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         )
 
         response = RedirectResponse(
-            url=request.url_for("atualizar_page"),
+            url=request.url_for("atualizar_page" if admin_user.is_admin else "consulta_page"),
             status_code=303,
         )
         set_admin_cookie(response, settings, app.state.admin_accounts.new_session(logged_username))
@@ -485,7 +499,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
     @app.post("/admin/logout")
     async def admin_logout(
         request: Request,
-        user: Annotated[WebUser, Depends(require_admin)],
+        user: Annotated[WebUser, Depends(require_user)],
         csrf: str = Form(...),
     ):
         validate_csrf(csrf, user, settings)
@@ -534,25 +548,28 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         action: str = Form(...),
         username: str = Form(...),
         password: str = Form(""),
+        role: str = Form("consulta"),
     ):
         validate_csrf(csrf, user, settings)
         accounts = app.state.admin_accounts
         try:
             if action == "create":
-                await run_in_threadpool(accounts.create, username, password)
+                await run_in_threadpool(accounts.create, username, password, role)
             elif action == "reset":
                 await run_in_threadpool(accounts.reset_password, username, password)
             elif action in {"activate", "deactivate"}:
                 await run_in_threadpool(accounts.set_active, username, action == "activate")
+            elif action == "role":
+                await run_in_threadpool(accounts.set_role, username, role)
             else:
                 raise ValueError("Ação inválida.")
         except ValueError as exc:
             app.state.audit.write(request, user, "admin_accounts", "erro", target=username, operation=action)
             return _render(request, "admin_accounts.html", user, status_code=400,
                            accounts=accounts.list_accounts(), error=str(exc))
-        app.state.audit.write(request, user, "admin_accounts", "ok", target=username, operation=action)
+        app.state.audit.write(request, user, "admin_accounts", "ok", target=username, operation=action, target_role=role if action in {"create", "role"} else None)
         response = RedirectResponse(url=request.url_for("admin_accounts_page").include_query_params(ok="1"), status_code=303)
-        if action == "deactivate" and username.casefold() == user.username.casefold():
+        if action in {"deactivate", "role", "reset"} and username.casefold() == user.username.casefold():
             clear_admin_cookie(response, settings)
             response.headers["location"] = str(request.url_for("admin_login_page"))
         return response
@@ -663,7 +680,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
     @app.get("/consulta/exportar")
     async def exportar_consulta_eventos(
         request: Request,
-        user: Annotated[WebUser, Depends(current_user)],
+        user: Annotated[WebUser, Depends(require_export)],
         data_inicial: str = "",
         data_final: str = "",
         numero: str = "",
@@ -775,7 +792,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
     @app.post("/excel")
     async def exportar_excel_chaves(
         request: Request,
-        user: Annotated[WebUser, Depends(current_user)],
+        user: Annotated[WebUser, Depends(require_export)],
         csrf: str = Form(...),
         files: UploadFile = File(...),
     ):

@@ -121,7 +121,7 @@
       {% endif %}
     </div>
 
-    {% if resultado.total %}
+    {% if resultado.total and user.can_export %}
     <form action="{{ url_for('exportar_consulta_eventos') }}" method="get">
       <input type="hidden" name="data_inicial" value="{{ filtros.data_inicial_texto }}">
       <input type="hidden" name="data_final" value="{{ filtros.data_final_texto }}">
@@ -165,7 +165,7 @@
           <td class="mono access-key">{{ evento.chave }}</td>
           <td class="mono">{{ evento.nsu }}</td>
           <td>{{ evento.recebido_label }}</td>
-          <td>{% if evento.chave in xml_keys|default([]) %}<a class="button secondary" href="{{ url_for('xml_download', chave=evento.chave) }}">Baixar XML</a><a href="{{ url_for('xml_page').include_query_params(tipo='itens', q=evento.chave) }}">Ver itens</a>{% else %}<span class="muted">Não importado</span>{% endif %}</td>
+          <td>{% if evento.chave in xml_keys|default([]) %}{% if user.can_export %}<a class="button secondary" href="{{ url_for('xml_download', chave=evento.chave) }}">Baixar XML</a>{% endif %}<a href="{{ url_for('xml_page').include_query_params(tipo='itens', q=evento.chave) }}">Ver itens</a>{% else %}<span class="muted">Não importado</span>{% endif %}</td>
         </tr>
         {% endfor %}
       </tbody>
@@ -197,6 +197,7 @@
 </section>
 {% endif %}
 
+{% if user.can_export %}
 <section class="card file-query-card">
   <div class="card-title">
     <div>
@@ -224,4 +225,5 @@
     </div>
   </form>
 </section>
+{% endif %}
 {% endblock %}

@@ -121,8 +121,8 @@ def test_web_lote_manifestacao_download_export_e_permissoes(tmp_path, monkeypatc
     monkeypatch.setattr('nfe_consulta.web.app.sincronizar_configurado', proibido)
     app = create_app(cfg)
     with TestClient(app) as client:
-        assert client.get('/xml').status_code == 200
-        assert client.post('/xml/importar', data={'csrf': csrf_token(PUBLIC_USER,cfg)}, files={'files':('a.xml',xml())}).status_code == 403
+        assert client.get('/xml',follow_redirects=False).status_code == 303
+        assert client.post('/xml/importar', data={'csrf': csrf_token(PUBLIC_USER,cfg)}, files={'files':('a.xml',xml())}).status_code == 401
         token = login(client, cfg)
         assert client.post('/xml/importar', data={'csrf':'errado'}, files={'files':('a.xml',xml())}).status_code == 403
         response = client.post('/xml/importar', data={'csrf':token}, files={'files':('mensal.zip',zip_bytes([('a.xml',xml())]),'application/zip')})
@@ -141,10 +141,11 @@ def test_web_lote_manifestacao_download_export_e_permissoes(tmp_path, monkeypatc
         assert 'Baixar XML' in consulta.text and '/xml/arquivo/'+CHAVE in consulta.text
         assert client.get('/xml?tipo=itens&q=produto').status_code == 200
     with TestClient(create_app(cfg)) as client:
+        assert client.get('/xml/arquivo/'+CHAVE).status_code == 401
+        login(client,cfg)
         assert '1 nota arquivada' in client.get('/xml').text
-        assert 'Importar e arquivar' not in client.get('/xml').text
         assert client.get('/xml/arquivo/'+CHAVE).content == xml()
-        assert client.get('/xml/lote/1/registro').status_code in (401,403)
+        assert client.get('/xml/lote/1/registro').status_code == 200
 
 
 def test_limites_zip_e_xml(tmp_path, monkeypatch):

@@ -1,4 +1,4 @@
-"""Autenticação simples da área administrativa."""
+"""Sessões individuais e autorização dos dados fiscais."""
 
 from __future__ import annotations
 
@@ -18,6 +18,15 @@ class WebUser:
     display_name: str
     is_admin: bool
     session_token: str = ""
+    role: str = "consulta"
+
+    @property
+    def authenticated(self) -> bool:
+        return bool(self.session_token)
+
+    @property
+    def can_export(self) -> bool:
+        return self.authenticated and (self.is_admin or self.role == "fiscal")
 
 
 PUBLIC_USER = WebUser(
@@ -40,15 +49,19 @@ def admin_session_active(request: Request) -> bool:
 def current_user(request: Request) -> WebUser:
     settings: WebSettings = request.app.state.settings
 
-    username = _session_username(
+    identity = request.app.state.admin_accounts.session_identity(
         request.cookies.get(settings.admin_cookie_name, ""),
-        settings, request.app.state.admin_accounts,
+        settings.admin_session_minutes * 60,
     )
-    if username:
+    if identity:
+        username, role = identity
+        if role not in {"consulta", "fiscal", "admin"}:
+            return PUBLIC_USER
         return WebUser(
             username=username,
             display_name=username,
-            is_admin=True,
+            is_admin=role == "admin",
+            role=role,
             session_token=request.cookies.get(settings.admin_cookie_name, ""),
         )
 
@@ -56,12 +69,26 @@ def current_user(request: Request) -> WebUser:
 
 
 def require_admin(request: Request) -> WebUser:
-    user = current_user(request)
+    user = require_user(request)
     if not user.is_admin:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Faça login para acessar a área Atualizar.",
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Esta ação exige perfil Administrador.",
         )
+    return user
+
+
+def require_user(request: Request) -> WebUser:
+    user = current_user(request)
+    if not user.authenticated:
+        raise HTTPException(401, "Faça login para acessar o aplicativo.")
+    return user
+
+
+def require_export(request: Request) -> WebUser:
+    user = require_user(request)
+    if not user.can_export:
+        raise HTTPException(403, "Baixar arquivos e exportar exige perfil Fiscal ou Administrador.")
     return user
 
 
@@ -90,7 +117,7 @@ def clear_admin_cookie(response: Response, settings: WebSettings) -> None:
 def csrf_token(user: WebUser, settings: WebSettings) -> str:
     # A área pública usa um token de origem; a área administrativa vincula
     # cada formulário à sessão concreta, revogada no logout.
-    identidade = user.session_token if user.is_admin else "publico"
+    identidade = user.session_token if user.authenticated else "publico"
     mensagem = f"{user.username.casefold()}|{identidade}|nfe-web-v3".encode("utf-8")
     return hmac.new(
         settings.csrf_secret.encode("utf-8"),

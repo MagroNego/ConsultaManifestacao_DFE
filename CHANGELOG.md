@@ -1,5 +1,15 @@
 # Histórico de versões
 
+## 2.4.0 — 2026-10-05
+
+- Login individual obrigatório para consultar qualquer dado fiscal, inclusive por links diretos.
+- Perfis Consulta, Fiscal e Administrador; cadastro padrão com privilégio mínimo.
+- Download de XML e exportações restritos a Fiscal/Administrador; importação, configuração e sincronização permanecem administrativas.
+- Gestão de perfis e revogação de sessões ao alterar perfil, senha ou estado da conta.
+- Migração preserva administradores e senhas existentes e encerra sessões anteriores.
+- Proteção transacional do último administrador ativo; CSRF vinculado à sessão de todos os perfis.
+- Auditoria de acessos com usuário e perfil; healthcheck sem dados sobre o banco.
+
 ## 2.3.0 — 2026-10-05
 
 - Leitor XML de saída integrado com importação administrativa de XMLs ou ZIPs mensais.

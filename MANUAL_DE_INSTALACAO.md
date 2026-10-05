@@ -1,4 +1,4 @@
-# Manual de instalação — v2.2.0
+# Manual de instalação — v2.4.0
 
 ## Requisitos
 
@@ -10,7 +10,7 @@
 
 ## Windows
 
-Extraia `ConsultaManifestacao_DFE-v2.2.0.zip`, por exemplo em `C:\ConsultaManifestacao`.
+Extraia `ConsultaManifestacao_DFE-v2.4.0.zip`, por exemplo em `C:\ConsultaManifestacao`.
 
 ```powershell
 .\INSTALAR.cmd
@@ -20,7 +20,7 @@ Extraia `ConsultaManifestacao_DFE-v2.2.0.zip`, por exemplo em `C:\ConsultaManife
 
 O instalador cria `.venv`, instala as dependências e prepara as pastas operacionais. O configurador cria as credenciais da primeira conta. O lançador inicia em modo produção, cria o segredo Web persistente quando necessário e habilita a rotina das 08:00 e 15:00.
 
-Abra http://127.0.0.1:8080. Em **Atualizar**, autentique-se, selecione o banco e configure o certificado. Para SQLCipher, coloque a senha em `secrets\db-password.txt`. Usuários comuns não informam essa senha na consulta.
+Abra http://127.0.0.1:8080 e entre com sua conta. Em **Atualizar**, selecione o banco e configure o certificado. Para SQLCipher, coloque a senha em `secrets\db-password.txt`. Usuários comuns não informam essa senha na consulta.
 
 ## Linux
 
@@ -62,7 +62,7 @@ Configure o certificado por arquivo PFX/P12 em **Atualizar**. O Windows Certific
 4. Preserve `dados`, `secrets`, `logs`, arquivos de entrada/saída e o certificado. Preserve também `.venv`; as dependências serão atualizadas pelo instalador.
 5. Remova o antigo `TESTAR_SYNC_30-09_09H.cmd` e qualquer variável `NFE_AUTO_SYNC_ONCE_DATE` do processo de inicialização.
 6. Execute `INSTALAR.cmd` no Windows ou `.venv/bin/python -m pip install -e .` no Linux.
-7. Reinicie, confirme a versão **2.2.0** e compare `ultNSU`, `maxNSU` e última gravação em **Status** com os dados anteriores.
+7. Reinicie, confirme a versão **2.4.0** e compare `ultNSU`, `maxNSU` e última gravação em **Status** com os dados anteriores.
 
 As tabelas adicionais são criadas pelo aplicativo sem apagar o histórico existente. Não avance nem zere o cursor NSU manualmente durante a atualização.
 
@@ -78,3 +78,7 @@ $env:NFE_AUTO_SYNC_ENABLED = "0"
 No Linux, a ativação é definida no ambiente do serviço conforme o comando acima. `WEB_CONFIG.example` é uma referência; não é carregado automaticamente.
 
 Execute uma única instância. O processo precisa permanecer ativo; feche-o de forma controlada antes de substituir código ou restaurar backups. Consulte [SERVIDOR_WEB.md](SERVIDOR_WEB.md) para HTTPS e execução como serviço.
+
+## Atualização para contas e perfis
+
+A v2.4.0 exige login para todo acesso fiscal. Preserve dados/admin_accounts.db: a migração mantém contas, senhas e administradores, adiciona perfis e encerra sessões antigas. Cadastre os usuários em Atualizar → Gerenciar acessos após entrar novamente. Novas contas usam Consulta por padrão; escolha Fiscal para liberar downloads/exportações e Administrador para gestão.

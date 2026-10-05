@@ -1,4 +1,4 @@
-"""Contas locais para a área Atualizar, separadas do banco fiscal."""
+"""Contas individuais e perfis, separados do banco fiscal."""
 
 from __future__ import annotations
 
@@ -15,6 +15,7 @@ from pathlib import Path
 
 ITERATIONS = 600_000
 USERNAME = re.compile(r"[A-Za-z0-9._@-]{3,64}\Z")
+ROLES = {"consulta", "fiscal", "admin"}
 
 
 def _hash_password(password: str) -> str:
@@ -54,11 +55,15 @@ class AdminAccounts:
                 expires_at INTEGER NOT NULL
             )""")
             db.execute("CREATE INDEX IF NOT EXISTS idx_admin_sessions_user ON admin_sessions(username)")
+            if "role" not in {row[1] for row in db.execute("PRAGMA table_info(admins)")}:
+                db.execute("ALTER TABLE admins ADD COLUMN role TEXT NOT NULL DEFAULT 'admin' CHECK(role IN ('consulta','fiscal','admin'))")
+                # Requer novo login após atualizar a política de acesso.
+                db.execute("DELETE FROM admin_sessions")
             if bootstrap_password and db.execute("SELECT 1 FROM admins LIMIT 1").fetchone() is None:
                 # O configurador anterior aceitava nomes que o cadastro novo restringe.
                 if len(bootstrap_password) < 12 or len(bootstrap_password) > 1024:
                     raise ValueError("A senha deve ter entre 12 e 1024 caracteres.")
-                db.execute("INSERT INTO admins VALUES (?, ?, 1)",
+                db.execute("INSERT INTO admins(username,password_hash,active) VALUES (?, ?, 1)",
                            (bootstrap_username.strip(), _hash_password(bootstrap_password)))
         if os.name != "nt":
             path.chmod(0o600)
@@ -75,12 +80,17 @@ class AdminAccounts:
 
     def configured(self) -> bool:
         with closing(self._connect()) as db, db:
-            return db.execute("SELECT 1 FROM admins WHERE active=1 LIMIT 1").fetchone() is not None
+            return db.execute("SELECT 1 FROM admins WHERE active=1 AND role='admin' LIMIT 1").fetchone() is not None
 
     def list_accounts(self) -> list[dict]:
         with closing(self._connect()) as db, db:
-            rows = db.execute("SELECT username, active FROM admins ORDER BY username COLLATE NOCASE").fetchall()
-        return [{"username": name, "active": bool(active)} for name, active in rows]
+            rows = db.execute("SELECT username, active, role FROM admins ORDER BY username COLLATE NOCASE").fetchall()
+        return [{"username": name, "active": bool(active), "role": role} for name, active, role in rows]
+
+    def role(self, username: str) -> str | None:
+        with closing(self._connect()) as db:
+            row = db.execute("SELECT role FROM admins WHERE username=? AND active=1", (username,)).fetchone()
+            return row[0] if row else None
 
     def account(self, username: str) -> tuple[str, str] | None:
         with closing(self._connect()) as db, db:
@@ -95,12 +105,14 @@ class AdminAccounts:
             return row[0]
         return None
 
-    def create(self, username: str, password: str) -> None:
+    def create(self, username: str, password: str, role: str = "consulta") -> None:
         username = username.strip()
         self._validate(username, password)
+        if role not in ROLES:
+            raise ValueError("Perfil inválido.")
         with closing(self._connect()) as db, db:
             try:
-                db.execute("INSERT INTO admins VALUES (?, ?, 1)", (username, _hash_password(password)))
+                db.execute("INSERT INTO admins(username,password_hash,active,role) VALUES (?, ?, 1, ?)", (username, _hash_password(password), role))
             except sqlite3.IntegrityError as exc:
                 raise ValueError("Este usuário já existe.") from exc
 
@@ -117,12 +129,25 @@ class AdminAccounts:
     def set_active(self, username: str, active: bool) -> None:
         with closing(self._connect()) as db, db:
             db.execute("BEGIN IMMEDIATE")
-            row = db.execute("SELECT active FROM admins WHERE username=?", (username,)).fetchone()
+            row = db.execute("SELECT active,role FROM admins WHERE username=?", (username,)).fetchone()
             if row is None:
                 raise ValueError("Usuário não encontrado.")
-            if not active and row[0] and db.execute("SELECT count(*) FROM admins WHERE active=1").fetchone()[0] <= 1:
+            if not active and row[0] and row[1] == "admin" and db.execute("SELECT count(*) FROM admins WHERE active=1 AND role='admin'").fetchone()[0] <= 1:
                 raise ValueError("Mantenha pelo menos um administrador ativo.")
             db.execute("UPDATE admins SET active=? WHERE username=?", (int(active), username))
+            db.execute("DELETE FROM admin_sessions WHERE username=? COLLATE NOCASE", (username,))
+
+    def set_role(self, username: str, role: str) -> None:
+        if role not in ROLES:
+            raise ValueError("Perfil inválido.")
+        with closing(self._connect()) as db, db:
+            db.execute("BEGIN IMMEDIATE")
+            row = db.execute("SELECT active,role FROM admins WHERE username=?", (username,)).fetchone()
+            if row is None:
+                raise ValueError("Usuário não encontrado.")
+            if row[0] and row[1] == "admin" and role != "admin" and db.execute("SELECT count(*) FROM admins WHERE active=1 AND role='admin'").fetchone()[0] <= 1:
+                raise ValueError("Mantenha pelo menos um administrador ativo.")
+            db.execute("UPDATE admins SET role=? WHERE username=?", (role, username))
             db.execute("DELETE FROM admin_sessions WHERE username=? COLLATE NOCASE", (username,))
 
     def new_session(self, username: str) -> str:
@@ -137,25 +162,29 @@ class AdminAccounts:
         return token
 
     def session_username(self, token: str, idle_seconds: int) -> str | None:
+        identity = self.session_identity(token, idle_seconds)
+        return identity[0] if identity else None
+
+    def session_identity(self, token: str, idle_seconds: int) -> tuple[str, str] | None:
         if not token or len(token) > 128:
             return None
         now = int(time.time())
         digest = hashlib.sha256(token.encode()).hexdigest()
         with closing(self._connect()) as db, db:
             row = db.execute(
-                """SELECT a.username, s.last_seen, s.expires_at
+                """SELECT a.username, a.role, s.last_seen, s.expires_at
                    FROM admin_sessions s JOIN admins a ON a.username=s.username
                    WHERE s.token_hash=? AND a.active=1""",
                 (digest,),
             ).fetchone()
             if row is None:
                 return None
-            if row[2] <= now or row[1] + idle_seconds <= now:
+            if row[3] <= now or row[2] + idle_seconds <= now:
                 db.execute("DELETE FROM admin_sessions WHERE token_hash=?", (digest,))
                 return None
-            if now - row[1] >= 30:
+            if now - row[2] >= 30:
                 db.execute("UPDATE admin_sessions SET last_seen=? WHERE token_hash=?", (now, digest))
-            return row[0]
+            return row[0], row[1]
 
     def revoke_session(self, token: str) -> None:
         if not token:

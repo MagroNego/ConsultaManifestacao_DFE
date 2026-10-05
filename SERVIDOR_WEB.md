@@ -1,4 +1,4 @@
-# Implantação Web — v2.2.0
+# Implantação Web — v2.4.0
 
 ## Processo e rede
 
@@ -14,19 +14,25 @@ NFE_WEB_FORWARDED_ALLOW_IPS=127.0.0.1
 NFE_ADMIN_SESSION_MINUTES=30
 ```
 
-Se o proxy estiver em outra máquina, informe somente os endereços confiáveis em `NFE_WEB_FORWARDED_ALLOW_IPS`. O endpoint `GET /healthz` retorna estado básico, versão e disponibilidade do arquivo do banco.
+Se o proxy estiver em outra máquina, informe somente os endereços confiáveis em `NFE_WEB_FORWARDED_ALLOW_IPS`. O endpoint `GET /healthz` retorna somente estado básico e versão, sem indicar a disponibilidade do banco.
+
+## Controle de acesso
+
+Toda rota exige sessão válida, exceto login, recursos estáticos e healthcheck sem dados fiscais. A validação ocorre no servidor antes de processar corpos de upload anônimos. Dados fiscais são acessíveis a Consulta/Fiscal/Administrador; exportações e download de XML exigem Fiscal/Administrador; configuração, sincronização e importação exigem Administrador. Cabeçalhos de identidade e campos enviados pelo cliente não conferem permissões. Não existem contas públicas ou cadastro automático.
+
+Na primeira execução da v2.4.0, a coluna de perfil é adicionada ao banco de contas: administradores existentes são preservados com suas senhas e sessões anteriores são revogadas. Mantenha backup desse banco, sem substituir o arquivo por uma cópia vazia. A autenticação no app complementa HTTPS, firewall e permissões de acesso às pastas; não altera a infraestrutura de rede.
 
 ## Credenciais e contas
 
 O primeiro acesso é configurado por `CONFIGURAR_ADMIN.cmd` no Windows ou por `secrets/admin-user.txt` e `secrets/admin-password.txt`. Após criar contas individuais em **Atualizar → Gerenciar acessos**, desative a conta compartilhada e remova o arquivo da senha inicial. As contas existentes não são recriadas a partir desses arquivos.
 
-Contas e sessões ficam em `dados/admin_accounts.db`. A aplicação armazena hashes de senhas e de tokens. Sessões expiram por inatividade, com limite absoluto de oito horas, e são revogadas no logout, troca de senha ou alteração do estado da conta.
+Contas e sessões ficam em `dados/admin_accounts.db`. A aplicação armazena hashes de senhas e de tokens. Sessões expiram por inatividade, com limite absoluto de oito horas, e são revogadas no logout, troca de senha, alteração de perfil ou do estado da conta.
 
 `INICIAR_WEB.cmd` cria `secrets/web-csrf-secret.txt` na primeira execução e preserva o arquivo nos reinícios. Em outro método de inicialização, configure esse arquivo com pelo menos 32 caracteres aleatórios ou defina `NFE_WEB_CSRF_SECRET` no ambiente do serviço.
 
 As senhas do banco, certificado e SMTP são lidas dos arquivos de `secrets`; `NFE_DATABASE_PASSWORD`, `NFE_CERT_PASSWORD` e `NFE_ADMIN_PASSWORD` não são fontes de senha.
 
-Restrinja as permissões NTFS ou Unix das pastas operacionais à conta do processo e aos administradores autorizados. O banco de contas administrativas é SQLite e depende dessas permissões e da proteção dos backups.
+Restrinja as permissões NTFS ou Unix das pastas operacionais à conta do processo e aos administradores autorizados. O banco de contas é SQLite e depende dessas permissões e da proteção dos backups.
 
 ## Banco fiscal
 

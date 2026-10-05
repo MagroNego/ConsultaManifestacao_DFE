@@ -2,7 +2,7 @@
 
 Aplicação Web para consultar manifestações de NF-e, exportar relatórios Excel e sincronizar o histórico com o serviço **NFeDistribuicaoDFe** do Ambiente Nacional da NF-e.
 
-**Versão 2.3.0** · Python 3.11+ · Windows e Linux
+**Versão 2.4.0** · Python 3.11+ · Windows e Linux
 
 ## Funcionalidades
 
@@ -12,7 +12,7 @@ Aplicação Web para consultar manifestações de NF-e, exportar relatórios Exc
 - Identificação do emitente pelo nome recebido ou pelo CNPJ da chave.
 - Status do banco, cursor NSU, bloqueio e últimas sincronizações.
 - Sincronização manual administrativa e automática às **08:00 e 15:00 (Brasília)**.
-- Contas individuais de administradores, revogação de sessões e histórico administrativo.
+- Login obrigatório com contas individuais, perfis Consulta/Fiscal/Administrador e revogação de sessões.
 - Alertas de novos eventos **Operação não Realizada (210240)** por e-mail, com fila persistente.
 - Leitor XML integrado: importação cumulativa de XML/ZIP mensal, busca, itens, retenções, Excel e CSV.
 - Download do XML original na consulta de manifestações, associado pela chave de acesso.
@@ -22,7 +22,7 @@ Consulta, Status e exportações usam o banco local e não fazem chamadas à SEF
 
 ## Instalação no Windows
 
-Baixe `ConsultaManifestacao_DFE-v2.3.0.zip` em [Releases](https://github.com/MagroNego/ConsultaManifestacao_DFE/releases), extraia em uma pasta definitiva e execute, nesta ordem:
+Baixe `ConsultaManifestacao_DFE-v2.4.0.zip` em [Releases](https://github.com/MagroNego/ConsultaManifestacao_DFE/releases), extraia em uma pasta definitiva e execute, nesta ordem:
 
 ```powershell
 .\INSTALAR.cmd
@@ -52,15 +52,15 @@ O cooldown padrão é **60 minutos**. A configuração antiga de cooldown é ign
 
 ## Lotes mensais de XML
 
-Entre como administrador, abra **XMLs → Importar lote mensal** e envie o ZIP baixado do Synchro ou vários XMLs completos. Os documentos ficam arquivados no banco fiscal, preservando os meses anteriores e ignorando chaves repetidas. Consulte por emissão, número, chave ou destinatário; abra itens e retenções e exporte Excel/CSV. Na Consulta, **Baixar XML** aparece quando a chave tem arquivo importado.
+Entre como administrador, abra **XMLs → Importar lote mensal** e envie o ZIP baixado do Synchro ou vários XMLs completos. Os documentos ficam arquivados no banco fiscal, preservando os meses anteriores e ignorando chaves repetidas. Consulte por emissão, número, chave ou destinatário; abra itens e retenções e exporte Excel/CSV. Para perfis Fiscal/Administrador, na Consulta, **Baixar XML** aparece quando a chave tem arquivo importado.
 
 O leitor foi integrado a partir de [Leitor_XML_Saida](https://github.com/MagroNego/Leitor_XML_Saida). Aceita NF-e modelo 55 emitidas pelo CNPJ do aplicativo. A importação é local, sem certificado e sem chamadas à SEFAZ. Faça backup do banco fiscal para preservar também os XMLs; SQLCipher protege os novos dados quando habilitado. Veja limites e detalhes no [manual de uso](MANUAL_DE_USO.md).
 
 ## Administração e segurança
 
-As telas de consulta são acessíveis aos usuários da rede interna. Configuração, sincronização manual, contas e destinatários de alertas exigem login administrativo.
+Todos os dados fiscais exigem login, inclusive acesso por URL direta. O perfil **Consulta** visualiza notas, itens, retenções, manifestações e Status. **Fiscal** também baixa XMLs e exporta Excel/CSV. **Administrador** importa lotes, sincroniza, configura o app e gerencia as contas. Cadastre os acessos em **Atualizar → Gerenciar acessos**; novas contas usam Consulta por padrão. Alterar perfil, senha ou estado da conta revoga suas sessões.
 
-- Senhas administrativas armazenadas como hash em `dados/admin_accounts.db`.
+- Senhas das contas armazenadas como hash em `dados/admin_accounts.db`.
 - Sessões mantidas no servidor e revogadas no logout, troca de senha e alteração do estado da conta.
 - Proteção CSRF, cookies `HttpOnly` e `SameSite=Strict`, com `Secure` em produção.
 - SQL parametrizado, processamento XML com `defusedxml` e limites de upload/exportação.
