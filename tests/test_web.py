@@ -2,6 +2,8 @@ from io import BytesIO
 from types import SimpleNamespace
 import asyncio
 import time
+import json
+import pytest
 
 from fastapi.testclient import TestClient
 import httpx
@@ -39,7 +41,7 @@ def settings_web(tmp_path, *, admin=False, auth_mode="dev", admin_users=frozense
         root_path="",
         forwarded_allow_ips="127.0.0.1",
         audit_log=tmp_path / "logs" / "web_audit.log",
-        sync_cooldown_minutes=120,
+        sync_cooldown_minutes=60,
         admin_username="admin",
         admin_password="Senha-Admin-123!",
         admin_session_minutes=30,
@@ -269,7 +271,7 @@ def test_login_admin_libera_atualizar_e_logout_bloqueia_novamente(tmp_path):
         pagina = client.get("/atualizar")
         assert pagina.status_code == 200
         assert "Sincronizar com a SEFAZ" in pagina.text
-        assert "2 horas" in pagina.text
+        assert "60 minutos" in pagina.text
         assert "Administrador" in pagina.text
 
         admin = WebUser(cfg.admin_username, "Administrador", True, client.cookies[cfg.admin_cookie_name])
@@ -389,7 +391,59 @@ def test_admin_pode_disparar_atualizacao_sefaz(tmp_path, monkeypatch):
     assert "Concluída" in history.text
     assert ">2</td>" in history.text
     assert chamadas[0].max_lotes == 25
-    assert chamadas[0].cooldown_minutos == 120
+    assert chamadas[0].cooldown_minutos == 60
+
+
+@pytest.mark.parametrize("pausa", [False, True])
+def test_post_direto_durante_bloqueio_nao_consulta_sefaz(tmp_path, monkeypatch, pausa):
+    from nfe_consulta.config import CNPJ_PADRAO
+    cfg = settings_web(tmp_path)
+    criar_banco(cfg.database_path)
+    banco = BancoManifestacoes(str(cfg.database_path))
+    if pausa:
+        banco.pausar_distribuicao(CNPJ_PADRAO, "656")
+    else:
+        banco.reservar_sincronizacao(CNPJ_PADRAO, 60)
+    banco.fechar()
+    def proibido(*args, **kwargs):
+        pytest.fail("POST durante bloqueio iniciou sincronização")
+    monkeypatch.setattr("nfe_consulta.web.app.sincronizar_configurado", proibido)
+    with TestClient(create_app(cfg)) as client:
+        client.post("/admin/login", data={
+            "csrf": csrf_token(PUBLIC_USER, cfg),
+            "username": cfg.admin_username, "password": cfg.admin_password,
+        })
+        admin = WebUser(cfg.admin_username, "Administrador", True, client.cookies[cfg.admin_cookie_name])
+        resposta = client.post("/atualizar/sincronizar", data={
+            "csrf": csrf_token(admin, cfg), "max_lotes": "50",
+        })
+    assert resposta.status_code == 429
+    assert "Sincronização bloqueada temporariamente" in resposta.text
+
+
+@pytest.mark.parametrize("pausa", [False, True])
+def test_agendamento_durante_bloqueio_nao_consulta_sefaz(tmp_path, monkeypatch, pausa):
+    from nfe_consulta.config import CNPJ_PADRAO
+    from nfe_consulta.web.scheduler import executar_sincronizacao_automatica
+    cfg = settings_web(tmp_path)
+    criar_banco(cfg.database_path)
+    banco = BancoManifestacoes(str(cfg.database_path))
+    if pausa:
+        banco.pausar_distribuicao(CNPJ_PADRAO, "656")
+    else:
+        banco.reservar_sincronizacao(CNPJ_PADRAO, 60)
+    banco.fechar()
+    def proibido(*args, **kwargs):
+        pytest.fail("Agendamento bloqueado chegou ao certificado ou à SEFAZ")
+    monkeypatch.setattr("nfe_consulta.servico.resolver_certificado", proibido)
+    monkeypatch.setattr("nfe_consulta.servico.sincronizar", proibido)
+    app = create_app(cfg)
+    asyncio.run(executar_sincronizacao_automatica(app))
+    registro = json.loads(cfg.audit_log.read_text().split(" ", 2)[2])
+    assert registro["reason"] == "cooldown"
+    assert registro["result"] == "ignorado"
+    assert app.state.sync_lock.acquire(blocking=False)
+    app.state.sync_lock.release()
 
 
 def test_status_mostra_ultima_gravacao_sem_chamar_sefaz(tmp_path):
@@ -906,4 +960,3 @@ def test_consulta_publica_nao_expoe_erro_de_senha_do_banco(tmp_path, monkeypatch
     assert "Banco não sincronizado" in resposta.text
     assert "informe a senha" not in resposta.text.casefold()
     assert "criptografado" not in resposta.text.casefold()
-

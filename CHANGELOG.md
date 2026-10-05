@@ -1,5 +1,12 @@
 # Histórico de versões
 
+## 2.2.1 — 2026-10-05
+
+- Cooldown padrão de 60 minutos, validado no servidor para atualização manual e automática.
+- Reserva atômica no banco impede duas sincronizações simultâneas de ultrapassarem a checagem.
+- Pausa 656 verificada antes do certificado, sem estender o bloqueio por tentativas recusadas.
+- Testes de POST direto, agendamento bloqueado e disputa entre conexões.
+
 ## 2.2.0 — 2026-09-30
 
 - Sincronização recorrente a cada oito horas, em janelas fixas de Brasília e com estado persistente por janela.

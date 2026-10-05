@@ -1187,6 +1187,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             )
 
         if not status_web.can_sync:
+            app.state.audit.write(request, user, "sefaz_sync", "ignorado", reason="cooldown")
             return _render(
                 request,
                 "sefaz.html",
@@ -1297,4 +1298,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

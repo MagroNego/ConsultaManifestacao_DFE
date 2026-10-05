@@ -2,7 +2,7 @@
 
 Aplicação Web para consultar manifestações de NF-e, exportar relatórios Excel e sincronizar o histórico com o serviço **NFeDistribuicaoDFe** do Ambiente Nacional da NF-e.
 
-**Versão 2.2.0** · Python 3.11+ · Windows e Linux
+**Versão 2.2.1** · Python 3.11+ · Windows e Linux
 
 ## Funcionalidades
 
@@ -20,7 +20,7 @@ Consulta, Status e exportações usam o banco local e não fazem chamadas à SEF
 
 ## Instalação no Windows
 
-Baixe `ConsultaManifestacao_DFE-v2.2.0.zip` em [Releases](https://github.com/MagroNego/ConsultaManifestacao_DFE/releases), extraia em uma pasta definitiva e execute, nesta ordem:
+Baixe `ConsultaManifestacao_DFE-v2.2.1.zip` em [Releases](https://github.com/MagroNego/ConsultaManifestacao_DFE/releases), extraia em uma pasta definitiva e execute, nesta ordem:
 
 ```powershell
 .\INSTALAR.cmd
@@ -49,7 +49,7 @@ NFE_AUTO_SYNC_MAX_LOTES=50
 
 A conclusão de cada janela é registrada no banco para evitar repetição após reiniciar. Se o servidor voltar depois de um horário programado, recupera apenas a janela mais recente ainda não concluída. Falhas e resultados parciais podem ser retomados a cada hora, respeitando o cooldown persistente. A rotina manual e a automática compartilham a mesma trava e o mesmo cursor NSU.
 
-O cooldown padrão é **120 minutos**. A rejeição 656 registra uma pausa sem avançar o cursor com base na rejeição.
+O cooldown padrão é **60 minutos**. Em instalações com `NFE_SEFAZ_COOLDOWN_MINUTES=120`, altere a variável para `60` e reinicie. Bloqueios já persistidos são preservados até expirar. A rejeição 656 registra uma pausa sem avançar o cursor com base na rejeição.
 
 ## Administração e segurança
 

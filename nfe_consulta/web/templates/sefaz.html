@@ -45,7 +45,7 @@
 
     <div class="cooldown-note">
       {% if status_web.can_sync %}
-        Disponível. Após iniciar, este botão fica bloqueado por {{ cooldown_minutes // 60 }} horas.
+        Disponível. Após iniciar, este botão fica bloqueado por {{ cooldown_minutes }} minutos.
       {% else %}
         Nova tentativa disponível em <strong>{{ status_web.available_label }}</strong>.
       {% endif %}

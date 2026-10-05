@@ -9,6 +9,40 @@ from nfe_consulta.servico import ParametrosSincronizacao, sincronizar_banco
 from nfe_consulta.sincronizacao import ResumoSincronizacao
 
 
+def test_reserva_atomica_bloqueia_outra_conexao_sem_estender_prazo(tmp_path):
+    path = str(tmp_path / "historico.db")
+    primeiro = BancoManifestacoes(path)
+    segundo = BancoManifestacoes(path)
+    try:
+        primeiro.reservar_sincronizacao(CNPJ_PADRAO, 60)
+        ultima, proxima = primeiro.obter_janela_sincronizacao(CNPJ_PADRAO)
+        assert proxima - ultima == timedelta(minutes=60)
+        with pytest.raises(NfeLimiteConsultaErro):
+            segundo.reservar_sincronizacao(CNPJ_PADRAO, 60)
+        assert segundo.obter_janela_sincronizacao(CNPJ_PADRAO) == (ultima, proxima)
+        assert primeiro.bloqueio_sincronizacao(CNPJ_PADRAO, agora=proxima) is None
+    finally:
+        primeiro.fechar()
+        segundo.fechar()
+
+
+@pytest.mark.parametrize("pausa", [False, True])
+def test_servico_bloqueado_nao_resolve_certificado_nem_consulta(tmp_path, monkeypatch, pausa):
+    path = tmp_path / "historico.db"
+    banco = BancoManifestacoes(str(path))
+    if pausa:
+        banco.pausar_distribuicao(CNPJ_PADRAO, "656")
+    else:
+        banco.reservar_sincronizacao(CNPJ_PADRAO, 60)
+    banco.fechar()
+    def proibido(*args, **kwargs):
+        pytest.fail("Tentativa bloqueada chegou ao certificado ou à SEFAZ")
+    monkeypatch.setattr("nfe_consulta.servico.resolver_certificado", proibido)
+    monkeypatch.setattr("nfe_consulta.servico.sincronizar", proibido)
+    with pytest.raises(NfeLimiteConsultaErro):
+        sincronizar_banco(ParametrosSincronizacao(banco=path, cnpj=CNPJ_PADRAO))
+
+
 def test_cooldown_de_120_minutos_fica_persistido_no_banco(tmp_path, monkeypatch):
     banco_path = tmp_path / "historico.db"
     banco = BancoManifestacoes(str(banco_path))

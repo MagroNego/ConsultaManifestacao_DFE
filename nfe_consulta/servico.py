@@ -142,7 +142,7 @@ class ParametrosSincronizacao:
     cert_store: str | None = None
     cert_arquivo: Path | None = None
     cert_senha_arquivo: str | None = None
-    cooldown_minutos: int = 0
+    cooldown_minutos: int = 60
     destinatarios_alerta: tuple[str, ...] = ()
 
 
@@ -158,25 +158,20 @@ def sincronizar_banco(
 
     cnpj = validar_cnpj(parametros.cnpj)
     c_uf = validar_uf(parametros.uf)
-    certificado = resolver_certificado(
-        cnpj,
-        parametros.cert_indice,
-        parametros.cert_thumbprint,
-        parametros.cert_store,
-        parametros.cert_arquivo,
-        parametros.cert_senha_arquivo,
-    )
-
     banco = BancoManifestacoes(str(banco_path), senha=parametros.senha_banco)
     try:
-        if parametros.cooldown_minutos:
-            bloqueio = banco.bloqueio_sincronizacao(cnpj)
-            if bloqueio:
-                raise NfeLimiteConsultaErro(bloqueio)
-            banco.registrar_tentativa_sincronizacao(
-                cnpj,
-                parametros.cooldown_minutos,
-            )
+        bloqueio = banco.bloqueio_sincronizacao(cnpj) or banco.pausa_ativa(cnpj)
+        if bloqueio:
+            raise NfeLimiteConsultaErro(bloqueio)
+        certificado = resolver_certificado(
+            cnpj,
+            parametros.cert_indice,
+            parametros.cert_thumbprint,
+            parametros.cert_store,
+            parametros.cert_arquivo,
+            parametros.cert_senha_arquivo,
+        )
+        banco.reservar_sincronizacao(cnpj, parametros.cooldown_minutos)
 
         return sincronizar(
             banco,

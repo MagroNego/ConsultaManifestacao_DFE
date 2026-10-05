@@ -93,7 +93,7 @@ class WebSettings:
     root_path: str
     forwarded_allow_ips: str
     audit_log: Path
-    sync_cooldown_minutes: int = 120
+    sync_cooldown_minutes: int = 60
     max_upload_bytes: int = 2 * 1024 * 1024
     max_keys: int = 10_000
     admin_username: str = "admin"
@@ -253,7 +253,7 @@ def get_settings() -> WebSettings:
             "NFE_WEB_FORWARDED_ALLOW_IPS", "127.0.0.1"
         ).strip(),
         audit_log=audit,
-        sync_cooldown_minutes=int(os.getenv("NFE_SEFAZ_COOLDOWN_MINUTES", "120")),
+        sync_cooldown_minutes=max(60, int(os.getenv("NFE_SEFAZ_COOLDOWN_MINUTES", "60"))),
         admin_username=admin_username,
         admin_password=admin_password,
         admin_accounts_path=accounts_path,
@@ -278,4 +278,3 @@ def get_settings() -> WebSettings:
         smtp_user=os.getenv("NFE_SMTP_USER", "").strip(),
         smtp_security=smtp_security,
     )
-

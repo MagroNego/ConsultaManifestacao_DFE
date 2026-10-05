@@ -12,7 +12,7 @@ NFE_WEB_HOST=127.0.0.1
 NFE_WEB_PORT=8080
 NFE_WEB_FORWARDED_ALLOW_IPS=127.0.0.1
 NFE_ADMIN_SESSION_MINUTES=30
-NFE_SEFAZ_COOLDOWN_MINUTES=120
+NFE_SEFAZ_COOLDOWN_MINUTES=60
 ```
 
 Se o proxy estiver em outra máquina, informe somente os endereços confiáveis em `NFE_WEB_FORWARDED_ALLOW_IPS`. O endpoint `GET /healthz` retorna estado básico, versão e disponibilidade do arquivo do banco.
@@ -73,7 +73,7 @@ Remova a variável legada `NFE_AUTO_SYNC_ONCE_DATE` caso tenha sido usada no tes
 
 ## Cooldown e rejeição 656
 
-O bloqueio padrão é de **120 minutos**, persistido no banco e validado no backend. Reiniciar o aplicativo não o remove. A rejeição 656 preserva o cursor local, registra a pausa e permite consultar o NSU enviado e o informado no retorno, quando disponível.
+O bloqueio padrão é de **60 minutos**, persistido no banco e validado no backend. Reiniciar o aplicativo não o remove. A rejeição 656 preserva o cursor local, registra a pausa e permite consultar o NSU enviado e o informado no retorno, quando disponível.
 
 Não avance o cursor com base na rejeição e não alterne entre cópias de banco para tentar contornar o bloqueio. Outros sistemas de distribuição do mesmo CNPJ também podem afetar a sequência e o consumo do serviço.
 

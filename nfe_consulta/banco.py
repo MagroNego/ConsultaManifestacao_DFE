@@ -186,6 +186,20 @@ class BancoManifestacoes:
             )
         return proxima
 
+    def reservar_sincronizacao(self, cnpj: str, cooldown_minutos: int) -> datetime:
+        """Verifica e reserva a janela numa transação, inclusive entre processos."""
+        if cooldown_minutos < 60:
+            raise ValueError("O cooldown deve ser de pelo menos 60 minutos.")
+        self.conexao.execute("BEGIN IMMEDIATE")
+        try:
+            bloqueio = self.bloqueio_sincronizacao(cnpj) or self.pausa_ativa(cnpj)
+            if bloqueio:
+                raise NfeLimiteConsultaErro(bloqueio)
+            return self.registrar_tentativa_sincronizacao(cnpj, cooldown_minutos)
+        except Exception:
+            self.conexao.rollback()
+            raise
+
     def sincronizacao_recente_e_completa(self, cnpj: str) -> bool:
         linha = self.conexao.execute(
             "SELECT ult_nsu, max_nsu, atualizado_em FROM estado_distribuicao "
