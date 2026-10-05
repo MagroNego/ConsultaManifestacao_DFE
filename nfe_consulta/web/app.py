@@ -265,9 +265,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         app.state.audit.write_system(
             "sefaz_scheduler",
             "iniciado",
-            intervalo_horas=settings.auto_sync_interval_hours,
-            hora=settings.auto_sync_hour,
-            minuto=settings.auto_sync_minute,
+            horarios=["08:00", "15:00"],
             dias=list(settings.auto_sync_weekdays),
             data_unica=settings.auto_sync_once_date.isoformat() if settings.auto_sync_once_date else None,
             max_lotes=settings.auto_sync_max_lotes,
@@ -1164,8 +1162,13 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         user: Annotated[WebUser, Depends(require_admin)],
         csrf: str = Form(...),
         max_lotes: int = Form(50),
+        confirmacao: str = Form(""),
     ):
         validate_csrf(csrf, user, settings)
+
+        if confirmacao != "sincronizar":
+            app.state.audit.write(request, user, "sefaz_sync", "ignorado", reason="confirmation_required")
+            raise HTTPException(status_code=400, detail="Confirme a sincronização manual antes de continuar.")
 
         if not 1 <= max_lotes <= 500:
             raise HTTPException(status_code=400, detail="Lotes devem estar entre 1 e 500.")

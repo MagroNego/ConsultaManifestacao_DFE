@@ -13,6 +13,19 @@ CNPJ = "16840128000101"
 CHAVE = "33260812345678000199550010000917791147439711"
 
 
+@pytest.mark.parametrize("entrada", ["01/02", "0102"])
+def test_data_sem_ano_usa_ano_atual_de_brasilia(entrada):
+    from datetime import datetime, timezone, timedelta
+    ano = datetime.now(timezone(timedelta(hours=-3))).year
+    filtros = normalizar_filtros(data_inicial=entrada)
+    assert filtros.data_inicial.isoformat() == f"{ano}-02-01"
+
+
+def test_data_invalida_sem_ano_e_rejeitada():
+    with pytest.raises(ValueError, match="Data inicial inválida"):
+        normalizar_filtros(data_inicial="31/02")
+
+
 def _chave(numero: int, serie: int = 1) -> str:
     return (
         CHAVE[:22]

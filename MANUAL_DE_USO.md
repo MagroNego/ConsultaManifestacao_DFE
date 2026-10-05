@@ -38,9 +38,9 @@ Use **Sair** para encerrar e revogar a sessão. Trocar a senha ou alterar o esta
 
 ## Sincronização automática
 
-A rotina executa a cada **8 horas**, às **00:00, 08:00 e 16:00 (Brasília)**, todos os dias. Usa o mesmo banco, certificado, cursor e cooldown da rotina manual. O aplicativo precisa permanecer em execução.
+A rotina executa às **08:00 e 15:00 (Brasília)**, todos os dias. Usa o mesmo banco, certificado, cursor e cooldown da rotina manual. O aplicativo precisa permanecer em execução.
 
-Uma janela concluída não é repetida após reiniciar. Falhas e distribuições parciais podem ser retomadas a cada hora, respeitando o bloqueio vigente. A rejeição 656 registra uma pausa; não altere o NSU para tentar eliminar esse bloqueio.
+Uma janela concluída não é repetida após reiniciar. Falhas e distribuições parciais são retomadas na próxima janela, respeitando o bloqueio vigente. A rejeição 656 registra uma pausa; não altere o NSU para tentar eliminar esse bloqueio.
 
 ## Alertas de Operação não Realizada
 
@@ -49,3 +49,7 @@ Em **Atualizar → Alertas por e-mail**, cadastre até 20 endereços, separados 
 Os envios dependem da configuração SMTP do servidor. Falhas temporárias mantêm os avisos na fila. Após corrigir o SMTP, use **Tentar enviar pendentes**; isso não refaz a sincronização da SEFAZ. Remover um destinatário cancela seus avisos ainda pendentes.
 
 Uma interrupção após a aceitação pelo SMTP e antes da confirmação no banco pode provocar um segundo envio. A entrega efetiva também depende das regras do servidor de e-mail.
+
+Na consulta, digite `01052026` para visualizar `01/05/2026` enquanto escreve. Informar apenas `01/02` completa o ano atual de Brasília ao sair do campo ou consultar. Datas inexistentes são recusadas.
+
+A sincronização manual exige login administrativo, marcação da confirmação e confirmação final. Repetir o envio ou alterar o botão no navegador não remove o cooldown do servidor.

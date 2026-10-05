@@ -25,6 +25,7 @@
     </div>
   </div>
 
+  <p class="muted">Digite a data com ou sem barras. Ao informar só dia e mês, o ano atual é preenchido ao sair do campo.</p>
   <form class="filters-form" action="{{ url_for('consulta_page') }}" method="get">
     <input type="hidden" name="consultar" value="1">
 
@@ -222,4 +223,3 @@
   </form>
 </section>
 {% endblock %}
-

@@ -7,13 +7,10 @@ NFE_WEB_HOST=127.0.0.1
 NFE_WEB_PORT=8080
 NFE_WEB_FORWARDED_ALLOW_IPS=127.0.0.1
 NFE_CERT_STORE=CurrentUser
-NFE_SEFAZ_COOLDOWN_MINUTES=60
+# Cooldown fixo de 60 minutos no servidor.
 
 # O agendador funciona somente enquanto o processo Web estiver ativo.
 NFE_AUTO_SYNC_ENABLED=1
-NFE_AUTO_SYNC_INTERVAL_HOURS=8
-NFE_AUTO_SYNC_HOUR=8
-NFE_AUTO_SYNC_MINUTE=0
 NFE_AUTO_SYNC_WEEKDAYS=0,1,2,3,4,5,6
 NFE_AUTO_SYNC_MAX_LOTES=50
 
@@ -32,5 +29,5 @@ NFE_SMTP_USER=
 # NFE_CERT_STORE=LocalMachine
 # NFE_CERT_THUMBPRINT=<impressão digital quando necessário>
 # Para desativar a rotina automática: NFE_AUTO_SYNC_ENABLED=0
-# Janelas padrão: 00:00, 08:00 e 16:00 (Brasília).
+# Janelas padrão: 08:00 e 15:00 (Brasília).
 

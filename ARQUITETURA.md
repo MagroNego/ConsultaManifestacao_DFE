@@ -8,7 +8,7 @@
 | `web/admin_accounts.py` e `web/auth.py` | Contas, hash de senhas, sessões e CSRF |
 | `web/consulta_local.py` | Filtros, paginação e leitura do histórico |
 | `relatorio_eventos.py` e `xlsx_writer.py` | Relatórios Excel |
-| `web/scheduler.py` | Janelas de oito horas, recuperação e estado persistente |
+| `web/scheduler.py` | Janelas das 08:00 e 15:00, recuperação e estado persistente |
 | `web/sync_runtime.py`, `sincronizacao.py` e `distribuicao.py` | Configuração e distribuição por NSU |
 | `banco.py` e `seguranca_banco.py` | Persistência SQLite/SQLCipher e transações |
 | `web/email_alerts.py` | Destinatários, configuração SMTP e processamento da fila |

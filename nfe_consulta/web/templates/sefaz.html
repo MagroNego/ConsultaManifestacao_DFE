@@ -28,12 +28,18 @@
       <span class="muted">NFeDistribuicaoDFe</span>
     </div>
 
-    <form action="{{ url_for('atualizar_sincronizar') }}" method="post" data-processing-form>
+    <p class="muted">A atualização automática ocorre às 08:00 e 15:00 (Brasília). Use a sincronização manual quando precisar atualizar fora desses horários.</p>
+    <form action="{{ url_for('atualizar_sincronizar') }}" method="post" data-processing-form data-sync-confirm>
       <input type="hidden" name="csrf" value="{{ csrf }}">
 
       <label class="field">
         <span>Lotes máximos</span>
         <input type="number" name="max_lotes" min="1" max="500" value="50">
+      </label>
+
+      <label class="sync-confirmation">
+        <input type="checkbox" name="confirmacao" value="sincronizar" required {% if not status_web.can_sync %}disabled{% endif %}>
+        <span>Confirmo a consulta à SEFAZ e o bloqueio de novas tentativas por 60 minutos.</span>
       </label>
 
       <div class="actions">
@@ -88,7 +94,7 @@
                 Tentativa única encerrada · confira o Status
               {% endif %}
             {% else %}
-              Ativa · a cada {{ request.app.state.settings.auto_sync_interval_hours }} horas (Brasília)
+              Ativa · 08:00 e 15:00 (Brasília)
             {% endif %}
           {% else %}
             Desativada
@@ -285,4 +291,3 @@
   </p>
 </section>
 {% endblock %}
-

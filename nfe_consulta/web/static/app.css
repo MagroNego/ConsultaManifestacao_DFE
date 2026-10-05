@@ -522,6 +522,22 @@ html[data-theme="dark"] .brand-logo-dark {
   letter-spacing: .08em;
 }
 
+.sync-confirmation {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 18px 0;
+  line-height: 1.5;
+  cursor: pointer;
+}
+
+.sync-confirmation input {
+  width: 18px;
+  height: 18px;
+  margin-top: 3px;
+  flex-shrink: 0;
+}
+
 [data-processing-form].busy {
   opacity: .78;
   pointer-events: none;

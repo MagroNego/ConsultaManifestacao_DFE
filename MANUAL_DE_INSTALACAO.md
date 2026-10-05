@@ -18,7 +18,7 @@ Extraia `ConsultaManifestacao_DFE-v2.2.0.zip`, por exemplo em `C:\ConsultaManife
 .\INICIAR_WEB.cmd
 ```
 
-O instalador cria `.venv`, instala as dependências e prepara as pastas operacionais. O configurador cria as credenciais da primeira conta. O lançador inicia em modo produção, cria o segredo Web persistente quando necessário e habilita a rotina de oito horas.
+O instalador cria `.venv`, instala as dependências e prepara as pastas operacionais. O configurador cria as credenciais da primeira conta. O lançador inicia em modo produção, cria o segredo Web persistente quando necessário e habilita a rotina das 08:00 e 15:00.
 
 Abra http://127.0.0.1:8080. Em **Atualizar**, autentique-se, selecione o banco e configure o certificado. Para SQLCipher, coloque a senha em `secrets\db-password.txt`. Usuários comuns não informam essa senha na consulta.
 
@@ -43,13 +43,13 @@ chmod 600 secrets/*
 Inicie com:
 
 ```bash
-NFE_WEB_ENV=production NFE_AUTO_SYNC_ENABLED=1 NFE_AUTO_SYNC_INTERVAL_HOURS=8 .venv/bin/python -m nfe_consulta.web.app
+NFE_WEB_ENV=production NFE_AUTO_SYNC_ENABLED=1 .venv/bin/python -m nfe_consulta.web.app
 ```
 
 Em fish:
 
 ```fish
-env NFE_WEB_ENV=production NFE_AUTO_SYNC_ENABLED=1 NFE_AUTO_SYNC_INTERVAL_HOURS=8 .venv/bin/python -m nfe_consulta.web.app
+env NFE_WEB_ENV=production NFE_AUTO_SYNC_ENABLED=1 .venv/bin/python -m nfe_consulta.web.app
 ```
 
 Configure o certificado por arquivo PFX/P12 em **Atualizar**. O Windows Certificate Store está disponível somente no Windows.
@@ -68,7 +68,7 @@ As tabelas adicionais são criadas pelo aplicativo sem apagar o histórico exist
 
 ## Configuração operacional
 
-A rotina final usa **00:00, 08:00 e 16:00, horário de Brasília, todos os dias**. `INICIAR_WEB.cmd` aplica a ativação se `NFE_AUTO_SYNC_ENABLED` não estiver definida. Para desativar no PowerShell antes de iniciar:
+A rotina final usa **08:00 e 15:00, horário de Brasília, todos os dias**. `INICIAR_WEB.cmd` aplica a ativação se `NFE_AUTO_SYNC_ENABLED` não estiver definida. Para desativar no PowerShell antes de iniciar:
 
 ```powershell
 $env:NFE_AUTO_SYNC_ENABLED = "0"

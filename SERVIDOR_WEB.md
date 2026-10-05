@@ -12,7 +12,6 @@ NFE_WEB_HOST=127.0.0.1
 NFE_WEB_PORT=8080
 NFE_WEB_FORWARDED_ALLOW_IPS=127.0.0.1
 NFE_ADMIN_SESSION_MINUTES=30
-NFE_SEFAZ_COOLDOWN_MINUTES=60
 ```
 
 Se o proxy estiver em outra máquina, informe somente os endereços confiáveis em `NFE_WEB_FORWARDED_ALLOW_IPS`. O endpoint `GET /healthz` retorna estado básico, versão e disponibilidade do arquivo do banco.
@@ -52,24 +51,21 @@ NFE_CERT_THUMBPRINT=<impressão digital do certificado selecionado>
 
 No Linux, use certificado por arquivo. O certificado e o banco usados pela rotina automática são os mesmos configurados na administração.
 
-## Sincronização a cada oito horas
+## Sincronização nos horários fixos de 08:00 e 15:00
 
 ```text
 NFE_AUTO_SYNC_ENABLED=1
-NFE_AUTO_SYNC_INTERVAL_HOURS=8
-NFE_AUTO_SYNC_HOUR=8
-NFE_AUTO_SYNC_MINUTE=0
 NFE_AUTO_SYNC_WEEKDAYS=0,1,2,3,4,5,6
 NFE_AUTO_SYNC_MAX_LOTES=50
 ```
 
-As janelas são **00:00, 08:00 e 16:00, horário de Brasília, todos os dias**, independentemente do fuso do sistema operacional. O horário configurado é a âncora do intervalo. Segunda-feira corresponde a `0` e domingo a `6`.
+As janelas são **08:00 e 15:00, horário de Brasília, todos os dias**, independentemente do fuso do sistema operacional. Segunda-feira corresponde a `0` e domingo a `6`.
 
 O lançador Windows ativa a rotina se `NFE_AUTO_SYNC_ENABLED` não estiver definida. Defina `0` para desativar. No Linux ou em um serviço configurado diretamente, defina as variáveis no ambiente do processo. `WEB_CONFIG.example` é apenas referência e não é carregado automaticamente.
 
-O aplicativo precisa permanecer ativo. A conclusão fica em `controle_agendamento_intervalo`. Ao reiniciar, uma janela já concluída não se repete. Se houver atraso, apenas a janela mais recente é recuperada. Falhas e resultados parciais são retomados a cada hora, sempre respeitando cooldown e trava. Não execute outra instância contra o mesmo banco.
+O aplicativo precisa permanecer ativo. A conclusão fica em `controle_agendamento_intervalo`. Ao reiniciar, uma janela já concluída não se repete. Se houver atraso, apenas a janela mais recente é recuperada. Falhas e resultados parciais são retomados na próxima janela, respeitando cooldown e trava. Antes das 08:00, aguarda a primeira janela do dia. Não execute outra instância contra o mesmo banco.
 
-Remova a variável legada `NFE_AUTO_SYNC_ONCE_DATE` caso tenha sido usada no teste; ela seleciona execução única e substitui a rotina recorrente.
+As variáveis antigas `NFE_AUTO_SYNC_ONCE_DATE`, `NFE_AUTO_SYNC_INTERVAL_HOURS`, `NFE_AUTO_SYNC_HOUR`, `NFE_AUTO_SYNC_MINUTE` e `NFE_SEFAZ_COOLDOWN_MINUTES` são ignoradas; remova-as da configuração. A rotina definitiva usa 08:00 e 15:00 e cooldown de 60 minutos.
 
 ## Cooldown e rejeição 656
 

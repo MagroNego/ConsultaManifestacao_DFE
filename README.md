@@ -2,7 +2,7 @@
 
 Aplicação Web para consultar manifestações de NF-e, exportar relatórios Excel e sincronizar o histórico com o serviço **NFeDistribuicaoDFe** do Ambiente Nacional da NF-e.
 
-**Versão 2.2.1** · Python 3.11+ · Windows e Linux
+**Versão 2.2.2** · Python 3.11+ · Windows e Linux
 
 ## Funcionalidades
 
@@ -11,7 +11,7 @@ Aplicação Web para consultar manifestações de NF-e, exportar relatórios Exc
 - Exportação por arquivo TXT com uma chave de 44 dígitos por linha.
 - Identificação do emitente pelo nome recebido ou pelo CNPJ da chave.
 - Status do banco, cursor NSU, bloqueio e últimas sincronizações.
-- Sincronização manual administrativa e automática a cada **8 horas**.
+- Sincronização manual administrativa e automática às **08:00 e 15:00 (Brasília)**.
 - Contas individuais de administradores, revogação de sessões e histórico administrativo.
 - Alertas de novos eventos **Operação não Realizada (210240)** por e-mail, com fila persistente.
 - Interface em português, com modos claro e escuro.
@@ -20,7 +20,7 @@ Consulta, Status e exportações usam o banco local e não fazem chamadas à SEF
 
 ## Instalação no Windows
 
-Baixe `ConsultaManifestacao_DFE-v2.2.1.zip` em [Releases](https://github.com/MagroNego/ConsultaManifestacao_DFE/releases), extraia em uma pasta definitiva e execute, nesta ordem:
+Baixe `ConsultaManifestacao_DFE-v2.2.2.zip` em [Releases](https://github.com/MagroNego/ConsultaManifestacao_DFE/releases), extraia em uma pasta definitiva e execute, nesta ordem:
 
 ```powershell
 .\INSTALAR.cmd
@@ -30,26 +30,23 @@ Baixe `ConsultaManifestacao_DFE-v2.2.1.zip` em [Releases](https://github.com/Mag
 
 Abra **http://127.0.0.1:8080**. Em **Atualizar**, configure o banco existente e o certificado A1. O certificado pode ser um PFX/P12 protegido ou estar instalado no repositório de certificados do Windows.
 
-O lançador Windows inicia em modo produção e habilita a sincronização a cada oito horas. Para desligá-la, defina `NFE_AUTO_SYNC_ENABLED=0` antes de executar o lançador. Banco, certificado e credenciais são configurados na instalação e não acompanham o pacote.
+O lançador Windows inicia em modo produção e habilita a sincronização nos horários fixos de 08:00 e 15:00. Para desligá-la, defina `NFE_AUTO_SYNC_ENABLED=0` antes de executar o lançador. Banco, certificado e credenciais são configurados na instalação e não acompanham o pacote.
 
 Para Linux e atualização de uma instalação existente, consulte o [manual de instalação](MANUAL_DE_INSTALACAO.md).
 
 ## Sincronização automática
 
-A rotina executa às **00:00, 08:00 e 16:00, horário de Brasília, todos os dias**. O processo Web precisa permanecer ativo. O intervalo independe do horário em que o aplicativo foi iniciado.
+A rotina executa às **08:00 e 15:00, horário de Brasília, todos os dias**. O processo Web precisa permanecer ativo. O agendamento independe do horário em que o aplicativo foi iniciado.
 
 ```text
 NFE_AUTO_SYNC_ENABLED=1
-NFE_AUTO_SYNC_INTERVAL_HOURS=8
-NFE_AUTO_SYNC_HOUR=8
-NFE_AUTO_SYNC_MINUTE=0
 NFE_AUTO_SYNC_WEEKDAYS=0,1,2,3,4,5,6
 NFE_AUTO_SYNC_MAX_LOTES=50
 ```
 
-A conclusão de cada janela é registrada no banco para evitar repetição após reiniciar. Se o servidor voltar depois de um horário programado, recupera apenas a janela mais recente ainda não concluída. Falhas e resultados parciais podem ser retomados a cada hora, respeitando o cooldown persistente. A rotina manual e a automática compartilham a mesma trava e o mesmo cursor NSU.
+A conclusão de cada janela é registrada no banco para evitar repetição após reiniciar. Se o servidor voltar depois de um horário programado, recupera apenas a janela mais recente ainda não concluída. Falhas e resultados parciais são retomados na próxima janela, respeitando o cooldown persistente. Após reiniciar, recupera apenas a janela mais recente do dia atual; antes das 08:00, aguarda a primeira janela. A rotina manual e a automática compartilham a mesma trava e o mesmo cursor NSU.
 
-O cooldown padrão é **60 minutos**. Em instalações com `NFE_SEFAZ_COOLDOWN_MINUTES=120`, altere a variável para `60` e reinicie. Bloqueios já persistidos são preservados até expirar. A rejeição 656 registra uma pausa sem avançar o cursor com base na rejeição.
+O cooldown padrão é **60 minutos**. A configuração antiga de cooldown é ignorada: o servidor usa 60 minutos. Bloqueios já persistidos são preservados até expirar. A rejeição 656 registra uma pausa sem avançar o cursor com base na rejeição.
 
 ## Administração e segurança
 

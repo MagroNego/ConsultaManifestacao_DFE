@@ -3,7 +3,6 @@ setlocal EnableExtensions
 cd /d "%~dp0"
 
 if not defined NFE_AUTO_SYNC_ENABLED set "NFE_AUTO_SYNC_ENABLED=1"
-if not defined NFE_AUTO_SYNC_INTERVAL_HOURS set "NFE_AUTO_SYNC_INTERVAL_HOURS=8"
 if not defined NFE_AUTO_SYNC_WEEKDAYS set "NFE_AUTO_SYNC_WEEKDAYS=0,1,2,3,4,5,6"
 if not defined NFE_ADMIN_SESSION_MINUTES set "NFE_ADMIN_SESSION_MINUTES=30"
 if not defined NFE_WEB_ENV set "NFE_WEB_ENV=production"

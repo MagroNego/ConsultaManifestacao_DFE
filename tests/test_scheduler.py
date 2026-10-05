@@ -1,5 +1,6 @@
 import asyncio
 import threading
+import pytest
 from datetime import date, datetime, timezone
 from types import SimpleNamespace
 
@@ -238,14 +239,48 @@ def test_janelas_oito_horas_usam_brasilia_em_fins_de_semana():
     assert proxima.hour == 16
 
 
-def test_persistencia_distingue_tres_janelas_e_sobrevive_a_reinicio(tmp_path):
+@pytest.mark.parametrize("hora,minuto,atual_dia,atual_hora,proximo_dia,proxima_hora", [
+    (0, 0, 2, 15, 3, 8),
+    (7, 59, 2, 15, 3, 8),
+    (8, 0, 3, 8, 3, 15),
+    (14, 59, 3, 8, 3, 15),
+    (15, 0, 3, 15, 4, 8),
+    (23, 59, 3, 15, 4, 8),
+])
+def test_janelas_fixas_08_e_15(hora, minuto, atual_dia, atual_hora, proximo_dia, proxima_hora):
+    agora = scheduler.horario_unico(date(2026, 10, 3), hora, minuto)
+    atual, proxima = scheduler.janelas_diarias(agora.astimezone(timezone.utc))
+    assert (atual.day, atual.hour, atual.minute) == (atual_dia, atual_hora, 0)
+    assert (proxima.day, proxima.hour, proxima.minute) == (proximo_dia, proxima_hora, 0)
+
+
+def test_loop_antes_das_08_nao_recupera_janela_de_ontem(monkeypatch):
+    agora = scheduler.horario_unico(date(2026, 10, 5), 7, 59)
+    monkeypatch.setattr(scheduler, "agora_brasilia", lambda: agora)
+    chamadas = []
+    async def executar(*args, **kwargs):
+        chamadas.append(kwargs)
+    async def encerrar(_):
+        raise asyncio.CancelledError
+    monkeypatch.setattr(scheduler, "executar_sincronizacao_automatica", executar)
+    monkeypatch.setattr(scheduler.asyncio, "sleep", encerrar)
+    app = SimpleNamespace(state=SimpleNamespace(settings=SimpleNamespace(
+        auto_sync_once_date=None, auto_sync_weekdays=tuple(range(7)),
+    )))
+    with pytest.raises(asyncio.CancelledError):
+        asyncio.run(scheduler.loop_sincronizacao_automatica(app))
+    assert chamadas == []
+    assert app.state.auto_sync_next_at == agora.replace(hour=8, minute=0)
+
+
+def test_persistencia_distingue_duas_janelas_e_sobrevive_a_reinicio(tmp_path):
     from nfe_consulta.banco import BancoManifestacoes
     caminho = tmp_path / "banco.db"
     BancoManifestacoes(str(caminho)).fechar()
     cfg = SimpleNamespace(database_path=caminho, database_path_file=None,
                           current_database_password=lambda: None)
     assert scheduler.ultima_janela_concluida(cfg) is None
-    for hora in (0, 8, 16):
+    for hora in (8, 15):
         janela = scheduler.horario_unico(date(2026, 9, 30), hora, 0)
         scheduler.registrar_janela_concluida(cfg, janela)
         # A leitura reabre o arquivo; não depende de estado em memória.
@@ -272,11 +307,11 @@ def test_loop_nao_repete_janela_concluida_apos_reinicio(monkeypatch):
     except asyncio.CancelledError:
         pass
     assert chamadas == []
-    assert app.state.auto_sync_next_at.hour == 16
+    assert app.state.auto_sync_next_at.hour == 15
 
 
 def test_loop_recupera_so_a_janela_mais_recente(monkeypatch):
-    atual = scheduler.horario_unico(date(2026, 10, 4), 16, 0)
+    atual = scheduler.horario_unico(date(2026, 10, 4), 15, 0)
     monkeypatch.setattr(scheduler, "agora_brasilia", lambda: atual.replace(hour=17))
     monkeypatch.setattr(scheduler, "ultima_janela_concluida", lambda _: atual.replace(day=1))
     chamadas = []

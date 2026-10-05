@@ -380,7 +380,7 @@ def test_admin_pode_disparar_atualizacao_sefaz(tmp_path, monkeypatch):
         admin = WebUser(cfg.admin_username, "Administrador", True, client.cookies[cfg.admin_cookie_name])
         resposta = client.post(
             "/atualizar/sincronizar",
-            data={"csrf": csrf_token(admin, cfg), "max_lotes": "25"},
+            data={"csrf": csrf_token(admin, cfg), "max_lotes": "25", "confirmacao": "sincronizar"},
             follow_redirects=False,
         )
         history = client.get("/status")
@@ -415,7 +415,7 @@ def test_post_direto_durante_bloqueio_nao_consulta_sefaz(tmp_path, monkeypatch, 
         })
         admin = WebUser(cfg.admin_username, "Administrador", True, client.cookies[cfg.admin_cookie_name])
         resposta = client.post("/atualizar/sincronizar", data={
-            "csrf": csrf_token(admin, cfg), "max_lotes": "50",
+            "csrf": csrf_token(admin, cfg), "max_lotes": "50", "confirmacao": "sincronizar",
         })
     assert resposta.status_code == 429
     assert "Sincronização bloqueada temporariamente" in resposta.text
@@ -444,6 +444,37 @@ def test_agendamento_durante_bloqueio_nao_consulta_sefaz(tmp_path, monkeypatch, 
     assert registro["result"] == "ignorado"
     assert app.state.sync_lock.acquire(blocking=False)
     app.state.sync_lock.release()
+
+
+def test_sincronizacao_manual_exige_confirmacao_no_servidor(tmp_path, monkeypatch):
+    cfg = settings_web(tmp_path)
+    criar_banco(cfg.database_path)
+    def proibido(*args, **kwargs):
+        pytest.fail("Sincronização sem confirmação chegou à SEFAZ")
+    monkeypatch.setattr("nfe_consulta.web.app.sincronizar_configurado", proibido)
+    with TestClient(create_app(cfg)) as client:
+        client.post("/admin/login", data={
+            "csrf": csrf_token(PUBLIC_USER, cfg),
+            "username": cfg.admin_username, "password": cfg.admin_password,
+        })
+        admin = WebUser(cfg.admin_username, "Administrador", True, client.cookies[cfg.admin_cookie_name])
+        resposta = client.post("/atualizar/sincronizar", data={"csrf": csrf_token(admin, cfg)})
+    assert resposta.status_code == 400
+    assert "Confirme" in resposta.text
+
+
+def test_usuario_sem_login_nao_sincroniza_mesmo_enviando_confirmacao(tmp_path, monkeypatch):
+    cfg = settings_web(tmp_path)
+    criar_banco(cfg.database_path)
+    def proibido(*args, **kwargs):
+        pytest.fail("Usuário sem login iniciou sincronização")
+    monkeypatch.setattr("nfe_consulta.web.app.sincronizar_configurado", proibido)
+    with TestClient(create_app(cfg)) as client:
+        resposta = client.post("/atualizar/sincronizar", data={
+            "csrf": csrf_token(PUBLIC_USER, cfg), "confirmacao": "sincronizar",
+        }, follow_redirects=False)
+    assert resposta.status_code == 303
+    assert resposta.headers["location"].endswith("/admin/login")
 
 
 def test_status_mostra_ultima_gravacao_sem_chamar_sefaz(tmp_path):
@@ -670,7 +701,7 @@ def test_sincronizacao_web_usa_certificado_configurado_em_arquivo(tmp_path, monk
         admin = WebUser(cfg.admin_username, "Administrador", True, client.cookies[cfg.admin_cookie_name])
         resposta = client.post(
             "/atualizar/sincronizar",
-            data={"csrf": csrf_token(admin, cfg), "max_lotes": "5"},
+            data={"csrf": csrf_token(admin, cfg), "max_lotes": "5", "confirmacao": "sincronizar"},
             follow_redirects=False,
         )
 

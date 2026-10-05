@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from math import ceil
 from pathlib import Path
 
@@ -110,6 +110,13 @@ def _parse_data(valor: str, rotulo: str) -> date | None:
     valor = valor.strip()
     if not valor:
         return None
+
+    if len(valor) == 5 and valor[2] == "/":
+        ano = datetime.now(timezone(timedelta(hours=-3))).year
+        valor = f"{valor}/{ano}"
+    elif len(valor) == 4 and valor.isdigit():
+        ano = datetime.now(timezone(timedelta(hours=-3))).year
+        valor = f"{valor[:2]}/{valor[2:]}/{ano}"
 
     formatos = ("%Y-%m-%d", "%d/%m/%Y", "%d%m%Y")
     for formato in formatos:
@@ -365,4 +372,3 @@ def consultar_numero_nota(
         por_pagina=min(max(limite, 1), 500),
     )
     return resultado.eventos
-

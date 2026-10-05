@@ -193,18 +193,12 @@ def get_settings() -> WebSettings:
         "NFE_AUTO_SYNC_ENABLED",
         "0",
     ).strip() == "1"
-    once_raw = os.getenv("NFE_AUTO_SYNC_ONCE_DATE", "").strip()
-    try:
-        auto_sync_once_date = date.fromisoformat(once_raw) if once_raw else None
-    except ValueError as exc:
-        raise RuntimeError("NFE_AUTO_SYNC_ONCE_DATE deve ter formato AAAA-MM-DD.") from exc
-    if auto_sync_once_date is not None:
-        auto_sync_enabled = True
-    auto_sync_interval_hours = int(os.getenv("NFE_AUTO_SYNC_INTERVAL_HOURS", "8"))
-    if auto_sync_interval_hours not in (1, 2, 3, 4, 6, 8, 12, 24):
-        raise RuntimeError("NFE_AUTO_SYNC_INTERVAL_HOURS deve dividir 24 horas.")
-    auto_sync_hour = int(os.getenv("NFE_AUTO_SYNC_HOUR", "8"))
-    auto_sync_minute = int(os.getenv("NFE_AUTO_SYNC_MINUTE", "0"))
+    # Variáveis legadas não substituem os dois horários da rotina definitiva.
+    auto_sync_once_date = None
+    # Compatibilidade da configuração; a rotina recorrente usa 08:00 e 15:00.
+    auto_sync_interval_hours = 8
+    auto_sync_hour = 8
+    auto_sync_minute = 0
     auto_sync_max_lotes = int(os.getenv("NFE_AUTO_SYNC_MAX_LOTES", "50"))
     auto_sync_weekdays = _dias_semana(
         os.getenv("NFE_AUTO_SYNC_WEEKDAYS", "0,1,2,3,4,5,6")
@@ -253,7 +247,7 @@ def get_settings() -> WebSettings:
             "NFE_WEB_FORWARDED_ALLOW_IPS", "127.0.0.1"
         ).strip(),
         audit_log=audit,
-        sync_cooldown_minutes=max(60, int(os.getenv("NFE_SEFAZ_COOLDOWN_MINUTES", "60"))),
+        sync_cooldown_minutes=60,
         admin_username=admin_username,
         admin_password=admin_password,
         admin_accounts_path=accounts_path,

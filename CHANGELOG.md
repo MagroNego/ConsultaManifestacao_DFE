@@ -1,5 +1,12 @@
 # Histórico de versões
 
+## 2.2.2 — 2026-10-05
+
+- Agendamento automático fixo às 08:00 e 15:00 de Brasília; removida a janela de meia-noite.
+- Sincronização manual com confirmação explícita validada no servidor, confirmação final e prevenção de envio repetido.
+- Cooldown do servidor fixado em 60 minutos, inclusive em instalações com configuração antiga.
+- Máscara das datas durante a digitação e preenchimento do ano atual ao sair do campo ou consultar.
+
 ## 2.2.1 — 2026-10-05
 
 - Cooldown padrão de 60 minutos, validado no servidor para atualização manual e automática.

@@ -269,12 +269,9 @@ async def loop_sincronizacao_automatica(app) -> None:
 
     while True:
         agora = agora_brasilia()
-        janela, proxima = janelas_intervalo(
-            agora, intervalo_horas=settings.auto_sync_interval_hours,
-            hora=settings.auto_sync_hour, minuto=settings.auto_sync_minute,
-        )
+        janela, proxima = janelas_diarias(agora)
         app.state.auto_sync_next_at = proxima
-        if janela.weekday() in settings.auto_sync_weekdays:
+        if janela.date() == agora.date() and janela.weekday() in settings.auto_sync_weekdays:
             try:
                 ultima = await asyncio.to_thread(ultima_janela_concluida, settings)
             except Exception as exc:
@@ -287,8 +284,22 @@ async def loop_sincronizacao_automatica(app) -> None:
                 if ultima is None or ultima < janela:
                     await executar_sincronizacao_automatica(app, janela_agendada=janela)
         agora = agora_brasilia()
-        # Recupera falhas ou lotes parciais a cada hora, respeitando o cooldown.
-        await asyncio.sleep(max(1.0, min(3600.0, (proxima - agora).total_seconds())))
+        await asyncio.sleep(max(1.0, (proxima - agora).total_seconds()))
+
+
+def janelas_diarias(agora: datetime) -> tuple[datetime, datetime]:
+    """Janelas fixas às 08:00 e 15:00 de Brasília, sem disparo à meia-noite."""
+    if agora.tzinfo is None:
+        raise ValueError("O instante deve ter fuso horário.")
+    agora = agora.astimezone(timezone(timedelta(hours=-3)))
+    candidatos = sorted(
+        datetime.combine(agora.date() + timedelta(days=dia), time(hora), tzinfo=agora.tzinfo)
+        for dia in (-1, 0, 1) for hora in (8, 15)
+    )
+    return (
+        max(instante for instante in candidatos if instante <= agora),
+        min(instante for instante in candidatos if instante > agora),
+    )
 
 
 def janelas_intervalo(
