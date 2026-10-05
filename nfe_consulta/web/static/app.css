@@ -531,6 +531,21 @@ html[data-theme="dark"] .brand-logo-dark {
   cursor: pointer;
 }
 
+.xml-import {
+  margin-bottom: 24px;
+}
+
+.xml-import summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: 4px 0;
+}
+
+.xml-row-actions {
+  flex-wrap: nowrap;
+  min-width: 220px;
+}
+
 .sync-confirmation input {
   width: 18px;
   height: 18px;

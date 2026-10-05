@@ -65,6 +65,9 @@ from nfe_consulta.web.email_alerts import (
 )
 from nfe_consulta.web.sync_runtime import sincronizar_configurado
 from nfe_consulta.web.uploads import consolidar_txts
+from nfe_consulta.web.xml_routes import register_xml_routes
+from nfe_consulta.web.xml_store import existing_keys, MAX_UPLOAD
+from nfe_consulta.web.xml_upload_limit import XmlUploadLimit
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -287,16 +290,18 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
     @app.middleware("http")
     async def security_headers(request: Request, call_next):
         path = request.url.path
-        if path in {"/excel", "/admin/login"} and request.method == "POST":
+        if path == "/xml/importar" and request.method == "POST" and not current_user(request).is_admin:
+            return JSONResponse({"detail": "A importação de XMLs exige login administrativo."}, status_code=403)
+        if path in {"/excel", "/admin/login", "/xml/importar"} and request.method == "POST":
             try:
                 size = int(request.headers.get("content-length", "0"))
             except ValueError:
                 return JSONResponse({"detail": "Tamanho da requisição inválido."}, status_code=400)
-            maximum = settings.max_upload_bytes + 65536 if path == "/excel" else 8192
+            maximum = MAX_UPLOAD + 2 * 1024 * 1024 if path == "/xml/importar" else settings.max_upload_bytes + 65536 if path == "/excel" else 8192
             if size > maximum:
                 return JSONResponse({"detail": "Requisição excede o limite."}, status_code=413)
 
-        export_request = path in {"/excel", "/consulta/exportar"}
+        export_request = path in {"/excel", "/consulta/exportar", "/xml/exportar"}
         if export_request:
             with app.state.export_lock:
                 if app.state.export_active >= 2:
@@ -608,6 +613,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             filtros = _filtros_iniciais()
 
         resultado = None
+        xml_keys = set()
         erro_consulta = None
         banco = _database_path(settings)
         database_state = _consulta_database_state(settings)
@@ -626,6 +632,8 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                         pagina=pagina,
                         por_pagina=100,
                     )
+                    xml_keys = await run_in_threadpool(existing_keys, banco, CNPJ_PADRAO,
+                        [evento.chave for evento in resultado.eventos], password=settings.current_database_password())
                     app.state.audit.write(
                         request,
                         user,
@@ -648,6 +656,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             tipos_manifestacao=TIPOS_MANIFESTACAO,
             consultou=consultou,
             resultado=resultado,
+            xml_keys=xml_keys,
             consulta_error=erro_consulta,
         )
 
@@ -1281,6 +1290,8 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         finally:
             lock.release()
 
+    register_xml_routes(app, settings, _render, _database_path)
+    app.add_middleware(XmlUploadLimit)
     return app
 
 

@@ -23,6 +23,7 @@
     <nav class="tabs" aria-label="Navegação principal">
       <a href="{{ url_for('consulta_page') }}" class="{% if request.url.path == '/' or request.url.path.startswith('/consulta') %}active{% endif %}">Consulta</a>
       <a href="{{ url_for('status_page') }}" class="{% if request.url.path.startswith('/status') %}active{% endif %}">Status</a>
+      <a href="{{ url_for('xml_page') }}" class="{% if request.url.path.startswith('/xml') %}active{% endif %}">XMLs</a>
       <a href="{{ url_for('atualizar_page') if user.is_admin else url_for('admin_login_page') }}" class="{% if request.url.path.startswith('/atualizar') or request.url.path.startswith('/admin/login') %}active{% endif %}">Atualizar</a>
     </nav>
 

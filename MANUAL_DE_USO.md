@@ -1,4 +1,4 @@
-# Manual de uso — v2.2.0
+# Manual de uso — v2.3.0
 
 ## Consulta
 
@@ -17,6 +17,25 @@ Colunas: Número NF, Série, Chave NF-e, Código, Manifestação, Data do evento
 ## Consulta por arquivo
 
 Selecione um TXT com uma chave de 44 dígitos por linha e use **Gerar Excel por chaves**. O arquivo serve para recortar o histórico do banco; não dispara uma consulta pontual à SEFAZ. O limite é de 10 mil chaves e 2 MB por upload.
+
+## XMLs — lotes mensais
+
+1. Baixe o lote mensal de XMLs completos no Synchro.
+2. Entre como administrador, abra **XMLs → Importar lote mensal**, selecione o ZIP ou vários XMLs e clique **Importar e arquivar**.
+3. Confira as quantidades importadas, duplicadas e recusadas. **Baixar registro do lote** lista o resultado por arquivo; o histórico mantém as últimas importações.
+4. Consulte **Notas e arquivos**, **Itens e impostos** ou **PIS/COFINS retidos**. Os meses anteriores permanecem no arquivo. Chaves repetidas preservam o primeiro XML, mesmo que o arquivo enviado tenha conteúdo diferente.
+
+O período do leitor filtra a **emissão da nota**. A consulta de manifestações continua filtrando a data do evento. A busca localiza número, chave e destinatário; nos itens também pesquisa o conteúdo fiscal e o produto. Os resultados têm 100 linhas por página. O Excel reúne Notas, Itens e Retencoes com os mesmos filtros e todas as páginas; para administradores, inclui Processamento do lote selecionado ou mais recente. O CSV exporta o relatório selecionado. Cada relatório tem limite de 100 mil linhas na exportação.
+
+Na tela **Consulta**, uma nota com XML importado mostra **Baixar XML** e **Ver itens**. Na aba XMLs, cada nota oferece XML, Itens e Manifestações. Notas sem evento de manifestação também podem ser arquivadas. O download entrega os bytes originais do documento.
+
+Somente administradores importam e acessam os registros dos lotes. Usuários da rede interna podem consultar, exportar e baixar XMLs, conforme a política existente de acesso às consultas. Não há chamadas à SEFAZ na importação, leitura ou download; o certificado não é necessário. A importação não altera NSU, cooldown, agendamento ou manifestações.
+
+Limites: 100 MiB de arquivos por envio, 250 MiB descompactados no lote, 5.000 entradas por ZIP/documentos no lote e 8 MiB por XML. ZIPs podem ter subpastas, mas não devem ser protegidos por senha. Arquivos que não sejam XML, eventos, resumos e documentos de outro emitente são recusados com registro. Se houver ZIP estruturalmente inválido ou excesso de limite do lote, nenhuma nova nota daquele envio é gravada; divida ou corrija o lote. Erros em XMLs individuais permitem importar os demais arquivos válidos.
+
+São aceitas NF-e modelo 55 completas, com ou sem envelope nfeProc, emitidas pelo CNPJ configurado no aplicativo. O leitor verifica a estrutura mínima e a correspondência da chave/emitente/número/série; não valida assinatura digital, schema fiscal completo nem autorização atual. Use o XML original autorizado obtido no sistema emissor.
+
+Os XMLs e relatórios ficam no banco fiscal configurado; bancos SQLCipher protegem os novos dados com a mesma senha. O banco cresce conforme as importações: inclua-o nos backups e mantenha espaço livre. O arquivo recebido é usado temporariamente durante a importação e removido ao terminar.
 
 ## Status
 

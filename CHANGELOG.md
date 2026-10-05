@@ -1,5 +1,14 @@
 # Histórico de versões
 
+## 2.3.0 — 2026-10-05
+
+- Leitor XML de saída integrado com importação administrativa de XMLs ou ZIPs mensais.
+- Arquivo cumulativo no banco fiscal, preservação do original e deduplicação pela chave.
+- Consulta de notas, itens/impostos e retenções, filtros pela emissão e exportações Excel/CSV.
+- Download do XML e acesso aos itens diretamente na consulta de manifestações.
+- Histórico de importações e registro por arquivo; XMLs protegidos pelo SQLCipher quando o banco é criptografado.
+- Limites de upload, ZIP e exportação, bloqueio de DTD/entidades e proteção contra fórmulas em planilhas.
+
 ## 2.2.2 — 2026-10-05
 
 - Agendamento automático fixo às 08:00 e 15:00 de Brasília; removida a janela de meia-noite.

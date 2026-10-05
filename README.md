@@ -2,7 +2,7 @@
 
 Aplicação Web para consultar manifestações de NF-e, exportar relatórios Excel e sincronizar o histórico com o serviço **NFeDistribuicaoDFe** do Ambiente Nacional da NF-e.
 
-**Versão 2.2.2** · Python 3.11+ · Windows e Linux
+**Versão 2.3.0** · Python 3.11+ · Windows e Linux
 
 ## Funcionalidades
 
@@ -14,13 +14,15 @@ Aplicação Web para consultar manifestações de NF-e, exportar relatórios Exc
 - Sincronização manual administrativa e automática às **08:00 e 15:00 (Brasília)**.
 - Contas individuais de administradores, revogação de sessões e histórico administrativo.
 - Alertas de novos eventos **Operação não Realizada (210240)** por e-mail, com fila persistente.
+- Leitor XML integrado: importação cumulativa de XML/ZIP mensal, busca, itens, retenções, Excel e CSV.
+- Download do XML original na consulta de manifestações, associado pela chave de acesso.
 - Interface em português, com modos claro e escuro.
 
 Consulta, Status e exportações usam o banco local e não fazem chamadas à SEFAZ. A aplicação consulta manifestações; não emite eventos de manifestação nem apresenta a situação de autorização ou cancelamento das notas.
 
 ## Instalação no Windows
 
-Baixe `ConsultaManifestacao_DFE-v2.2.2.zip` em [Releases](https://github.com/MagroNego/ConsultaManifestacao_DFE/releases), extraia em uma pasta definitiva e execute, nesta ordem:
+Baixe `ConsultaManifestacao_DFE-v2.3.0.zip` em [Releases](https://github.com/MagroNego/ConsultaManifestacao_DFE/releases), extraia em uma pasta definitiva e execute, nesta ordem:
 
 ```powershell
 .\INSTALAR.cmd
@@ -47,6 +49,12 @@ NFE_AUTO_SYNC_MAX_LOTES=50
 A conclusão de cada janela é registrada no banco para evitar repetição após reiniciar. Se o servidor voltar depois de um horário programado, recupera apenas a janela mais recente ainda não concluída. Falhas e resultados parciais são retomados na próxima janela, respeitando o cooldown persistente. Após reiniciar, recupera apenas a janela mais recente do dia atual; antes das 08:00, aguarda a primeira janela. A rotina manual e a automática compartilham a mesma trava e o mesmo cursor NSU.
 
 O cooldown padrão é **60 minutos**. A configuração antiga de cooldown é ignorada: o servidor usa 60 minutos. Bloqueios já persistidos são preservados até expirar. A rejeição 656 registra uma pausa sem avançar o cursor com base na rejeição.
+
+## Lotes mensais de XML
+
+Entre como administrador, abra **XMLs → Importar lote mensal** e envie o ZIP baixado do Synchro ou vários XMLs completos. Os documentos ficam arquivados no banco fiscal, preservando os meses anteriores e ignorando chaves repetidas. Consulte por emissão, número, chave ou destinatário; abra itens e retenções e exporte Excel/CSV. Na Consulta, **Baixar XML** aparece quando a chave tem arquivo importado.
+
+O leitor foi integrado a partir de [Leitor_XML_Saida](https://github.com/MagroNego/Leitor_XML_Saida). Aceita NF-e modelo 55 emitidas pelo CNPJ do aplicativo. A importação é local, sem certificado e sem chamadas à SEFAZ. Faça backup do banco fiscal para preservar também os XMLs; SQLCipher protege os novos dados quando habilitado. Veja limites e detalhes no [manual de uso](MANUAL_DE_USO.md).
 
 ## Administração e segurança
 
