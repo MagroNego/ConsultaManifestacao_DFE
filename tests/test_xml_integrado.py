@@ -139,7 +139,13 @@ def test_excel_csv_precisao_formula_e_codigos(tmp_path):
     assert sheet.cell(2, heads.index('Destinatario Razao') + 1).data_type == 's'
     assert sheet.cell(2, heads.index('Chave Acesso') + 1).value == CHAVE
     assert sheet.cell(2, heads.index('Codigo') + 1).value == '00007'
-    assert sheet.cell(2, heads.index('Vl. Unitario') + 1).value == pytest.approx(.123456789)
+    unit = sheet.cell(2, heads.index('Vl. Unitario') + 1)
+    assert unit.value == pytest.approx(.1235)
+    assert unit.number_format == '#,##0.0000'
+    quantity = sheet.cell(2, heads.index('Qtd') + 1)
+    assert quantity.value == 3 and quantity.number_format == '#,##0'
+    assert store.EXCEL_EXCLUDED_COLUMNS.isdisjoint(heads)
+    assert all(key in report['columns'] for key in store.EXCEL_EXCLUDED_COLUMNS)
 
 
 def test_web_lote_manifestacao_download_export_e_permissoes(tmp_path, monkeypatch):

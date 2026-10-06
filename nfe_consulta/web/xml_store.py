@@ -7,7 +7,7 @@ import json
 import re
 import stat
 from datetime import datetime
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP, localcontext
 from io import BytesIO, StringIO
 from pathlib import Path, PurePosixPath
 from zipfile import BadZipFile, ZipFile
@@ -26,6 +26,10 @@ MAX_EXPANDED = 250 * 1024 * 1024
 MAX_FILES = 5000
 MAX_EXPORT_ROWS = 100_000
 FIELDS_NOTAS = ["Chave Acesso", "Numero Nota", "Serie", "Data Emissao", "Emitente Razao", "Destinatario Razao", "Vl. Nota", "Itens"]
+EXCEL_EXCLUDED_COLUMNS = frozenset({
+    "CSOSN", "Origem ICMS", "Qtd Base PIS", "Aliquota PIS por unidade",
+    "Qtd Base COFINS", "Aliquota COFINS por unidade",
+})
 
 
 def _schema(conn):
@@ -298,14 +302,18 @@ def export_excel(reports):
     workbook.remove(workbook.active)
     for title, report in reports:
         sheet = workbook.create_sheet(title)
-        sheet.append(report["columns"])
+        columns = [key for key in report["columns"] if key not in EXCEL_EXCLUDED_COLUMNS]
+        sheet.append(columns)
         for row in report["rows"]:
             values = []
-            for key in report["columns"]:
+            for key in columns:
                 value = row.get(key, "")
                 if key.startswith(("Vl.", "Base ", "% ", "Qtd", "Aliquota ")) and value != "":
                     try:
-                        value = Decimal(str(value).replace(",", "."))
+                        with localcontext() as context:
+                            context.prec = 110
+                            value = Decimal(str(value).replace(",", ".")).quantize(
+                                Decimal("0.0001"), rounding=ROUND_HALF_UP)
                     except Exception:
                         pass
                 values.append(value)
@@ -315,13 +323,13 @@ def export_excel(reports):
                     cell.data_type = "s"
                     cell.number_format = "@"
                 elif cell.value is not None:
-                    cell.number_format = "#,##0.##########"
+                    cell.number_format = "#,##0" if cell.value == int(cell.value) else "#,##0.0000"
         for cell in sheet[1]:
             cell.font = Font(color="FFFFFF", bold=True)
             cell.fill = PatternFill("solid", fgColor="193D65")
         sheet.freeze_panes = "A2"
         sheet.auto_filter.ref = sheet.dimensions
-        for index, key in enumerate(report["columns"], 1):
+        for index, key in enumerate(columns, 1):
             sheet.column_dimensions[get_column_letter(index)].width = 48 if "Chave" in key else 36 if "Razao" in key or key == "Descricao" else 18
     out = BytesIO()
     workbook.save(out)
