@@ -146,8 +146,7 @@
           <th>Protocolo</th>
           <th>Chave NF-e</th>
           <th>NSU</th>
-          <th>Recebido no banco (UTC)</th>
-          <th>XML da nota</th>
+          <th>Ações</th>
         </tr>
       </thead>
       <tbody>
@@ -164,8 +163,16 @@
           <td class="mono">{{ evento.protocolo or "—" }}</td>
           <td class="mono access-key">{{ evento.chave }}</td>
           <td class="mono">{{ evento.nsu }}</td>
-          <td>{{ evento.recebido_label }}</td>
-          <td>{% if evento.chave in xml_keys|default([]) %}{% if user.can_export %}<a class="button secondary" href="{{ url_for('xml_download', chave=evento.chave) }}">Baixar XML</a>{% endif %}<a href="{{ url_for('xml_page').include_query_params(tipo='itens', q=evento.chave) }}">Ver itens</a>{% else %}<span class="muted">Não importado</span>{% endif %}</td>
+          <td>{% if evento.chave in xml_keys|default([]) %}
+            <div class="xml-row-actions">
+              {% if user.can_export %}<a class="xml-icon-action" href="{{ url_for('xml_download', chave=evento.chave) }}" title="Baixar XML" aria-label="Baixar XML da nota {{ evento.numero }}">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9zM14 3v6h6M9 12l-2 3 2 3M15 12l2 3-2 3"/></svg>
+              </a>{% endif %}
+              <a class="xml-icon-action" href="{{ url_for('xml_page').include_query_params(tipo='itens', q=evento.chave) }}" title="Itens" aria-label="Ver itens da nota {{ evento.numero }}">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/></svg>
+              </a>
+            </div>
+          {% else %}<span class="muted">Não importado</span>{% endif %}</td>
         </tr>
         {% endfor %}
       </tbody>
