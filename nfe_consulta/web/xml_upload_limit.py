@@ -42,7 +42,8 @@ class XmlUploadLimit:
             await send(message)
         try:
             await self.app(scope, limited_receive, tracked_send)
-        except _UploadTooLarge:
+        # BaseHTTPMiddleware pode envolver a rejeição em um ExceptionGroup.
+        except* _UploadTooLarge:
             if started:
                 raise
             await JSONResponse({"detail": "Envio excede 100 MiB. Divida o lote."}, status_code=413)(scope, receive, send)

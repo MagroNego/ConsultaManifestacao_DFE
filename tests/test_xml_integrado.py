@@ -99,6 +99,35 @@ def test_xml_sem_namespace_e_nfe_sem_envelope():
     assert store.read_document(ET.tostring(list(root)[0]), CNPJ_PADRAO)[0]['chave'] == CHAVE
 
 
+def test_web_importa_4000_xmls_soltos(tmp_path):
+    cfg = helpers['settings_web'](tmp_path)
+    helpers['criar_banco'](cfg.database_path)
+    app = create_app(cfg)
+    files = [('files', (f'{index}.xml', xml(chave=CHAVE[:25] + f'{index:09d}' + CHAVE[34:]),
+                        'application/xml')) for index in range(1, 4001)]
+    with TestClient(app) as client:
+        token = login(client, cfg)
+        response = client.post('/xml/importar', data={'csrf': token}, files=files,
+                               follow_redirects=False)
+        assert response.status_code == 303
+    assert store.query_report(cfg.database_path, CNPJ_PADRAO)['total'] == 4000
+    _, batch = store.import_history(cfg.database_path, batch_id=1)
+    assert batch['importadas'] == 4000 and batch['erros'] == 0
+
+
+def test_web_rejeita_mais_de_5000_arquivos_sem_importar(tmp_path):
+    cfg = helpers['settings_web'](tmp_path)
+    helpers['criar_banco'](cfg.database_path)
+    app = create_app(cfg)
+    with TestClient(app) as client:
+        token = login(client, cfg)
+        files = [('files', (f'{index}.xml', b'', 'application/xml')) for index in range(5001)]
+        response = client.post('/xml/importar', data={'csrf': token}, files=files)
+        assert response.status_code == 400
+        assert '5000' in response.json()['detail']
+    assert store.query_report(cfg.database_path, CNPJ_PADRAO)['total'] == 0
+
+
 def test_excel_csv_precisao_formula_e_codigos(tmp_path):
     path, source = setup(tmp_path)
     store.import_batch(path, CNPJ_PADRAO, [(source, 'a.xml')])

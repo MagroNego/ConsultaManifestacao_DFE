@@ -5,9 +5,10 @@ import tempfile
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi import Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse, Response
 from starlette.concurrency import run_in_threadpool
+from starlette.datastructures import UploadFile as MultipartUploadFile
 
 from nfe_consulta.config import CNPJ_PADRAO
 from nfe_consulta.web.auth import WebUser, current_user, require_admin, require_export, require_user, validate_csrf
@@ -45,9 +46,21 @@ def register_xml_routes(app, settings, render, database_path):
             history=history, batch=batch, error=error)
 
     @app.post("/xml/importar")
-    async def xml_import(request: Request, user: Annotated[WebUser, Depends(require_admin)],
-                         csrf: str = Form(...), files: list[UploadFile] = File(...)):
-        validate_csrf(csrf, user, settings)
+    async def xml_import(request: Request, user: Annotated[WebUser, Depends(require_admin)]):
+        # Os parâmetros File/Form do FastAPI usam max_files=1000 antes da rota.
+        # Faça o parse com o mesmo teto anunciado para o lote, apenas nesta rota.
+        async with request.form(max_files=store.MAX_FILES, max_fields=1,
+                                max_part_size=4096) as form:
+            csrf = form.get("csrf")
+            if not isinstance(csrf, str):
+                raise HTTPException(403, "Token de segurança inválido.")
+            validate_csrf(csrf, user, settings)
+            files = form.getlist("files")
+            if not files or any(not isinstance(upload, MultipartUploadFile) for upload in files):
+                raise HTTPException(400, "Selecione arquivos XML ou ZIP para importar.")
+            return await process_xml_import(request, user, files)
+
+    async def process_xml_import(request, user, files):
         total = 0
         try:
             if len(files) > store.MAX_FILES:
