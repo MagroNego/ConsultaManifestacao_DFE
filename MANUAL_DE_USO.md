@@ -2,7 +2,7 @@
 
 ## Acesso
 
-Abra o endereço do aplicativo. Não há login nem perfis. Todos que acessarem o endereço podem consultar, exportar e usar **Admin**. O log registra a identidade interna `usuario-interno` e o endereço de origem, sem atribuição a contas individuais.
+Abra o endereço do aplicativo. Consulta, Status, XML e exportações são públicos na rede. Ao abrir **Admin**, informe uma conta administrativa. A importação e as configurações exigem sessão válida, mesmo por endereço direto. Use **Sair do Admin** para encerrar a sessão. Operações públicas usam a identidade `usuario-interno`; operações administrativas registram a conta autenticada.
 
 ## Consulta
 
@@ -49,7 +49,7 @@ Apresenta última gravação, `ultNSU`, `maxNSU`, disponibilidade da sincroniza�
 
 ## Admin
 
-A área reúne:
+A área exige login administrativo e reúne:
 
 - Configuração do banco e certificado A1.
 - Sincronização manual e estado do agendamento automático.

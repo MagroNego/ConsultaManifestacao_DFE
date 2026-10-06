@@ -43,7 +43,7 @@ def zip_bytes(entries):
 
 
 def login(client, cfg):
-    return csrf_token(PUBLIC_USER, cfg)
+    return helpers["entrar_admin"](client, cfg)
 
 
 def test_arquivo_cumulativo_duplicatas_download_e_reabertura(tmp_path):

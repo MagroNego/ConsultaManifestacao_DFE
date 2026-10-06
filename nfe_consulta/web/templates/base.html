@@ -23,13 +23,19 @@
       <a href="{{ url_for('consulta_page') }}" class="{% if request.url.path == '/' or request.url.path.startswith('/consulta') %}active{% endif %}">Consulta</a>
       <a href="{{ url_for('status_page') }}" class="{% if request.url.path.startswith('/status') %}active{% endif %}">Status</a>
       <a href="{{ url_for('xml_page') }}" class="{% if request.url.path.startswith('/xml') %}active{% endif %}">XML</a>
-      {% if user.is_admin %}<a href="{{ url_for('atualizar_page') }}" class="{% if request.url.path.startswith('/atualizar') or request.url.path.startswith('/admin/login') %}active{% endif %}">Admin</a>{% endif %}
+      <a href="{{ url_for('atualizar_page') }}" class="{% if request.url.path.startswith('/atualizar') or request.url.path.startswith('/admin/login') %}active{% endif %}">Admin</a>
     </nav>
 
     <div class="account">
       <button class="theme-toggle" type="button" data-theme-toggle aria-label="Alternar tema">
         <span data-theme-icon>◐</span>
       </button>
+      {% if user.is_admin %}
+      <form action="{{ url_for('admin_logout') }}" method="post" class="logout-form">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button type="submit" class="logout-button">Sair do Admin</button>
+      </form>
+      {% endif %}
     </div>
   </header>
 

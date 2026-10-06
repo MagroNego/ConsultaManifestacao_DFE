@@ -17,7 +17,9 @@ Se o proxy estiver em outra máquina, informe somente os endereços confiáveis 
 
 ## Controle de acesso
 
-O aplicativo não exige login. Consultas, exportações e funções de **Admin** estão disponíveis a quem alcançar o endereço. A rede/firewall ou a autenticação no reverse proxy devem limitar esse acesso. A aba Admin não verifica identidade ou perfil. Contas antigas são preservadas no disco e não são utilizadas.
+Consultas e exportações não exigem login. **Admin**, a importação XML e os registros de lote exigem uma sessão administrativa válida. A validação é feita no servidor antes de processar uploads. Contas sem perfil Admin não entram nessa área.
+
+Configure ou redefina a conta com `CONFIGURAR_ADMIN.cmd` (Windows) ou `python -m nfe_consulta.web.configure_admin` (Linux). A senha fica como hash no banco de contas e os tokens são mantidos no servidor. Sessões expiram por inatividade (30 minutos por padrão) e são revogadas no logout ou redefinição da senha. Cookies são HttpOnly e SameSite=Strict; Secure é aplicado quando a requisição usa HTTPS. O modo HTTP local continua funcional; prefira HTTPS na implantação definitiva. Configure o proxy e `NFE_WEB_FORWARDED_ALLOW_IPS` apenas com origens confiáveis.
 
 ## Segredos do servidor
 

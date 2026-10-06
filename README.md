@@ -12,7 +12,7 @@ Aplicação Web para consultar manifestações de NF-e, exportar relatórios Exc
 - Identificação do emitente pelo nome recebido ou pelo CNPJ da chave.
 - Status do banco, cursor NSU, bloqueio e últimas sincronizações.
 - Sincronização manual administrativa e automática às **08:00 e 15:00 (Brasília)**.
-- Acesso direto sem login; importação e configurações reunidas em Admin.
+- Consulta e exportações sem login; Admin protegido por conta e senha.
 - Alertas de novos eventos **Operação não Realizada (210240)** por e-mail, com fila persistente.
 - Leitor XML integrado: importação cumulativa de XML/ZIP mensal, busca, itens, retenções, Excel e CSV.
 - Download do XML original na consulta de manifestações, associado pela chave de acesso.
@@ -26,6 +26,7 @@ Baixe `ConsultaManifestacao_DFE-v2.4.0.zip` em [Releases](https://github.com/Mag
 
 ```powershell
 .\INSTALAR.cmd
+.\CONFIGURAR_ADMIN.cmd
 .\INICIAR_WEB.cmd
 ```
 
@@ -57,14 +58,16 @@ O leitor foi integrado a partir de [Leitor_XML_Saida](https://github.com/MagroNe
 
 ## Administração e segurança
 
-O aplicativo não exige login. Quem alcançar o endereço pode consultar, exportar, importar e administrar. Restrinja o acesso pela rede/firewall ou por autenticação no reverse proxy. A aba **Admin** organiza as funções; não é uma barreira de permissão.
+Consulta, Status, XML e exportações não exigem login. **Admin** exige uma conta administrativa: importação de XML, sincronização manual, configuração e histórico são protegidos no servidor, inclusive por URLs diretas. `CONFIGURAR_ADMIN.cmd` cria ou redefine a conta escolhida, preserva as demais e faz backup do banco de contas antes de alterar uma instalação existente.
+
+A senha fica como hash em `dados/admin_accounts.db` (ou `NFE_ADMIN_ACCOUNTS_PATH`). Sessões são mantidas no servidor, expiram por inatividade e são revogadas no logout ou na redefinição da senha. O cookie é `HttpOnly` e `SameSite=Strict`; em HTTPS também usa `Secure`. Em HTTP local, o login funciona sem esse atributo; use HTTPS no servidor definitivo.
 
 - Proteção CSRF nos formulários.
 - SQL parametrizado, processamento XML com `defusedxml` e limites de upload/exportação.
 - Auditoria com rotação em `logs/web_audit.log`.
 - SQLCipher opcional para proteger o banco fiscal; a administração mostra o modo de armazenamento.
 
-Senhas do banco, certificado e SMTP ficam em `secrets`. Contas antigas não são usadas e seus arquivos permanecem preservados. As credenciais não são incluídas nas releases.
+Senhas do banco, certificado e SMTP ficam em `secrets`. Contas administrativas antigas continuam disponíveis; contas sem perfil Admin não entram nessa área. As credenciais não são incluídas nas releases.
 
 Em rede interna, use HTTPS por reverse proxy e **um único processo/worker**. Consulte [implantação](SERVIDOR_WEB.md) e [segurança do banco](SEGURANCA_BANCO.md).
 

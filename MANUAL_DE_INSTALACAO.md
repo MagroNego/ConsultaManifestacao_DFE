@@ -14,6 +14,7 @@ Extraia `ConsultaManifestacao_DFE-v2.4.0.zip`, por exemplo em `C:\ConsultaManife
 
 ```powershell
 .\INSTALAR.cmd
+.\CONFIGURAR_ADMIN.cmd
 .\INICIAR_WEB.cmd
 ```
 
@@ -32,7 +33,11 @@ mkdir -p secrets dados logs
 chmod 700 secrets dados logs
 ```
 
-Gere o segredo Web:
+Configure a conta administrativa e gere o segredo Web:
+
+```bash
+.venv/bin/python -m nfe_consulta.web.configure_admin
+```
 
 ```bash
 .venv/bin/python -c "from pathlib import Path; import secrets; p=Path('secrets/web-csrf-secret.txt'); p.exists() or p.write_text(secrets.token_urlsafe(48), encoding='utf-8')"
@@ -80,4 +85,4 @@ Execute uma única instância. O processo precisa permanecer ativo; feche-o de f
 
 ## Atualização para contas e perfis
 
-O acesso é direto, sem login. Arquivos de contas antigos permanecem preservados, mas não são usados pelo aplicativo. Quem alcançar o endereço também poderá usar Admin.
+As consultas e exportações continuam sem login. Admin exige conta administrativa. Contas existentes são preservadas; `CONFIGURAR_ADMIN.cmd` permite definir ou redefinir a conta escolhida, sem modificar as demais nem o banco fiscal.

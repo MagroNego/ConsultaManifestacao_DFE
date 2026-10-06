@@ -39,8 +39,8 @@ def test_web_settings_usa_senhas_da_pasta_secrets_e_ignora_env(tmp_path, monkeyp
     finally:
         settings.get_settings.cache_clear()
 
-    assert cfg.admin_username == "admin"
-    assert cfg.admin_password is None
+    assert cfg.admin_username == "administrador"
+    assert cfg.admin_password == "Senha-Admin-Arquivo-123!"
     assert cfg.database_password == "Senha-Banco-Arquivo-123!"
     assert cfg.certificate_path_file == cert_path
     assert cfg.certificate_password_file == cert_password

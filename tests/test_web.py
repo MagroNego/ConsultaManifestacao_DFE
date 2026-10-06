@@ -12,7 +12,7 @@ from openpyxl import load_workbook
 from nfe_consulta.banco import BancoManifestacoes
 from nfe_consulta.modelos import InformacaoNota, Manifestacao, RetornoDistribuicao
 from nfe_consulta.web.app import create_app
-from nfe_consulta.web.auth import PUBLIC_USER, csrf_token
+from nfe_consulta.web.auth import PUBLIC_USER, WebUser, csrf_token
 from nfe_consulta.web.settings import WebSettings
 
 
@@ -61,7 +61,11 @@ def criar_banco(caminho):
 
 
 def entrar_admin(client, cfg):
-    return csrf_token(PUBLIC_USER, cfg)
+    response = client.post('/admin/login', data={'csrf': csrf_token(PUBLIC_USER, cfg),
+        'username': cfg.admin_username, 'password': cfg.admin_password}, follow_redirects=False)
+    assert response.status_code == 303
+    user = WebUser(cfg.admin_username, cfg.admin_username, True, client.cookies[cfg.admin_cookie_name], 'admin')
+    return csrf_token(user, cfg)
 
 
 def test_admin_cadastra_alertas_e_bloqueia_csrf_invalido(tmp_path):
@@ -69,9 +73,10 @@ def test_admin_cadastra_alertas_e_bloqueia_csrf_invalido(tmp_path):
     criar_banco(cfg.database_path)
     app = create_app(cfg)
     with TestClient(app) as client:
+        token = entrar_admin(client, cfg)
         publico = client.post(
             "/atualizar/alertas-email",
-            data={"csrf": csrf_token(PUBLIC_USER, cfg), "recipients": "a@empresa.com.br"},
+            data={"csrf": token, "recipients": "a@empresa.com.br"},
             follow_redirects=False,
         )
         assert publico.status_code == 303
@@ -85,7 +90,7 @@ def test_admin_cadastra_alertas_e_bloqueia_csrf_invalido(tmp_path):
         })
         assert invalido.status_code == 403
         salvo = client.post("/atualizar/alertas-email", data={
-            "csrf": csrf_token(PUBLIC_USER, cfg),
+            "csrf": token,
             "recipients": "a@empresa.com.br\nb@empresa.com.br",
         }, follow_redirects=False)
         assert salvo.status_code == 303
@@ -155,10 +160,11 @@ def test_admin_pode_disparar_atualizacao_sefaz(tmp_path, monkeypatch):
     monkeypatch.setattr("nfe_consulta.web.sync_runtime.sincronizar_banco", fake_sync)
 
     with TestClient(app) as client:
+        token = entrar_admin(client, cfg)
 
         resposta = client.post(
             "/atualizar/sincronizar",
-            data={"csrf": csrf_token(PUBLIC_USER, cfg), "max_lotes": "25", "confirmacao": "sincronizar"},
+            data={"csrf": token, "max_lotes": "25", "confirmacao": "sincronizar"},
             follow_redirects=False,
         )
         history = client.get("/status")
@@ -187,8 +193,9 @@ def test_post_direto_durante_bloqueio_nao_consulta_sefaz(tmp_path, monkeypatch, 
         pytest.fail("POST durante bloqueio iniciou sincronização")
     monkeypatch.setattr("nfe_consulta.web.app.sincronizar_configurado", proibido)
     with TestClient(create_app(cfg)) as client:
+        token = entrar_admin(client, cfg)
         resposta = client.post("/atualizar/sincronizar", data={
-            "csrf": csrf_token(PUBLIC_USER, cfg), "max_lotes": "50", "confirmacao": "sincronizar",
+            "csrf": token, "max_lotes": "50", "confirmacao": "sincronizar",
         })
     assert resposta.status_code == 429
     assert "Sincronização bloqueada temporariamente" in resposta.text
@@ -226,7 +233,8 @@ def test_sincronizacao_manual_exige_confirmacao_no_servidor(tmp_path, monkeypatc
         pytest.fail("Sincronização sem confirmação chegou à SEFAZ")
     monkeypatch.setattr("nfe_consulta.web.app.sincronizar_configurado", proibido)
     with TestClient(create_app(cfg)) as client:
-        resposta = client.post("/atualizar/sincronizar", data={"csrf": csrf_token(PUBLIC_USER, cfg)})
+        token = entrar_admin(client, cfg)
+        resposta = client.post("/atualizar/sincronizar", data={"csrf": token})
     assert resposta.status_code == 400
     assert "Confirme" in resposta.text
 
@@ -381,11 +389,12 @@ def test_admin_configura_certificado_por_caminho_no_servidor(tmp_path, monkeypat
     )
 
     with TestClient(app) as client:
+        token = entrar_admin(client, cfg)
 
         resposta = client.post(
             "/atualizar/certificado",
             data={
-                "csrf": csrf_token(PUBLIC_USER, cfg),
+                "csrf": token,
                 "certificate_path": str(cert_path),
                 "certificate_password": "Senha-PFX-123!",
             },
@@ -434,9 +443,10 @@ def test_sincronizacao_web_usa_certificado_configurado_em_arquivo(tmp_path, monk
     )
 
     with TestClient(app) as client:
+        token = entrar_admin(client, cfg)
         resposta = client.post(
             "/atualizar/sincronizar",
-            data={"csrf": csrf_token(PUBLIC_USER, cfg), "max_lotes": "5", "confirmacao": "sincronizar"},
+            data={"csrf": token, "max_lotes": "5", "confirmacao": "sincronizar"},
             follow_redirects=False,
         )
 
@@ -475,11 +485,12 @@ def test_admin_configura_banco_por_caminho_e_aplicacao_passa_a_usar(tmp_path):
 
     app = create_app(cfg)
     with TestClient(app) as client:
+        token = entrar_admin(client, cfg)
 
         resposta = client.post(
             "/atualizar/banco",
             data={
-                "csrf": csrf_token(PUBLIC_USER, cfg),
+                "csrf": token,
                 "database_path": str(banco_novo),
             },
             follow_redirects=False,
@@ -502,10 +513,11 @@ def test_admin_rejeita_arquivo_que_nao_e_banco_de_manifestacoes(tmp_path):
 
     app = create_app(cfg)
     with TestClient(app) as client:
+        token = entrar_admin(client, cfg)
         resposta = client.post(
             "/atualizar/banco",
             data={
-                "csrf": csrf_token(PUBLIC_USER, cfg),
+                "csrf": token,
                 "database_path": str(invalido),
             },
         )
