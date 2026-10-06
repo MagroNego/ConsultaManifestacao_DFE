@@ -3,7 +3,7 @@
 {% block page_class %} xml-page{% endblock %}
 {% block content %}
 <section class="page-heading">
-  <div><h1>XML</h1><p>Importe os lotes mensais e consulte notas, itens e retenções no mesmo aplicativo.</p></div>
+  <div><h1>XML</h1></div>
   <span class="status-dot ok">{{ result.notas }} nota{{ '' if result.notas == 1 else 's' }} arquivada{{ '' if result.notas == 1 else 's' }}</span>
 </section>
 {% if error %}<div class="alert error">{{ error }}</div>{% endif %}
@@ -14,7 +14,7 @@
 {% endif %}
 {% if user.is_admin %}
 <details class="card xml-import" {% if not result.notas %}open{% endif %}>
-  <summary>Importar lote mensal</summary>
+  <summary>Importar</summary>
   <p class="muted">Selecione o ZIP exportado pelo Synchro ou vários XMLs completos. Os meses anteriores ficam preservados; chaves repetidas não substituem o original.</p>
   <form action="{{ url_for('xml_import') }}" method="post" enctype="multipart/form-data" data-processing-form>
     <input type="hidden" name="csrf" value="{{ csrf }}">
@@ -41,7 +41,6 @@
     </div>
     <div class="filter-actions"><button class="button primary" type="submit">Consultar XMLs</button><a class="button secondary" href="{{ url_for('xml_page') }}">Limpar filtros</a></div>
   </form>
-  <p class="muted">No leitor, o período corresponde à emissão da nota; na consulta de manifestações, corresponde à data do evento.</p>
 </section>
 <section class="card results-card">
   <div class="results-heading">
@@ -51,18 +50,34 @@
       <input type="hidden" name="tipo" value="{{ tipo }}"><input type="hidden" name="q" value="{{ q }}">
       <input type="hidden" name="data_inicial" value="{{ inicio }}"><input type="hidden" name="data_final" value="{{ fim }}">
       {% if request.query_params.get('lote') %}<input type="hidden" name="lote" value="{{ request.query_params.get('lote') }}">{% endif %}
-      <div class="actions"><button class="button secondary" name="formato" value="xlsx" type="submit">Excel com todas as abas</button><button class="button secondary" name="formato" value="csv" type="submit">CSV deste relatório</button></div>
+      <div class="actions"><button class="button secondary" name="formato" value="xlsx" type="submit">EXCEL</button><button class="button secondary" name="formato" value="csv" type="submit">CSV</button></div>
     </form>
     {% endif %}
   </div>
   {% if result.rows %}
-  <div class="table-wrap result-table-wrap"><table class="query-table result-table"><thead><tr>
-    {% if tipo == 'notas' %}<th>Ações</th>{% endif %}
-    {% for column in result.columns %}<th>{{ column }}</th>{% endfor %}
+  <div class="table-wrap result-table-wrap"><table class="query-table result-table{% if tipo == 'notas' %} xml-notes-table{% endif %}"><thead><tr>
+    {% if tipo == 'notas' %}
+    <th>Ações</th><th>Número de nota</th><th>Data emissão</th><th>Destinatário</th><th class="xml-value">Valor da nota</th>
+    {% else %}{% for column in result.columns %}<th>{{ column }}</th>{% endfor %}{% endif %}
   </tr></thead><tbody>
     {% for row in result.rows %}<tr>
-      {% if tipo == 'notas' %}<td><div class="actions xml-row-actions">{% if user.can_export %}<a class="button secondary" href="{{ url_for('xml_download', chave=row['Chave Acesso']) }}">XML</a>{% endif %}<a href="{{ url_for('xml_page').include_query_params(tipo='itens', q=row['Chave Acesso']) }}">Itens</a><a href="{{ url_for('consulta_page').include_query_params(chave=row['Chave Acesso']) }}">Manifestações</a></div></td>{% endif %}
-      {% for column in result.columns %}<td {% if column == 'Chave Acesso' %}class="mono access-key"{% endif %}>{{ row.get(column, '') }}</td>{% endfor %}
+      {% if tipo == 'notas' %}
+      <td><div class="xml-row-actions">
+        {% if user.can_export %}<a class="xml-icon-action" href="{{ url_for('xml_download', chave=row['Chave Acesso']) }}" title="Baixar XML" aria-label="Baixar XML da nota {{ row['Numero Nota'] }}">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9zM14 3v6h6M9 12l-2 3 2 3M15 12l2 3-2 3"/></svg>
+        </a>{% endif %}
+        <a class="xml-icon-action" href="{{ url_for('xml_page').include_query_params(tipo='itens', q=row['Chave Acesso']) }}" title="Itens" aria-label="Ver itens da nota {{ row['Numero Nota'] }}">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/></svg>
+        </a>
+        <a class="xml-icon-action" href="{{ url_for('consulta_page').include_query_params(chave=row['Chave Acesso']) }}" title="Manifestações" aria-label="Ver manifestações da nota {{ row['Numero Nota'] }}">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-3M9 2h6v4H9zM8 13l3 3 5-6"/></svg>
+        </a>
+      </div></td>
+      <td>{{ row['Numero Nota'] }}</td>
+      <td>{{ row['Data Emissao'][8:10] }}/{{ row['Data Emissao'][5:7] }}/{{ row['Data Emissao'][:4] }}</td>
+      <td>{{ row['Destinatario Razao'] }}</td>
+      <td class="xml-value">R$ {{ '{:,.2f}'.format(row['Vl. Nota']|float).replace(',', '_').replace('.', ',').replace('_', '.') }}</td>
+      {% else %}{% for column in result.columns %}<td {% if column == 'Chave Acesso' %}class="mono access-key"{% endif %}>{{ row.get(column, '') }}</td>{% endfor %}{% endif %}
     </tr>{% endfor %}
   </tbody></table></div>
   {% if result.pages > 1 %}<nav class="pagination" aria-label="Paginação dos XMLs">
@@ -72,11 +87,4 @@
   </nav>{% endif %}
   {% else %}<p class="muted">Nenhum XML corresponde aos filtros. Importe o lote mensal ou ajuste a busca.</p>{% endif %}
 </section>
-{% if user.is_admin and history %}
-<details class="card xml-import"><summary>Últimas importações</summary>
-  <div class="table-wrap"><table class="query-table"><thead><tr><th>Lote</th><th>Data (UTC)</th><th>Importadas</th><th>Duplicadas</th><th>Erros/ignoradas</th><th>Registro</th></tr></thead><tbody>
-  {% for item in history %}<tr><td>{{ item.id }}</td><td>{{ item.criado_em }}</td><td>{{ item.importadas }}</td><td>{{ item.duplicadas }}</td><td>{{ item.erros }}</td><td><a href="{{ url_for('xml_batch_log', lote=item.id) }}">CSV</a></td></tr>{% endfor %}
-  </tbody></table></div>
-</details>
-{% endif %}
 {% endblock %}

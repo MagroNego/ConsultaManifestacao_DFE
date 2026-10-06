@@ -543,8 +543,64 @@ html[data-theme="dark"] .brand-logo-dark {
 }
 
 .xml-row-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
   flex-wrap: nowrap;
-  min-width: 220px;
+  margin: 0;
+}
+
+.xml-icon-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  border-radius: 8px;
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.xml-icon-action svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.xml-icon-action:hover,
+.xml-icon-action:focus-visible {
+  color: var(--text);
+  background: var(--primary-soft);
+}
+
+.xml-icon-action:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.xml-page .result-table th,
+.xml-page .result-table td {
+  white-space: nowrap;
+}
+
+.xml-page .xml-notes-table {
+  min-width: 0;
+}
+
+.xml-notes-table th:first-child,
+.xml-notes-table td:first-child {
+  width: 1%;
+}
+
+.xml-page .xml-value {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .xml-page .page-heading {
