@@ -533,6 +533,7 @@ html[data-theme="dark"] .brand-logo-dark {
 
 .xml-import {
   margin-bottom: 24px;
+  padding: 22px;
 }
 
 .xml-import summary {
@@ -544,6 +545,50 @@ html[data-theme="dark"] .brand-logo-dark {
 .xml-row-actions {
   flex-wrap: nowrap;
   min-width: 220px;
+}
+
+.xml-page .page-heading {
+  align-items: center;
+}
+
+.xml-page .card-title {
+  flex-wrap: wrap;
+}
+
+.xml-page .actions {
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.xml-page .field {
+  min-width: 0;
+}
+
+.xml-page .muted {
+  line-height: 1.5;
+}
+
+.xml-page .results-heading .actions {
+  margin-top: 0;
+}
+
+@media (max-width: 620px) {
+  .xml-page .page-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .xml-page .xml-import,
+  .xml-page .consultation-card,
+  .xml-page .results-card {
+    padding: 16px;
+  }
+
+  .xml-page .actions:not(.xml-row-actions) {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }
 
 .sync-confirmation input {

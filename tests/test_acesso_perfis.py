@@ -66,7 +66,7 @@ def test_matriz_de_permissoes_no_servidor_e_na_tela(tmp_path,role):
             assert client.get(path).status_code==200
         xml_page=client.get('/xml')
         assert ('Importar e arquivar' in xml_page.text) == (role=='admin')
-        assert ('>XML</a>' in xml_page.text) == (role!='consulta')
+        assert ('/xml/arquivo/' in xml_page.text) == (role!='consulta')
         assert ('Excel com todas as abas' in xml_page.text) == (role!='consulta')
         assert ('>Atualizar</a>' in xml_page.text) == (role=='admin')
         assert 'Sair' in xml_page.text

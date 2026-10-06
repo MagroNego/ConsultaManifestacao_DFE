@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Consulta de Manifestação{% endblock %}</title>
-  <link rel="stylesheet" href="{{ url_for('static', path='/app.css') }}?v={{ version }}">
+  <link rel="stylesheet" href="{{ url_for('static', path='/app.css') }}?v={{ version }}-xml-layout-1">
   <script src="{{ url_for('static', path='/app.js') }}?v={{ version }}" defer></script>
 </head>
 <body>
@@ -23,7 +23,7 @@
     <nav class="tabs" aria-label="Navegação principal">
       <a href="{{ url_for('consulta_page') }}" class="{% if request.url.path == '/' or request.url.path.startswith('/consulta') %}active{% endif %}">Consulta</a>
       <a href="{{ url_for('status_page') }}" class="{% if request.url.path.startswith('/status') %}active{% endif %}">Status</a>
-      <a href="{{ url_for('xml_page') }}" class="{% if request.url.path.startswith('/xml') %}active{% endif %}">XMLs</a>
+      <a href="{{ url_for('xml_page') }}" class="{% if request.url.path.startswith('/xml') %}active{% endif %}">XML</a>
       {% if user.is_admin %}<a href="{{ url_for('atualizar_page') }}" class="{% if request.url.path.startswith('/atualizar') or request.url.path.startswith('/admin/login') %}active{% endif %}">Atualizar</a>{% endif %}
     </nav>
 
@@ -45,7 +45,7 @@
     {% endif %}
   </header>
 
-  <main class="page">
+  <main class="page{% block page_class %}{% endblock %}">
     {% block content %}{% endblock %}
   </main>
 </body>
