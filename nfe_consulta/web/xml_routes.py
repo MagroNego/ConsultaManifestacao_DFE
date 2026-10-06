@@ -134,12 +134,6 @@ def register_xml_routes(app, settings, render, database_path):
                 return store.export_csv(store.query_report(database_path(settings), CNPJ_PADRAO, kind=tipo, **kwargs))
             reports = [(title, store.query_report(database_path(settings), CNPJ_PADRAO, kind=kind, **kwargs))
                 for title, kind in (("Notas", "notas"), ("Itens", "itens"), ("Retencoes", "retencoes"))]
-            if user.is_admin:
-                history, batch = store.import_history(database_path(settings), password=settings.current_database_password(), batch_id=lote)
-                if batch is None and history:
-                    _, batch = store.import_history(database_path(settings), password=settings.current_database_password(), batch_id=history[0]["id"])
-                if batch:
-                    reports.append(("Processamento", dict(columns=["arquivo", "status", "mensagem"], rows=batch["registros"])))
             return store.export_excel(reports)
         try:
             data = await run_in_threadpool(generate)

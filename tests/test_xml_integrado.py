@@ -133,7 +133,8 @@ def test_excel_csv_precisao_formula_e_codigos(tmp_path):
     store.import_batch(path, CNPJ_PADRAO, [(source, 'a.xml')])
     report = store.query_report(path, CNPJ_PADRAO, kind='itens', export=True)
     assert "'=1+1" in store.export_csv(report).decode('utf-8-sig')
-    wb = load_workbook(BytesIO(store.export_excel([('Itens', report)])))
+    notes = store.query_report(path, CNPJ_PADRAO, kind='notas', export=True)
+    wb = load_workbook(BytesIO(store.export_excel([('Notas', notes), ('Itens', report)])))
     sheet = wb['Itens']
     heads = [c.value for c in sheet[1]]
     assert sheet.cell(2, heads.index('Destinatario Razao') + 1).data_type == 's'
@@ -146,6 +147,12 @@ def test_excel_csv_precisao_formula_e_codigos(tmp_path):
     assert quantity.value == 3 and quantity.number_format == '#,##0'
     assert store.EXCEL_EXCLUDED_COLUMNS.isdisjoint(heads)
     assert all(key in report['columns'] for key in store.EXCEL_EXCLUDED_COLUMNS)
+    for title in ('Notas', 'Itens'):
+        current = wb[title]
+        columns = [cell.value for cell in current[1]]
+        emission = current.cell(2, columns.index('Data Emissao') + 1)
+        assert emission.value.date() == date(2026, 10, 1)
+        assert emission.number_format == 'dd/mm/yyyy'
 
 
 def test_web_lote_manifestacao_download_export_e_permissoes(tmp_path, monkeypatch):
@@ -167,7 +174,7 @@ def test_web_lote_manifestacao_download_export_e_permissoes(tmp_path, monkeypatc
         assert client.get('/xml/arquivo/'+'9'*44).status_code == 404
         assert client.get('/xml/exportar?formato=csv&tipo=itens&q=produto').status_code == 200
         data = client.get('/xml/exportar?formato=xlsx').content
-        assert load_workbook(BytesIO(data)).sheetnames == ['Notas','Itens','Retencoes','Processamento']
+        assert load_workbook(BytesIO(data)).sheetnames == ['Notas','Itens','Retencoes']
         assert client.get('/xml/lote/1/registro').status_code == 200
         banco = BancoManifestacoes(str(cfg.database_path))
         banco.salvar_retorno(CNPJ_PADRAO, RetornoDistribuicao(138,'ok','1'.zfill(15),'1'.zfill(15),((CHAVE,Manifestacao('210240','Operação não Realizada','2026-10-01T10:00:00-03:00','1')),),0))

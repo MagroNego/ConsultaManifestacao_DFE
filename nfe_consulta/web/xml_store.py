@@ -6,7 +6,7 @@ import hashlib
 import json
 import re
 import stat
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal, ROUND_HALF_UP, localcontext
 from io import BytesIO, StringIO
 from pathlib import Path, PurePosixPath
@@ -308,7 +308,14 @@ def export_excel(reports):
             values = []
             for key in columns:
                 value = row.get(key, "")
-                if key.startswith(("Vl.", "Base ", "% ", "Qtd", "Aliquota ")) and value != "":
+                if key == "Data Emissao" and value:
+                    for pattern in ("%Y-%m-%d", "%d/%m/%Y"):
+                        try:
+                            value = datetime.strptime(str(value), pattern).date()
+                            break
+                        except ValueError:
+                            continue
+                elif key.startswith(("Vl.", "Base ", "% ", "Qtd", "Aliquota ")) and value != "":
                     try:
                         with localcontext() as context:
                             context.prec = 110
@@ -319,7 +326,9 @@ def export_excel(reports):
                 values.append(value)
             sheet.append(values)
             for cell in sheet[sheet.max_row]:
-                if isinstance(cell.value, str):
+                if isinstance(cell.value, date):
+                    cell.number_format = "dd/mm/yyyy"
+                elif isinstance(cell.value, str):
                     cell.data_type = "s"
                     cell.number_format = "@"
                 elif cell.value is not None:
