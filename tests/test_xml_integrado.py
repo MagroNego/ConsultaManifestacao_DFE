@@ -275,3 +275,19 @@ def test_importacao_travada_e_texto_html_escapado(tmp_path):
 def test_total_nota_com_expoente_extremo_recusado(number):
     with pytest.raises(ValueError, match='numérico'):
         store.read_document(xml().replace(b'<vNF>0.37</vNF>', b'<vNF>'+number+b'</vNF>'), CNPJ_PADRAO)
+
+
+@pytest.mark.parametrize('emission, expected', [('2026-05-10', '10/05/2026'), ('2026-10-05', '05/10/2026')])
+def test_datas_xml_em_formato_brasileiro_sem_inverter_dia_mes(tmp_path, emission, expected):
+    cfg = helpers['settings_web'](tmp_path)
+    helpers['criar_banco'](cfg.database_path)
+    source = tmp_path / 'nota.xml'
+    source.write_bytes(xml(emission=emission))
+    store.import_batch(cfg.database_path, CNPJ_PADRAO, [(source, 'nota.xml')])
+    with TestClient(create_app(cfg)) as client:
+        for tipo in ['notas', 'itens', 'retencoes']:
+            response = client.get('/xml', params={'tipo': tipo})
+            assert response.status_code == 200
+            assert expected in response.text
+            assert emission not in response.text
+    assert store.query_report(cfg.database_path, CNPJ_PADRAO)['rows'][0]['Data Emissao'] == emission

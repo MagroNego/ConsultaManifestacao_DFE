@@ -1283,3 +1283,30 @@ html[data-theme="dark"] .brand-logo-dark {
 .manifestation-cell strong {
   white-space: nowrap;
 }
+
+/* Filtros da consulta distribuídos em duas linhas completas. */
+.consulta-page .filters-form {
+  width: 100%;
+  max-width: 960px;
+  margin-inline: auto;
+}
+
+.consulta-page .filters-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.consulta-page .filter-actions {
+  justify-content: center;
+}
+
+@media (max-width: 900px) {
+  .consulta-page .filters-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  .consulta-page .filters-grid {
+    grid-template-columns: 1fr;
+  }
+}

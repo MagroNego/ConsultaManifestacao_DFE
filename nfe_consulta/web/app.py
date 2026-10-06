@@ -7,7 +7,7 @@ import contextlib
 import shutil
 import tempfile
 import threading
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 from typing import Annotated
 
@@ -67,6 +67,23 @@ from nfe_consulta.web.xml_upload_limit import XmlUploadLimit
 
 BASE_DIR = Path(__file__).resolve().parent
 TEMPLATES = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+
+
+def _format_date_br(value) -> str:
+    if not value:
+        return ""
+    if isinstance(value, (date, datetime)):
+        return value.strftime("%d/%m/%Y")
+    text = str(value)
+    for pattern in ("%Y-%m-%d", "%d/%m/%Y"):
+        try:
+            return datetime.strptime(text[:10], pattern).strftime("%d/%m/%Y")
+        except ValueError:
+            continue
+    return text
+
+
+TEMPLATES.env.filters["date_br"] = _format_date_br
 
 
 def _context(
