@@ -11,32 +11,25 @@ NFE_WEB_ENV=production
 NFE_WEB_HOST=127.0.0.1
 NFE_WEB_PORT=8080
 NFE_WEB_FORWARDED_ALLOW_IPS=127.0.0.1
-NFE_ADMIN_SESSION_MINUTES=30
 ```
 
 Se o proxy estiver em outra máquina, informe somente os endereços confiáveis em `NFE_WEB_FORWARDED_ALLOW_IPS`. O endpoint `GET /healthz` retorna somente estado básico e versão, sem indicar a disponibilidade do banco.
 
 ## Controle de acesso
 
-Toda rota exige sessão válida, exceto login, recursos estáticos e healthcheck sem dados fiscais. A validação ocorre no servidor antes de processar corpos de upload anônimos. Dados fiscais são acessíveis a Consulta/Fiscal/Administrador; exportações e download de XML exigem Fiscal/Administrador; configuração, sincronização e importação exigem Administrador. Cabeçalhos de identidade e campos enviados pelo cliente não conferem permissões. Não existem contas públicas ou cadastro automático.
+O aplicativo não exige login. Consultas, exportações e funções de **Admin** estão disponíveis a quem alcançar o endereço. A rede/firewall ou a autenticação no reverse proxy devem limitar esse acesso. A aba Admin não verifica identidade ou perfil. Contas antigas são preservadas no disco e não são utilizadas.
 
-Na primeira execução da v2.4.0, a coluna de perfil é adicionada ao banco de contas: administradores existentes são preservados com suas senhas e sessões anteriores são revogadas. Mantenha backup desse banco, sem substituir o arquivo por uma cópia vazia. A autenticação no app complementa HTTPS, firewall e permissões de acesso às pastas; não altera a infraestrutura de rede.
-
-## Credenciais e contas
-
-O primeiro acesso é configurado por `CONFIGURAR_ADMIN.cmd` no Windows ou por `secrets/admin-user.txt` e `secrets/admin-password.txt`. Após criar contas individuais em **Atualizar → Gerenciar acessos**, desative a conta compartilhada e remova o arquivo da senha inicial. As contas existentes não são recriadas a partir desses arquivos.
-
-Contas e sessões ficam em `dados/admin_accounts.db`. A aplicação armazena hashes de senhas e de tokens. Sessões expiram por inatividade, com limite absoluto de oito horas, e são revogadas no logout, troca de senha, alteração de perfil ou do estado da conta.
+## Segredos do servidor
 
 `INICIAR_WEB.cmd` cria `secrets/web-csrf-secret.txt` na primeira execução e preserva o arquivo nos reinícios. Em outro método de inicialização, configure esse arquivo com pelo menos 32 caracteres aleatórios ou defina `NFE_WEB_CSRF_SECRET` no ambiente do serviço.
 
 As senhas do banco, certificado e SMTP são lidas dos arquivos de `secrets`; `NFE_DATABASE_PASSWORD`, `NFE_CERT_PASSWORD` e `NFE_ADMIN_PASSWORD` não são fontes de senha.
 
-Restrinja as permissões NTFS ou Unix das pastas operacionais à conta do processo e aos administradores autorizados. O banco de contas é SQLite e depende dessas permissões e da proteção dos backups.
+Restrinja as permissões NTFS ou Unix das pastas operacionais à conta do processo e aos administradores autorizados.
 
 ## Banco fiscal
 
-Em **Atualizar**, selecione o banco existente. A configuração é salva em `secrets/db-path.txt`; a senha SQLCipher fica em `secrets/db-password.txt`. A tela administrativa identifica se o arquivo usa SQLite ou SQLCipher.
+Em **Admin**, selecione o banco existente. A configuração é salva em `secrets/db-path.txt`; a senha SQLCipher fica em `secrets/db-password.txt`. A tela administrativa identifica se o arquivo usa SQLite ou SQLCipher.
 
 SQLCipher é opcional e protege o banco fiscal em repouso. Não criptografa automaticamente exportações, logs, o banco de contas ou arquivos de segredo. Consulte [SEGURANCA_BANCO.md](SEGURANCA_BANCO.md) para continuidade e restauração.
 
@@ -44,7 +37,7 @@ SQLCipher é opcional e protege o banco fiscal em repouso. Não criptografa auto
 
 ### Arquivo PFX/P12
 
-Armazene o certificado em pasta protegida, por exemplo `C:\Certificados\certificado.pfx`, e configure-o em **Atualizar**. A conta do serviço precisa ler o arquivo. O aplicativo guarda o caminho em `secrets/cert-path.txt` e a senha em `secrets/cert-password.txt`; não copia o certificado para o projeto.
+Armazene o certificado em pasta protegida, por exemplo `C:\Certificados\certificado.pfx`, e configure-o em **Admin**. A conta do serviço precisa ler o arquivo. O aplicativo guarda o caminho em `secrets/cert-path.txt` e a senha em `secrets/cert-password.txt`; não copia o certificado para o projeto.
 
 ### Windows Certificate Store
 

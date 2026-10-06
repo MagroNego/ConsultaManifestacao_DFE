@@ -43,8 +43,7 @@ echo.
 echo Proximos passos:
 echo   1. Coloque o banco em dados\nfe_manifestacoes_seguro.db
 echo   2. Coloque a senha do banco em secrets\db-password.txt
-echo   3. Execute CONFIGURAR_ADMIN.cmd
-echo   4. Execute INICIAR_WEB.cmd
+echo   3. Execute INICIAR_WEB.cmd
 echo.
 pause
 exit /b 0

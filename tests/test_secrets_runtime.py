@@ -39,8 +39,8 @@ def test_web_settings_usa_senhas_da_pasta_secrets_e_ignora_env(tmp_path, monkeyp
     finally:
         settings.get_settings.cache_clear()
 
-    assert cfg.admin_username == "administrador"
-    assert cfg.admin_password == "Senha-Admin-Arquivo-123!"
+    assert cfg.admin_username == "admin"
+    assert cfg.admin_password is None
     assert cfg.database_password == "Senha-Banco-Arquivo-123!"
     assert cfg.certificate_path_file == cert_path
     assert cfg.certificate_password_file == cert_password
@@ -75,7 +75,6 @@ def test_producao_usa_segredo_persistente_e_nao_ativa_sync_sozinha(tmp_path, mon
     secret = tmp_path / "web-csrf-secret.txt"
     secret.write_text("s" * 48, encoding="utf-8")
     accounts = tmp_path / "admin_accounts.db"
-    accounts.touch()
     monkeypatch.setattr(settings, "CSRF_SECRET_FILE", secret)
     monkeypatch.setenv("NFE_WEB_ENV", "production")
     monkeypatch.delenv("NFE_WEB_CSRF_SECRET", raising=False)

@@ -43,9 +43,7 @@ def zip_bytes(entries):
 
 
 def login(client, cfg):
-    assert client.post('/admin/login', data={'csrf': csrf_token(PUBLIC_USER, cfg), 'username': cfg.admin_username, 'password': cfg.admin_password}, follow_redirects=False).status_code == 303
-    user = WebUser(cfg.admin_username, 'Administrador', True, client.cookies[cfg.admin_cookie_name])
-    return csrf_token(user, cfg)
+    return csrf_token(PUBLIC_USER, cfg)
 
 
 def test_arquivo_cumulativo_duplicatas_download_e_reabertura(tmp_path):
@@ -163,13 +161,12 @@ def test_web_lote_manifestacao_download_export_e_permissoes(tmp_path, monkeypatc
     monkeypatch.setattr('nfe_consulta.web.app.sincronizar_configurado', proibido)
     app = create_app(cfg)
     with TestClient(app) as client:
-        assert client.get('/xml',follow_redirects=False).status_code == 303
-        assert client.post('/xml/importar', data={'csrf': csrf_token(PUBLIC_USER,cfg)}, files={'files':('a.xml',xml())}).status_code == 401
+        assert client.get('/xml',follow_redirects=False).status_code == 200
         token = login(client, cfg)
         assert client.post('/xml/importar', data={'csrf':'errado'}, files={'files':('a.xml',xml())}).status_code == 403
         response = client.post('/xml/importar', data={'csrf':token}, files={'files':('mensal.zip',zip_bytes([('a.xml',xml())]),'application/zip')})
         assert response.status_code == 200 and '1 importada(s)' in response.text
-        assert '=1+1' in response.text
+        assert '=1+1' in client.get('/xml').text
         assert client.get('/xml/arquivo/'+CHAVE).content == xml()
         assert client.get('/xml/arquivo/'+'9'*44).status_code == 404
         assert client.get('/xml/exportar?formato=csv&tipo=itens&q=produto').status_code == 200
@@ -183,7 +180,7 @@ def test_web_lote_manifestacao_download_export_e_permissoes(tmp_path, monkeypatc
         assert 'Baixar XML' in consulta.text and '/xml/arquivo/'+CHAVE in consulta.text
         assert client.get('/xml?tipo=itens&q=produto').status_code == 200
     with TestClient(create_app(cfg)) as client:
-        assert client.get('/xml/arquivo/'+CHAVE).status_code == 401
+        assert client.get('/xml/arquivo/'+CHAVE).status_code == 200
         login(client,cfg)
         assert '1 nota arquivada' in client.get('/xml').text
         assert client.get('/xml/arquivo/'+CHAVE).content == xml()
@@ -271,7 +268,7 @@ def test_importacao_travada_e_texto_html_escapado(tmp_path):
         response = client.post('/xml/importar', data={'csrf':token}, files={'files':('a.xml',xml(dest='&lt;script&gt;alert(1)&lt;/script&gt;'))})
         assert response.status_code == 200
         assert '<script>alert(1)</script>' not in response.text
-        assert '&lt;script&gt;alert(1)&lt;/script&gt;' in response.text
+        assert '&lt;script&gt;alert(1)&lt;/script&gt;' in client.get('/xml').text
 
 
 @pytest.mark.parametrize('number', [b'0E-10000000', b'1E+10000000'])

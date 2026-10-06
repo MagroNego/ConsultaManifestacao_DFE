@@ -14,13 +14,12 @@ Extraia `ConsultaManifestacao_DFE-v2.4.0.zip`, por exemplo em `C:\ConsultaManife
 
 ```powershell
 .\INSTALAR.cmd
-.\CONFIGURAR_ADMIN.cmd
 .\INICIAR_WEB.cmd
 ```
 
-O instalador cria `.venv`, instala as dependências e prepara as pastas operacionais. O configurador cria as credenciais da primeira conta. O lançador inicia em modo produção, cria o segredo Web persistente quando necessário e habilita a rotina das 08:00 e 15:00.
+O instalador cria `.venv`, instala as dependências e prepara as pastas operacionais. O lançador inicia em modo produção, cria o segredo Web persistente quando necessário e habilita a rotina das 08:00 e 15:00.
 
-Abra http://127.0.0.1:8080 e entre com sua conta. Em **Atualizar**, selecione o banco e configure o certificado. Para SQLCipher, coloque a senha em `secrets\db-password.txt`. Usuários comuns não informam essa senha na consulta.
+Abra http://127.0.0.1:8080 . Em **Admin**, selecione o banco e configure o certificado. Para SQLCipher, coloque a senha em `secrets\db-password.txt`. Usuários comuns não informam essa senha na consulta.
 
 ## Linux
 
@@ -33,7 +32,7 @@ mkdir -p secrets dados logs
 chmod 700 secrets dados logs
 ```
 
-Crie `secrets/admin-user.txt` e `secrets/admin-password.txt` em um editor local. A senha inicial deve ter pelo menos 12 caracteres. Gere o segredo Web:
+Gere o segredo Web:
 
 ```bash
 .venv/bin/python -c "from pathlib import Path; import secrets; p=Path('secrets/web-csrf-secret.txt'); p.exists() or p.write_text(secrets.token_urlsafe(48), encoding='utf-8')"
@@ -52,7 +51,7 @@ Em fish:
 env NFE_WEB_ENV=production NFE_AUTO_SYNC_ENABLED=1 .venv/bin/python -m nfe_consulta.web.app
 ```
 
-Configure o certificado por arquivo PFX/P12 em **Atualizar**. O Windows Certificate Store está disponível somente no Windows.
+Configure o certificado por arquivo PFX/P12 em **Admin**. O Windows Certificate Store está disponível somente no Windows.
 
 ## Atualizar uma instalação existente
 
@@ -81,4 +80,4 @@ Execute uma única instância. O processo precisa permanecer ativo; feche-o de f
 
 ## Atualização para contas e perfis
 
-A v2.4.0 exige login para todo acesso fiscal. Preserve dados/admin_accounts.db: a migração mantém contas, senhas e administradores, adiciona perfis e encerra sessões antigas. Cadastre os usuários em Atualizar → Gerenciar acessos após entrar novamente. Novas contas usam Consulta por padrão; escolha Fiscal para liberar downloads/exportações e Administrador para gestão.
+O acesso é direto, sem login. Arquivos de contas antigos permanecem preservados, mas não são usados pelo aplicativo. Quem alcançar o endereço também poderá usar Admin.

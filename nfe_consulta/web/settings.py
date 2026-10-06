@@ -157,19 +157,12 @@ def get_settings() -> WebSettings:
     elif not csrf_secret:
         csrf_secret = secrets.token_urlsafe(32)
 
-    admin_password = _senha_admin()
-    admin_username = _usuario_admin()
-    if admin_password and len(admin_password) < 12:
-        raise RuntimeError("A senha do administrador deve ter pelo menos 12 caracteres.")
+    # Contas antigas são preservadas no disco, mas não são usadas pelo app.
+    admin_password = None
+    admin_username = "admin"
     accounts_path = Path(os.getenv("NFE_ADMIN_ACCOUNTS_PATH", str(RAIZ_PROJETO / "dados" / "admin_accounts.db"))).expanduser()
-    if ambiente == "production" and not admin_password and not accounts_path.is_file():
-        raise RuntimeError(
-            f"Configure {ADMIN_PASSWORD_FILE} para o primeiro acesso administrativo."
-        )
 
-    admin_session_minutes = int(os.getenv("NFE_ADMIN_SESSION_MINUTES", "30"))
-    if not 5 <= admin_session_minutes <= 480:
-        raise RuntimeError("NFE_ADMIN_SESSION_MINUTES deve estar entre 5 e 480.")
+    admin_session_minutes = 30  # Compatibilidade de WebSettings; não há sessões.
 
     cert_store = os.getenv("NFE_CERT_STORE", "CurrentUser").strip()
     if cert_store not in {"CurrentUser", "LocalMachine"}:

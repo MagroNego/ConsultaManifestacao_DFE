@@ -7,7 +7,6 @@ import contextlib
 import shutil
 import tempfile
 import threading
-import time
 from datetime import date
 from pathlib import Path
 from typing import Annotated
@@ -46,19 +45,13 @@ from nfe_consulta.web.consulta_local import (
     normalizar_filtros,
 )
 from nfe_consulta.web.auth import (
-    PUBLIC_USER,
     WebUser,
-    admin_session_active,
-    clear_admin_cookie,
     csrf_token,
     current_user,
     require_admin,
-    require_user,
     require_export,
-    set_admin_cookie,
     validate_csrf,
 )
-from nfe_consulta.web.admin_accounts import AdminAccounts
 from nfe_consulta.web.scheduler import loop_sincronizacao_automatica
 from nfe_consulta.web.settings import WebSettings, get_settings
 from nfe_consulta.web.email_alerts import (
@@ -68,7 +61,7 @@ from nfe_consulta.web.email_alerts import (
 from nfe_consulta.web.sync_runtime import sincronizar_configurado
 from nfe_consulta.web.uploads import consolidar_txts
 from nfe_consulta.web.xml_routes import register_xml_routes
-from nfe_consulta.web.xml_store import existing_keys, MAX_UPLOAD
+from nfe_consulta.web.xml_store import existing_keys, MAX_UPLOAD, import_history
 from nfe_consulta.web.xml_upload_limit import XmlUploadLimit
 
 
@@ -246,13 +239,6 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         redoc_url=None,
     )
     app.state.settings = settings
-    app.state.admin_accounts = AdminAccounts(
-        settings.admin_accounts_path or settings.database_path.parent / "admin_accounts.db",
-        bootstrap_username=settings.admin_username,
-        bootstrap_password=settings.admin_password,
-    )
-    app.state.login_attempts = {}
-    app.state.login_lock = threading.Lock()
     app.state.export_lock = threading.Lock()
     app.state.export_active = 0
     app.state.sync_lock = threading.Lock()
@@ -292,21 +278,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
     @app.middleware("http")
     async def security_headers(request: Request, call_next):
         path = request.url.path
-        if path not in {"/admin/login", "/healthz"} and not path.startswith("/static/"):
-            user = current_user(request)
-            if not user.authenticated:
-                if request.method == "GET" and path in {"/", "/consulta", "/status", "/xml", "/atualizar"}:
-                    return RedirectResponse(request.url_for("admin_login_page"), status_code=303,
-                        headers={"Cache-Control": "no-store"})
-                return JSONResponse({"detail": "Faça login para acessar o aplicativo."}, status_code=401,
-                    headers={"Cache-Control": "no-store"})
-            if (path in {"/excel", "/consulta/exportar", "/xml/exportar"} or path.startswith("/xml/arquivo/")) and not user.can_export:
-                app.state.audit.write(request, user, "access_denied", "erro", operation="export_download")
-                return JSONResponse({"detail": "Esta ação exige perfil Fiscal ou Administrador."}, status_code=403,
-                    headers={"Cache-Control": "no-store"})
-        if path == "/xml/importar" and request.method == "POST" and not current_user(request).is_admin:
-            return JSONResponse({"detail": "A importação de XMLs exige login administrativo."}, status_code=403)
-        if path in {"/excel", "/admin/login", "/xml/importar"} and request.method == "POST":
+        if path in {"/excel", "/xml/importar"} and request.method == "POST":
             try:
                 size = int(request.headers.get("content-length", "0"))
             except ValueError:
@@ -328,11 +300,6 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                 with app.state.export_lock:
                     app.state.export_active -= 1
 
-        if (
-            request.url.path != "/admin/logout"
-            and admin_session_active(request)
-        ):
-            set_admin_cookie(response, settings, request.cookies[settings.admin_cookie_name])
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
         response.headers.setdefault("X-Frame-Options", "DENY")
         response.headers.setdefault("Referrer-Policy", "no-referrer")
@@ -367,11 +334,6 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
 
     @app.exception_handler(HTTPException)
     async def http_error(request: Request, exc: HTTPException):
-        if exc.status_code == 401 and request.url.path.startswith("/atualizar"):
-            return RedirectResponse(
-                url=request.url_for("admin_login_page"),
-                status_code=303,
-            )
         if exc.status_code in {401, 403}:
             return _render(
                 request,
@@ -394,138 +356,9 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         }
 
     @app.get("/admin/login", response_class=HTMLResponse)
-    async def admin_login_page(
-        request: Request,
-        user: Annotated[WebUser, Depends(current_user)],
-    ):
-        if user.authenticated:
-            return RedirectResponse(
-                url=request.url_for("atualizar_page" if user.is_admin else "consulta_page"),
-                status_code=303,
-            )
-
-        return _render(
-            request,
-            "login.html",
-            user,
-            admin_configured=app.state.admin_accounts.configured(),
-        )
-
-    @app.post("/admin/login")
-    async def admin_login(
-        request: Request,
-        user: Annotated[WebUser, Depends(current_user)],
-        csrf: str = Form(...),
-        username: str = Form(...),
-        password: str = Form(...),
-    ):
-        validate_csrf(csrf, user, settings)
-        if len(username) > 64 or len(password) > 1024:
-            return _render(request, "login.html", user, status_code=400,
-                           admin_configured=True, error="Usuário ou senha inválidos.")
-
-        if not app.state.admin_accounts.configured():
-            return _render(
-                request,
-                "login.html",
-                user,
-                status_code=503,
-                admin_configured=False,
-                error="Login de administrador ainda não configurado no servidor.",
-            )
-
-        address = request.client.host if request.client else "unknown"
-        key = ("account", username.strip().casefold())
-        ip_key = ("ip", address)
-        now = time.monotonic()
-        with app.state.login_lock:
-            attempts = app.state.login_attempts
-            if len(attempts) > 2000:
-                for old_key in list(attempts):
-                    attempts[old_key] = [t for t in attempts[old_key] if now - t < 300]
-                    if not attempts[old_key]:
-                        del attempts[old_key]
-            recent = [t for t in attempts.get(key, ()) if now - t < 300]
-            recent_ip = [t for t in attempts.get(ip_key, ()) if now - t < 300]
-            blocked = (len(recent) >= 10 or len(recent_ip) >= 30
-                       or (len(attempts) >= 5000 and key not in attempts))
-            if not blocked:
-                attempts[key] = recent + [now]
-                attempts[ip_key] = recent_ip + [now]
-        if blocked:
-            return _render(request, "login.html", user, status_code=429,
-                           admin_configured=True, error="Muitas tentativas. Tente novamente em alguns minutos.")
-
-        logged_username = await run_in_threadpool(app.state.admin_accounts.authenticate, username, password)
-        if not logged_username:
-            app.state.audit.write(
-                request,
-                PUBLIC_USER,
-                "admin_login",
-                "erro",
-                reason="invalid_credentials",
-            )
-            return _render(
-                request,
-                "login.html",
-                user,
-                status_code=401,
-                admin_configured=True,
-                error="Usuário ou senha inválidos.",
-            )
-
-        with app.state.login_lock:
-            app.state.login_attempts.pop(key, None)
-        admin_user = WebUser(
-            username=logged_username,
-            display_name=logged_username,
-            is_admin=app.state.admin_accounts.role(logged_username) == "admin",
-            role=app.state.admin_accounts.role(logged_username) or "consulta",
-        )
-        app.state.audit.write(
-            request,
-            admin_user,
-            "admin_login",
-            "ok",
-        )
-
-        response = RedirectResponse(
-            url=request.url_for("atualizar_page" if admin_user.is_admin else "consulta_page"),
-            status_code=303,
-        )
-        set_admin_cookie(response, settings, app.state.admin_accounts.new_session(logged_username))
-        return response
-
-    @app.post("/admin/logout")
-    async def admin_logout(
-        request: Request,
-        user: Annotated[WebUser, Depends(require_user)],
-        csrf: str = Form(...),
-    ):
-        validate_csrf(csrf, user, settings)
-        app.state.admin_accounts.revoke_session(user.session_token)
-        app.state.audit.write(
-            request,
-            user,
-            "admin_logout",
-            "ok",
-        )
-        response = RedirectResponse(
-            url=request.url_for("consulta_page"),
-            status_code=303,
-        )
-        clear_admin_cookie(response, settings)
-        return response
-
-    @app.get("/admin/contas", response_class=HTMLResponse)
-    async def admin_accounts_page(
-        request: Request,
-        user: Annotated[WebUser, Depends(require_admin)],
-        ok: str | None = None,
-    ):
-        return _render(request, "admin_accounts.html", user,
-                       accounts=app.state.admin_accounts.list_accounts(),
-                       success="Acesso atualizado." if ok else None)
+    async def admin_login_page(request: Request):
+        # Links antigos abrem diretamente a administração, sem autenticação.
+        return RedirectResponse(request.url_for("atualizar_page"), status_code=303)
 
     @app.get("/admin/historico", response_class=HTMLResponse)
     async def admin_history_page(
@@ -539,40 +372,6 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             history = ()
             error = "Histórico temporariamente indisponível."
         return _render(request, "admin_history.html", user, history=history, error=error)
-
-    @app.post("/admin/contas")
-    async def admin_accounts_update(
-        request: Request,
-        user: Annotated[WebUser, Depends(require_admin)],
-        csrf: str = Form(...),
-        action: str = Form(...),
-        username: str = Form(...),
-        password: str = Form(""),
-        role: str = Form("consulta"),
-    ):
-        validate_csrf(csrf, user, settings)
-        accounts = app.state.admin_accounts
-        try:
-            if action == "create":
-                await run_in_threadpool(accounts.create, username, password, role)
-            elif action == "reset":
-                await run_in_threadpool(accounts.reset_password, username, password)
-            elif action in {"activate", "deactivate"}:
-                await run_in_threadpool(accounts.set_active, username, action == "activate")
-            elif action == "role":
-                await run_in_threadpool(accounts.set_role, username, role)
-            else:
-                raise ValueError("Ação inválida.")
-        except ValueError as exc:
-            app.state.audit.write(request, user, "admin_accounts", "erro", target=username, operation=action)
-            return _render(request, "admin_accounts.html", user, status_code=400,
-                           accounts=accounts.list_accounts(), error=str(exc))
-        app.state.audit.write(request, user, "admin_accounts", "ok", target=username, operation=action, target_role=role if action in {"create", "role"} else None)
-        response = RedirectResponse(url=request.url_for("admin_accounts_page").include_query_params(ok="1"), status_code=303)
-        if action in {"deactivate", "role", "reset"} and username.casefold() == user.username.casefold():
-            clear_admin_cookie(response, settings)
-            response.headers["location"] = str(request.url_for("admin_login_page"))
-        return response
 
     @app.get("/", response_class=HTMLResponse)
     async def home(
@@ -956,6 +755,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         db_ok: str | None = None,
         email_ok: str | None = None,
         email_sent: str | None = None,
+        lote: int | None = None,
     ):
         try:
             status_web = await run_in_threadpool(_status_web, settings)
@@ -970,10 +770,19 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             email_recipients = ""
             erro = "Lista de destinatários inválida. Salve novamente os endereços para corrigir."
 
+        batch = None
+        if lote is not None:
+            try:
+                _, batch = await run_in_threadpool(import_history, _database_path(settings),
+                    password=settings.current_database_password(), batch_id=lote)
+            except Exception:
+                erro = "Não foi possível consultar o resultado da importação."
+
         return _render(
             request,
             "sefaz.html",
             user,
+            batch=batch,
             status_web=status_web,
             success=(
                 "Sincronização concluída." if ok == "1"

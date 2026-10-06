@@ -12,7 +12,7 @@ Aplicação Web para consultar manifestações de NF-e, exportar relatórios Exc
 - Identificação do emitente pelo nome recebido ou pelo CNPJ da chave.
 - Status do banco, cursor NSU, bloqueio e últimas sincronizações.
 - Sincronização manual administrativa e automática às **08:00 e 15:00 (Brasília)**.
-- Login obrigatório com contas individuais, perfis Consulta/Fiscal/Administrador e revogação de sessões.
+- Acesso direto sem login; importação e configurações reunidas em Admin.
 - Alertas de novos eventos **Operação não Realizada (210240)** por e-mail, com fila persistente.
 - Leitor XML integrado: importação cumulativa de XML/ZIP mensal, busca, itens, retenções, Excel e CSV.
 - Download do XML original na consulta de manifestações, associado pela chave de acesso.
@@ -26,11 +26,10 @@ Baixe `ConsultaManifestacao_DFE-v2.4.0.zip` em [Releases](https://github.com/Mag
 
 ```powershell
 .\INSTALAR.cmd
-.\CONFIGURAR_ADMIN.cmd
 .\INICIAR_WEB.cmd
 ```
 
-Abra **http://127.0.0.1:8080**. Em **Atualizar**, configure o banco existente e o certificado A1. O certificado pode ser um PFX/P12 protegido ou estar instalado no repositório de certificados do Windows.
+Abra **http://127.0.0.1:8080**. Em **Admin**, configure o banco existente e o certificado A1. O certificado pode ser um PFX/P12 protegido ou estar instalado no repositório de certificados do Windows.
 
 O lançador Windows inicia em modo produção e habilita a sincronização nos horários fixos de 08:00 e 15:00. Para desligá-la, defina `NFE_AUTO_SYNC_ENABLED=0` antes de executar o lançador. Banco, certificado e credenciais são configurados na instalação e não acompanham o pacote.
 
@@ -52,22 +51,20 @@ O cooldown padrão é **60 minutos**. A configuração antiga de cooldown é ign
 
 ## Lotes mensais de XML
 
-Entre como administrador, abra **XMLs → Importar lote mensal** e envie o ZIP baixado do Synchro ou vários XMLs completos. Os documentos ficam arquivados no banco fiscal, preservando os meses anteriores e ignorando chaves repetidas. Consulte por emissão, número, chave ou destinatário; abra itens e retenções e exporte Excel/CSV. Para perfis Fiscal/Administrador, na Consulta, **Baixar XML** aparece quando a chave tem arquivo importado.
+Abra **Admin → Importar XML** e envie o ZIP baixado do Synchro ou vários XMLs completos. Os documentos ficam arquivados no banco fiscal, preservando os meses anteriores e ignorando chaves repetidas. Consulte por emissão, número, chave ou destinatário; abra itens e retenções e exporte Excel/CSV. Na Consulta, **Baixar XML** aparece quando a chave tem arquivo importado.
 
 O leitor foi integrado a partir de [Leitor_XML_Saida](https://github.com/MagroNego/Leitor_XML_Saida). Aceita NF-e modelo 55 emitidas pelo CNPJ do aplicativo. A importação é local, sem certificado e sem chamadas à SEFAZ. Faça backup do banco fiscal para preservar também os XMLs; SQLCipher protege os novos dados quando habilitado. Veja limites e detalhes no [manual de uso](MANUAL_DE_USO.md).
 
 ## Administração e segurança
 
-Todos os dados fiscais exigem login, inclusive acesso por URL direta. O perfil **Consulta** visualiza notas, itens, retenções, manifestações e Status. **Fiscal** também baixa XMLs e exporta Excel/CSV. **Administrador** importa lotes, sincroniza, configura o app e gerencia as contas. Cadastre os acessos em **Atualizar → Gerenciar acessos**; novas contas usam Consulta por padrão. Alterar perfil, senha ou estado da conta revoga suas sessões.
+O aplicativo não exige login. Quem alcançar o endereço pode consultar, exportar, importar e administrar. Restrinja o acesso pela rede/firewall ou por autenticação no reverse proxy. A aba **Admin** organiza as funções; não é uma barreira de permissão.
 
-- Senhas das contas armazenadas como hash em `dados/admin_accounts.db`.
-- Sessões mantidas no servidor e revogadas no logout, troca de senha e alteração do estado da conta.
-- Proteção CSRF, cookies `HttpOnly` e `SameSite=Strict`, com `Secure` em produção.
+- Proteção CSRF nos formulários.
 - SQL parametrizado, processamento XML com `defusedxml` e limites de upload/exportação.
 - Auditoria com rotação em `logs/web_audit.log`.
 - SQLCipher opcional para proteger o banco fiscal; a administração mostra o modo de armazenamento.
 
-Senhas do banco, certificado e SMTP ficam em `secrets`. Os arquivos iniciais `admin-user.txt` e `admin-password.txt` criam a primeira conta; depois, gerencie contas em **Atualizar → Gerenciar acessos**. As credenciais não são incluídas nas releases.
+Senhas do banco, certificado e SMTP ficam em `secrets`. Contas antigas não são usadas e seus arquivos permanecem preservados. As credenciais não são incluídas nas releases.
 
 Em rede interna, use HTTPS por reverse proxy e **um único processo/worker**. Consulte [implantação](SERVIDOR_WEB.md) e [segurança do banco](SEGURANCA_BANCO.md).
 

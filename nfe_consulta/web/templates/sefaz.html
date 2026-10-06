@@ -1,16 +1,14 @@
 {% extends "base.html" %}
-{% block title %}Atualizar · Consulta de Manifestação{% endblock %}
+{% block title %}Admin · Consulta de Manifestação{% endblock %}
 
 {% block content %}
 <section class="page-heading">
   <div>
-    <h1>Atualizar</h1>
+    <h1>Admin</h1>
     <p>Configura o servidor e sincroniza o banco com a SEFAZ.</p>
   </div>
-  <span class="admin-badge">Administrador</span>
 </section>
 <div class="actions">
-  <a class="button secondary" href="{{ url_for('admin_accounts_page') }}">Gerenciar acessos</a>
   <a class="button secondary" href="{{ url_for('admin_history_page') }}">Histórico administrativo</a>
 </div>
 
@@ -20,6 +18,23 @@
 {% if error %}
 <div class="alert error">{{ error }}</div>
 {% endif %}
+
+{% if batch %}
+<div class="alert success">Lote processado: {{ batch.importadas }} importada(s), {{ batch.duplicadas }} duplicada(s), {{ batch.erros }} erro(s)/ignorada(s).
+  <a href="{{ url_for('xml_batch_log', lote=request.query_params.get('lote')) }}">Baixar registro do lote</a>
+  <a href="{{ url_for('xml_page') }}">Consultar XMLs</a>
+</div>
+{% endif %}
+<details class="card xml-import" open>
+  <summary>Importar XML</summary>
+  <p class="muted">Selecione o ZIP exportado pelo Synchro ou vários XMLs completos. Os meses anteriores ficam preservados; chaves repetidas não substituem o original.</p>
+  <form action="{{ url_for('xml_import') }}" method="post" enctype="multipart/form-data" data-processing-form>
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label class="field"><span>Arquivos XML ou ZIP</span><input type="file" name="files" accept=".xml,.zip" multiple required></label>
+    <p class="muted">Até 100 MiB por envio, 250 MiB descompactados e 5.000 documentos. Somente NF-e emitidas pelo CNPJ configurado.</p>
+    <div class="actions"><button class="button primary" type="submit">Importar e arquivar</button></div>
+  </form>
+</details>
 
 <div class="admin-grid">
   <section class="card">

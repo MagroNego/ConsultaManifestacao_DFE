@@ -1,18 +1,8 @@
 # Manual de uso — v2.4.0
 
-## Entrar e perfis
+## Acesso
 
-O aplicativo exige conta individual e senha para acessar qualquer dado fiscal. Abra o endereço do app e faça login. As contas administrativas existentes continuam com as mesmas senhas; na primeira atualização para v2.4.0, as sessões antigas são encerradas. O administrador cadastra as demais contas em **Atualizar → Gerenciar acessos**.
-
-| Perfil | Acesso |
-| --- | --- |
-| Consulta | Visualizar notas, itens, impostos, retenções, manifestações e Status |
-| Fiscal | Tudo de Consulta, mais download de XML e exportações Excel/CSV/TXT por chaves |
-| Administrador | Tudo de Fiscal, mais importação mensal, sincronização, configuração e gestão de contas |
-
-A seleção de perfil aparece no cadastro e em cada conta existente. Novas contas são Consulta por padrão. Somente Administradores criam contas, alteram perfis, ativam/desativam e trocam senhas; não existe cadastro público. Nenhuma informação fiscal, exportação ou download é liberada sem sessão válida, mesmo por link direto. O último administrador ativo não pode ser desativado nem perder esse perfil.
-
-Use **Sair** para encerrar a sessão. Trocar senha, alterar perfil ou ativar/desativar a conta revoga todas as sessões dela. Uma conta desativada não faz login e reativá-la não restaura os cookies antigos. As sessões expiram por inatividade e têm limite absoluto de oito horas. O log administrativo identifica o usuário das consultas, importações, exportações e downloads, sem gravar o conteúdo dos XMLs ou senhas.
+Abra o endereço do aplicativo. Não há login nem perfis. Todos que acessarem o endereço podem consultar, exportar e usar **Admin**. O log registra a identidade interna `usuario-interno` e o endereço de origem, sem atribuição a contas individuais.
 
 ## Consulta
 
@@ -35,15 +25,15 @@ Selecione um TXT com uma chave de 44 dígitos por linha e use **Gerar Excel por 
 ## XMLs — lotes mensais
 
 1. Baixe o lote mensal de XMLs completos no Synchro.
-2. Entre como administrador, abra **XMLs → Importar lote mensal**, selecione o ZIP ou vários XMLs e clique **Importar e arquivar**.
-3. Confira as quantidades importadas, duplicadas e recusadas. **Baixar registro do lote** lista o resultado por arquivo; o histórico mantém as últimas importações.
+2. Abra **Admin → Importar XML**, selecione o ZIP ou vários XMLs e clique **Importar e arquivar**.
+3. Confira as quantidades importadas, duplicadas e recusadas. **Baixar registro do lote** lista o resultado por arquivo.
 4. Consulte **Notas e arquivos**, **Itens e impostos** ou **PIS/COFINS retidos**. Os meses anteriores permanecem no arquivo. Chaves repetidas preservam o primeiro XML, mesmo que o arquivo enviado tenha conteúdo diferente.
 
-O período do leitor filtra a **emissão da nota**. A consulta de manifestações continua filtrando a data do evento. A busca localiza número, chave e destinatário; nos itens também pesquisa o conteúdo fiscal e o produto. Os resultados têm 100 linhas por página. O Excel reúne Notas, Itens e Retencoes com os mesmos filtros e todas as páginas; para administradores, inclui Processamento do lote selecionado ou mais recente. O CSV exporta o relatório selecionado. Cada relatório tem limite de 100 mil linhas na exportação.
+O período do leitor filtra a **emissão da nota**. A consulta de manifestações continua filtrando a data do evento. A busca localiza número, chave e destinatário; nos itens também pesquisa o conteúdo fiscal e o produto. Os resultados têm 100 linhas por página. O Excel reúne Notas, Itens e Retencoes com os mesmos filtros e todas as páginas. O CSV exporta o relatório selecionado. Cada relatório tem limite de 100 mil linhas na exportação.
 
-Na tela **Consulta**, uma nota com XML importado mostra **Baixar XML** e **Ver itens**. Na aba XMLs, cada nota oferece XML, Itens e Manifestações. Notas sem evento de manifestação também podem ser arquivadas. O download entrega os bytes originais do documento.
+Na tela **Consulta**, uma nota com XML importado mostra **Baixar XML** e **Ver itens**. Na aba XML, cada nota oferece XML, Itens e Manifestações. Notas sem evento de manifestação também podem ser arquivadas. O download entrega os bytes originais do documento.
 
-Somente administradores importam e acessam os registros dos lotes. Todos os usuários precisam de login. Consulta pode visualizar os relatórios; Fiscal e Administrador podem exportar e baixar XMLs. Não há chamadas à SEFAZ na importação, leitura ou download; o certificado não é necessário. A importação não altera NSU, cooldown, agendamento ou manifestações.
+Não há chamadas à SEFAZ na importação, leitura ou download; o certificado não é necessário. A importação não altera NSU, cooldown, agendamento ou manifestações.
 
 Limites: 100 MiB de arquivos por envio, 250 MiB descompactados no lote, 5.000 entradas por ZIP/documentos no lote e 8 MiB por XML. ZIPs podem ter subpastas, mas não devem ser protegidos por senha. Arquivos que não sejam XML, eventos, resumos e documentos de outro emitente são recusados com registro. Se houver ZIP estruturalmente inválido ou excesso de limite do lote, nenhuma nova nota daquele envio é gravada; divida ou corrija o lote. Erros em XMLs individuais permitem importar os demais arquivos válidos.
 
@@ -57,17 +47,15 @@ Apresenta última gravação, `ultNSU`, `maxNSU`, disponibilidade da sincroniza�
 
 **Completo** indica que a última distribuição alcançou o limite disponível. **Parcial** indica que ainda há distribuição a processar. O bloqueio e a próxima tentativa permitida são mostrados quando houver cooldown.
 
-## Atualizar
+## Admin
 
-A área exige login administrativo e reúne:
+A área reúne:
 
 - Configuração do banco e certificado A1.
 - Sincronização manual e estado do agendamento automático.
-- Contas individuais e troca de senha/desativação.
+- Importação de XML e ZIP.
 - Destinatários e fila dos alertas por e-mail.
 - Histórico administrativo.
-
-Use **Sair** para encerrar e revogar a sessão. Trocar a senha ou alterar o estado de uma conta também encerra suas sessões. Mantenha ao menos um administrador ativo.
 
 ## Sincronização automática
 
@@ -77,7 +65,7 @@ Uma janela concluída não é repetida após reiniciar. Falhas e distribuições
 
 ## Alertas de Operação não Realizada
 
-Em **Atualizar → Alertas por e-mail**, cadastre até 20 endereços, separados por linha ou vírgula. Novos eventos **210240** geram avisos para os destinatários cadastrados. Reprocessar um evento já gravado não cria uma nova mensagem.
+Em **Admin → Alertas por e-mail**, cadastre até 20 endereços, separados por linha ou vírgula. Novos eventos **210240** geram avisos para os destinatários cadastrados. Reprocessar um evento já gravado não cria uma nova mensagem.
 
 Os envios dependem da configuração SMTP do servidor. Falhas temporárias mantêm os avisos na fila. Após corrigir o SMTP, use **Tentar enviar pendentes**; isso não refaz a sincronização da SEFAZ. Remover um destinatário cancela seus avisos ainda pendentes.
 
@@ -85,4 +73,4 @@ Uma interrupção após a aceitação pelo SMTP e antes da confirmação no banc
 
 Na consulta, digite `01052026` para visualizar `01/05/2026` enquanto escreve. Informar apenas `01/02` completa o ano atual de Brasília ao sair do campo ou consultar. Datas inexistentes são recusadas.
 
-A sincronização manual exige login administrativo, marcação da confirmação e confirmação final. Repetir o envio ou alterar o botão no navegador não remove o cooldown do servidor.
+A sincronização manual exige marcação da confirmação e confirmação final. Repetir o envio ou alterar o botão no navegador não remove o cooldown do servidor.
