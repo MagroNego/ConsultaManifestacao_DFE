@@ -95,3 +95,7 @@ Sem host e remetente configurados, não há envio. A fila `notificacoes_email` p
 O log fica em `logs/web_audit.log`, com rotação. Registra responsável, ação, resultado e dados operacionais; não registra senhas ou chaves de NF-e. `NFE_WEB_AUDIT_LOG` permite mudar o caminho.
 
 Faça backup do banco fiscal, `dados/admin_accounts.db`, `secrets`, certificado e logs em local protegido. Pare o processo antes de copiar os bancos para um backup consistente ou restaurá-los. Após restauração, confira versão, acesso administrativo, caminho do banco e cursores em **Status** antes de retomar a operação.
+
+### Exportações simultâneas
+
+A geração de relatórios permite duas exportações em paralelo. Até 16 pedidos adicionais aguardam uma vaga, por no máximo cinco minutos, sem bloquear as consultas ou a sincronização. Uma vaga é liberada ao terminar a geração da resposta, inclusive em erro ou cancelamento. Downloads já arquivados e XMLs individuais não entram nessa fila. Se a capacidade de espera for atingida, a resposta é 429; se a espera expirar, é 503, com `Retry-After: 15`. Os formulários de Excel voltam a habilitar o botão após sucesso ou erro. A fila é mantida em memória por processo; não persiste após reiniciar o servidor.

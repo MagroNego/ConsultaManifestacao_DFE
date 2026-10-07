@@ -69,6 +69,7 @@ from nfe_consulta.web.uploads import consolidar_txts
 from nfe_consulta.web.xml_routes import register_xml_routes
 from nfe_consulta.web.xml_store import existing_keys, MAX_UPLOAD, import_history
 from nfe_consulta.web.xml_upload_limit import XmlUploadLimit
+from nfe_consulta.web.export_queue import ExportQueue, ExportQueueBusy
 from nfe_consulta.web.downloads import DownloadArchive, archive_file, cleanup_loop, period_label
 
 
@@ -272,8 +273,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
     )
     app.state.login_attempts = {}
     app.state.login_lock = threading.Lock()
-    app.state.export_lock = threading.Lock()
-    app.state.export_active = 0
+    app.state.export_queue = ExportQueue()
     app.state.sync_lock = threading.Lock()
     app.state.audit = AuditLog(settings.audit_log)
     app.state.auto_sync_task = None
@@ -337,16 +337,14 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
 
         export_request = path in {"/excel", "/consulta/exportar", "/xml/exportar"}
         if export_request:
-            with app.state.export_lock:
-                if app.state.export_active >= 2:
-                    return JSONResponse({"detail": "Há exportações em andamento. Tente novamente."}, status_code=429)
-                app.state.export_active += 1
-        try:
+            try:
+                async with app.state.export_queue.slot():
+                    response = await call_next(request)
+            except ExportQueueBusy as exc:
+                return JSONResponse({"detail": exc.detail}, status_code=exc.status_code,
+                    headers={"Retry-After": "15", "Cache-Control": "no-store"})
+        else:
             response = await call_next(request)
-        finally:
-            if export_request:
-                with app.state.export_lock:
-                    app.state.export_active -= 1
 
         if path != "/admin/logout" and admin_session_active(request):
             set_admin_cookie(response, settings, request.cookies[settings.admin_cookie_name],
