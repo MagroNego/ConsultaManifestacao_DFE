@@ -1,17 +1,22 @@
 {% from "cte_links.html" import cte_links %}
 {% extends "base.html" %}
-{% block title %}Consulta · Manifestação NF-e{% endblock %}
-{% block page_class %} consulta-page{% endblock %}
+{% block title %}{{ 'MANIFESTAÇÕES | NF ' ~ (detail['Numero Nota']|int) if detail else 'Consulta' }} · Manifestação NF-e{% endblock %}
+{% block page_class %} consulta-page{% if detail %} xml-page manifestations-detail{% endif %}{% endblock %}
 {% block content %}
 <section class="page-heading">
   <div>
-    <h1>Consulta</h1>
+    <h1>{{ 'MANIFESTAÇÕES | NF ' ~ (detail['Numero Nota']|int) if detail else 'Consulta' }}</h1>
   </div>
-  <span class="status-dot {{ 'ok' if database_ready else 'bad' }}">
+  {% if detail %}<a class="button secondary" href="{{ back_url }}" data-items-back>← Voltar</a>{% else %}<span class="status-dot {{ 'ok' if database_ready else 'bad' }}">
     {{ database_status_label or ("Banco disponível" if database_ready else "Banco indisponível") }}
-  </span>
+  </span>{% endif %}
 </section>
 
+{% if detail %}<section class="card item-detail-card">
+  <div class="meta-row"><span>Destinatário</span><strong>{{ detail['Destinatario Razao'] }}</strong></div>
+  <div class="meta-row"><span>Emissão</span><strong>{{ detail['Data Emissao']|date_br }}</strong></div>
+  <div class="meta-row"><span>Situação</span><strong>{{ detail['Situação'] }}</strong></div>
+</section>{% endif %}
 {% if error %}
 <div class="alert error">{{ error }}</div>
 {% elif database_notice and not database_ready %}
@@ -25,8 +30,9 @@
     </div>
   </div>
 
-  <form class="filters-form" action="{{ url_for('consulta_page') }}" method="get">
+  <form class="filters-form" action="{{ url_for('xml_manifestations', chave=note_key) if detail else url_for('consulta_page') }}" method="get">
     <input type="hidden" name="consultar" value="1">
+    {% if detail %}<input type="hidden" name="voltar" value="{{ back_url }}">{% endif %}
 
     <div class="filters-grid">
       <label class="field">
@@ -57,7 +63,7 @@
         >
       </label>
 
-      <label class="field">
+      {% if not detail %}<label class="field">
         <span>Número da NF</span>
         <input
           type="number"
@@ -83,7 +89,7 @@
         >
       </label>
 
-      <label class="field">
+      {% endif %}<label class="field">
         <span>Manifestação</span>
         <select name="codigo">
           <option value="">Todas</option>
@@ -94,14 +100,14 @@
           {% endfor %}
         </select>
       </label>
-      <label class="field"><span>Situação</span><select name="situacao">
+      {% if not detail %}<label class="field"><span>Situação</span><select name="situacao">
         <option value="" {% if not filtros.situacao %}selected{% endif %}>Todas</option>
         <option value="autorizada" {% if filtros.situacao == 'autorizada' %}selected{% endif %}>Autorizada</option>
         <option value="cancelada" {% if filtros.situacao == 'cancelada' %}selected{% endif %}>Cancelada</option>
-      </select></label>
+      </select></label>{% endif %}
     </div>
     <div class="filter-actions">
-      <a class="button secondary" href="{{ url_for('consulta_page') }}">Limpar</a>
+      <a class="button secondary" href="{{ url_for('xml_manifestations', chave=note_key).include_query_params(voltar=back_url) if detail else url_for('consulta_page') }}">Limpar</a>
       <button class="button primary" type="submit" {% if not database_ready %}disabled{% endif %}>
         Consultar
       </button>
@@ -154,7 +160,7 @@
           <th>Chave NF-e</th>
           <th>NSU</th>
           <th>CT-e</th>
-          <th>Ações</th>
+          {% if not detail %}<th>Ações</th>{% endif %}
         </tr>
       </thead>
       <tbody>
@@ -172,16 +178,16 @@
           <td class="mono access-key">{{ evento.chave }}</td>
           <td class="mono">{{ evento.nsu }}</td>
           <td>{{ cte_links(evento.ctes) }}</td>
-          <td>{% if evento.chave in xml_keys|default([]) %}
+          {% if not detail %}<td>{% if evento.chave in xml_keys|default([]) %}
             <div class="xml-row-actions">
               {% if user.can_export %}<a class="xml-icon-action" data-download-link href="{{ url_for('xml_download', chave=evento.chave) }}" title="Baixar XML" aria-label="Baixar XML da nota {{ evento.numero }}">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9zM14 3v6h6M9 12l-2 3 2 3M15 12l2 3-2 3"/></svg>
               </a>{% endif %}
-              <a class="xml-icon-action" href="{{ url_for('xml_page').include_query_params(tipo='itens', q=evento.chave) }}" title="Itens" aria-label="Ver itens da nota {{ evento.numero }}">
+              <a class="xml-icon-action" data-items-open href="{{ url_for('xml_items', chave=evento.chave).include_query_params(voltar=request.url.path ~ ('?' ~ request.url.query if request.url.query else '')) }}" title="Itens" aria-label="Ver itens da nota {{ evento.numero }}">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/></svg>
               </a>
             </div>
-          {% else %}<span class="muted">Não importado</span>{% endif %}</td>
+          {% else %}<span class="muted">Não importado</span>{% endif %}</td>{% endif %}
         </tr>
         {% endfor %}
       </tbody>
@@ -213,7 +219,7 @@
 </section>
 {% endif %}
 
-{% if user.can_export %}
+{% if user.can_export and not detail %}
 <section class="card file-query-card">
   <div class="card-title">
     <div>

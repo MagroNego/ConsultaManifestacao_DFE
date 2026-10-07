@@ -68,7 +68,7 @@
         <a class="xml-icon-action" data-items-open href="{{ url_for('xml_items', chave=row['Chave Acesso']).include_query_params(voltar=request.url.path ~ ('?' ~ request.url.query if request.url.query else '')) }}" title="Itens" aria-label="Ver itens da nota {{ row['Numero Nota'] }}">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/></svg>
         </a>
-        <a class="xml-icon-action" href="{{ url_for('consulta_page').include_query_params(chave=row['Chave Acesso']) }}" title="Manifestações" aria-label="Ver manifestações da nota {{ row['Numero Nota'] }}">
+        <a class="xml-icon-action" data-items-open href="{{ url_for('xml_manifestations', chave=row['Chave Acesso']).include_query_params(voltar=request.url.path ~ ('?' ~ request.url.query if request.url.query else '')) }}" title="Manifestações" aria-label="Ver manifestações da nota {{ row['Numero Nota'] }}">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-3M9 2h6v4H9zM8 13l3 3 5-6"/></svg>
         </a>
       </div></td>

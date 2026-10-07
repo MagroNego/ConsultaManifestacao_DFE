@@ -1362,3 +1362,5 @@ html[data-theme="dark"] .brand-logo-dark {
 @media (max-width: 620px) {
   .xml-page .item-detail-card { padding: 16px; }
 }
+
+.manifestations-detail .filters-form { max-width: none; }

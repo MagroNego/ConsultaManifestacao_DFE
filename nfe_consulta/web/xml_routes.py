@@ -12,7 +12,7 @@ from starlette.datastructures import UploadFile as MultipartUploadFile
 
 from nfe_consulta.config import CNPJ_PADRAO
 from nfe_consulta.web.auth import WebUser, current_user, require_admin, require_export, require_user, validate_csrf
-from nfe_consulta.web.consulta_local import normalizar_filtros
+from nfe_consulta.web.consulta_local import normalizar_filtros, consultar_eventos, ResultadoEventos, TIPOS_MANIFESTACAO
 from nfe_consulta.web import xml_store as store
 from nfe_consulta.web.downloads import archive_file, period_label
 from nfe_consulta.cte import linked_ctes
@@ -27,9 +27,43 @@ def register_xml_routes(app, settings, render, database_path):
         from urllib.parse import urlsplit
         parsed = urlsplit(value)
         expected = request.url_for('xml_page').path
-        if parsed.scheme or parsed.netloc or parsed.path != expected or any(c in value for c in '\r\n\\'):
+        if parsed.scheme or parsed.netloc or parsed.path not in {expected, request.url_for('consulta_page').path} or any(c in value for c in '\r\n\\'):
             return expected
         return parsed.path + ('?' + parsed.query if parsed.query else '')
+
+    @app.get("/xml/manifestacoes/{chave}")
+    async def xml_manifestations(request: Request, chave: str, user: Annotated[WebUser, Depends(require_user)],
+                                 data_inicial: str = "", data_final: str = "", codigo: str = "",
+                                 pagina: int = 1, voltar: str = ""):
+        if len(chave) != 44 or not chave.isascii() or not chave.isdigit():
+            raise HTTPException(400, 'Chave de acesso inválida.')
+        try:
+            note = await run_in_threadpool(store.query_report, database_path(settings), CNPJ_PADRAO,
+                password=settings.current_database_password(), note_key=chave)
+            if not note['rows']:
+                raise HTTPException(404, 'Nota não encontrada no arquivo local.')
+            selected = normalizar_filtros(chave=chave, data_inicial=data_inicial, data_final=data_final, codigo=codigo)
+            if pagina < 1:
+                raise ValueError('Página inválida.')
+            def read_events():
+                conn = abrir_banco(database_path(settings), settings.current_database_password(), somente_leitura=True)
+                try:
+                    has_events = conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='manifestacoes'").fetchone()
+                finally:
+                    conn.close()
+                if not has_events:
+                    return ResultadoEventos((), 0, 1, 100)
+                return consultar_eventos(database_path(settings), CNPJ_PADRAO, selected,
+                    password=settings.current_database_password(), pagina=pagina)
+            result = await run_in_threadpool(read_events)
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        return render(request, 'consulta.html', user, detail=note['rows'][0],
+            note_key=chave, back_url=return_url(voltar, request),
+            filtros=selected, tipos_manifestacao=TIPOS_MANIFESTACAO,
+            database_ready=True, database_status_label='Banco disponível',
+            database_notice=None, error=None, consulta_error=None,
+            consultou=True, resultado=result, xml_keys={chave})
 
     @app.get("/xml/itens/{chave}")
     async def xml_items(request: Request, chave: str, user: Annotated[WebUser, Depends(require_user)],

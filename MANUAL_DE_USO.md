@@ -108,3 +108,5 @@ Em **Admin → Alterar situação de notas**, informe números ou chaves de aces
 Na Emissão, **Item** pesquisa descrição, código ou NCM dos produtos. Em notas e retenções, mostra os documentos que contêm o produto; no relatório de itens, mostra apenas as linhas correspondentes. O filtro combina com datas, busca e situação e acompanha as exportações.
 
 O ícone **Itens** de uma nota abre uma tela própria, com os dados da nota, filtro de produtos e exportação dos seus itens. **Voltar** retorna à Emissão com os filtros e a página anteriores, restaurando a posição de rolagem quando o navegador permite armazenamento de sessão.
+
+O ícone **Manifestações** na Emissão abre uma tela da nota com os eventos existentes no banco local, filtros por data e manifestação e exportação para Excel. **Voltar** mantém os filtros, a página e a posição da lista. Se não houver eventos, a tela informa que nenhum registro foi encontrado.
