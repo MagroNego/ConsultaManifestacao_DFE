@@ -69,6 +69,7 @@ from nfe_consulta.web.uploads import consolidar_txts
 from nfe_consulta.web.xml_routes import register_xml_routes
 from nfe_consulta.web.xml_store import existing_keys, MAX_UPLOAD, import_history
 from nfe_consulta.web.xml_upload_limit import XmlUploadLimit
+from nfe_consulta.web.downloads import DownloadArchive, archive_file, cleanup_loop, period_label
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -261,6 +262,8 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         docs_url=None if settings.production else "/docs",
         redoc_url=None,
     )
+    app.state.downloads = DownloadArchive(settings.audit_log.parent.parent / "dados" / "downloads")
+    app.state.downloads_cleanup_task = None
     app.state.settings = settings
     app.state.admin_accounts = AdminAccounts(
         settings.admin_accounts_path or settings.database_path.parent / "admin_accounts.db",
@@ -278,6 +281,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
 
     @app.on_event("startup")
     async def start_auto_sync():
+        app.state.downloads_cleanup_task = asyncio.create_task(cleanup_loop(app.state.downloads))
         if not settings.auto_sync_enabled:
             return
         app.state.auto_sync_task = asyncio.create_task(
@@ -294,6 +298,11 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
 
     @app.on_event("shutdown")
     async def stop_auto_sync():
+        cleanup = app.state.downloads_cleanup_task
+        if cleanup is not None:
+            cleanup.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await cleanup
         task = app.state.auto_sync_task
         if task is None:
             return
@@ -396,6 +405,26 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             "status": "ok",
             "version": __version__,
         }
+
+    @app.get("/downloads", response_class=HTMLResponse)
+    async def downloads_page(request: Request, user: Annotated[WebUser, Depends(current_user)]):
+        try:
+            items = await run_in_threadpool(app.state.downloads.list, admin=user.is_admin)
+            error = None
+        except OSError:
+            items = []
+            error = "Não foi possível consultar os downloads. Confira a pasta de arquivos no servidor."
+        return _render(request, "downloads.html", user, items=items, error=error)
+
+    @app.get("/downloads/{identifier}")
+    async def archived_download(request: Request, identifier: str, user: Annotated[WebUser, Depends(current_user)]):
+        item = await run_in_threadpool(app.state.downloads.get, identifier, admin=user.is_admin)
+        if item is None:
+            raise HTTPException(404, "Arquivo indisponível ou expirado. Gere o relatório novamente.")
+        app.state.audit.write(request, user, "download_archived", "ok")
+        return FileResponse(app.state.downloads.directory / f"{item['id']}.bin",
+            filename=item['filename'], media_type=item['media_type'],
+            headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"})
 
     @app.get("/admin/login", response_class=HTMLResponse)
     async def admin_login_page(
@@ -732,6 +761,15 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             "ok",
             eventos=len(eventos),
         )
+        try:
+            await archive_file(request, saida, filename=nome,
+                media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                documents=len({evento.chave for evento in eventos}),
+                period=period_label((evento.data for evento in eventos),
+                    start=filtros.data_inicial, end=filtros.data_final))
+        except HTTPException:
+            shutil.rmtree(temporario, ignore_errors=True)
+            raise
         return FileResponse(
             path=saida,
             filename=nome,
@@ -818,6 +856,10 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                 erros=resultado.com_erro,
             )
 
+            await archive_file(request, saida, filename=NOME_PLANILHA,
+                media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                documents=resultado.total,
+                period=period_label(evento.data for nota in resultado.resultados for evento in nota.manifestacoes))
             return FileResponse(
                 path=saida,
                 filename=NOME_PLANILHA,
@@ -835,6 +877,9 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                     ignore_errors=True,
                 ),
             )
+        except HTTPException:
+            shutil.rmtree(temporario, ignore_errors=True)
+            raise
         except (ValueError, OSError, RuntimeError) as exc:
             shutil.rmtree(temporario, ignore_errors=True)
             app.state.audit.write(

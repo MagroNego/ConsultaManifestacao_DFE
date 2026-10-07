@@ -100,3 +100,7 @@ python scripts/package_release.py
 ```
 
 O empacotador inclui apenas código, recursos estáticos, lançadores e documentação. Pastas operacionais são criadas vazias, sem bancos, credenciais, certificados, logs ou planilhas.
+
+### Downloads recentes
+
+A aba **Downloads** guarda cópias dos relatórios Excel/CSV e dos XMLs baixados por **24 horas após a geração**. Cada arquivo mostra a quantidade de documentos processados, o período do relatório, a geração e a expiração em horário de Brasília. Baixar novamente não renova o prazo. As cópias ficam em `dados/downloads`, fora do banco fiscal, e são removidas automaticamente. A quantidade representa notas distintas nos relatórios; os registros de importação ficam disponíveis apenas no Admin. O período usa o filtro informado ou as datas de emissão dos XMLs / eventos das manifestações; sem datas, aparece “Não informado”.

@@ -14,6 +14,7 @@ from nfe_consulta.config import CNPJ_PADRAO
 from nfe_consulta.web.auth import WebUser, current_user, require_admin, require_export, require_user, validate_csrf
 from nfe_consulta.web.consulta_local import normalizar_filtros
 from nfe_consulta.web import xml_store as store
+from nfe_consulta.web.downloads import archive_file, period_label
 
 
 def register_xml_routes(app, settings, render, database_path):
@@ -116,6 +117,10 @@ def register_xml_routes(app, settings, render, database_path):
             raise HTTPException(503, "Arquivo de XMLs indisponível.") from exc
         if data is None:
             raise HTTPException(404, "XML ainda não importado. Envie o lote mensal no leitor.")
+        report = await run_in_threadpool(store.query_report, database_path(settings), CNPJ_PADRAO,
+            password=settings.current_database_password(), kind="notas", query=chave)
+        await archive_file(request, data, filename=f"{chave}.xml", media_type="application/xml",
+            documents=1, period=period_label(row.get("Data Emissao") for row in report["rows"]))
         app.state.audit.write(request, user, "xml_download", "ok")
         return Response(data, media_type="application/xml", headers={
             "Content-Disposition": f'attachment; filename="{chave}.xml"', "Cache-Control": "no-store"})
@@ -131,18 +136,27 @@ def register_xml_routes(app, settings, render, database_path):
             kwargs = dict(password=settings.current_database_password(), query=q,
                           inicio=selected.data_inicial, fim=selected.data_final, export=True)
             if formato == "csv":
-                return store.export_csv(store.query_report(database_path(settings), CNPJ_PADRAO, kind=tipo, **kwargs))
-            reports = [(title, store.query_report(database_path(settings), CNPJ_PADRAO, kind=kind, **kwargs))
-                for title, kind in (("Notas", "notas"), ("Itens", "itens"), ("Retencoes", "retencoes"))]
-            return store.export_excel(reports)
+                report = store.query_report(database_path(settings), CNPJ_PADRAO, kind=tipo, **kwargs)
+                data = store.export_csv(report)
+                metadata_rows = report["rows"]
+            else:
+                reports = [(title, store.query_report(database_path(settings), CNPJ_PADRAO, kind=kind, **kwargs))
+                    for title, kind in (("Notas", "notas"), ("Itens", "itens"), ("Retencoes", "retencoes"))]
+                metadata_rows = [row for _, report in reports for row in report["rows"]]
+                data = store.export_excel(reports)
+            return data, len({row["Chave Acesso"] for row in metadata_rows}), period_label(
+                (row.get("Data Emissao") for row in metadata_rows),
+                start=selected.data_inicial, end=selected.data_final)
         try:
-            data = await run_in_threadpool(generate)
+            data, documents, period = await run_in_threadpool(generate)
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
         except Exception as exc:
             raise HTTPException(503, "Não foi possível gerar o relatório. Confira o banco.") from exc
         app.state.audit.write(request, user, "xml_export", "ok", formato=formato)
         media = "text/csv" if formato == "csv" else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        await archive_file(request, data, filename=f"Leitor_XML.{formato}", media_type=media,
+            documents=documents, period=period)
         return Response(data, media_type=media, headers={"Content-Disposition": f'attachment; filename="Leitor_XML.{formato}"'})
 
     @app.get("/xml/lote/{lote}/registro")
@@ -155,4 +169,6 @@ def register_xml_routes(app, settings, render, database_path):
         if batch is None:
             raise HTTPException(404, "Lote não encontrado.")
         data = store.export_csv(dict(columns=["arquivo", "status", "mensagem"], rows=batch["registros"]))
+        await archive_file(request, data, filename=f"Importacao_XML_{lote}.csv", media_type="text/csv",
+            documents=len(batch["registros"]), period="Não informado", admin_only=True)
         return Response(data, media_type="text/csv", headers={"Content-Disposition": f'attachment; filename="Importacao_XML_{lote}.csv"'})
