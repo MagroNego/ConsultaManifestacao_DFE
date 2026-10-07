@@ -1,10 +1,10 @@
 {% from "cte_links.html" import cte_links %}
 {% extends "base.html" %}
-{% block title %}{{ 'Itens | NF ' ~ '{:,}'.format(detail['Numero Nota']|int).replace(',', '.') if detail else 'Emissão' }} · Consulta de Manifestação{% endblock %}
+{% block title %}{{ 'ITENS | NF ' ~ (detail['Numero Nota']|int) if detail else 'Emissão' }} · Consulta de Manifestação{% endblock %}
 {% block page_class %} xml-page{% endblock %}
 {% block content %}
 <section class="page-heading">
-  <div><h1>{{ 'Itens | NF ' ~ '{:,}'.format(detail['Numero Nota']|int).replace(',', '.') if detail else 'Emissão' }}</h1></div>
+  <div><h1>{{ 'ITENS | NF ' ~ (detail['Numero Nota']|int) if detail else 'Emissão' }}</h1></div>
   {% if detail %}<a class="button secondary" href="{{ back_url }}" data-items-back>← Voltar</a>{% endif %}
   {% if not detail %}<span class="status-dot ok">{{ result.notas }} nota{{ '' if result.notas == 1 else 's' }} arquivada{{ '' if result.notas == 1 else 's' }}</span>{% endif %}
 </section>

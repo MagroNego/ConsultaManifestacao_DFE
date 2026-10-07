@@ -52,7 +52,7 @@ def test_item_screen_and_return_keep_original_filters(tmp_path):
         assert '/xml/itens/' + KEY in link
         detail = client.get(link)
         assert detail.status_code == 200
-        assert '<h1>Itens | NF 123</h1>' in detail.text
+        assert '<h1>ITENS | NF 123</h1>' in detail.text
         assert 'Aço especial' in detail.text and 'Produto de teste' in detail.text
         assert 'Outra empresa' not in detail.text
         back = unescape(re.search(r'href="([^"]+)" data-items-back', detail.text).group(1))
