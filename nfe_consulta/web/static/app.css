@@ -1312,9 +1312,6 @@ html[data-theme="dark"] .brand-logo-dark {
 }
 
 .downloads-table th, .downloads-table td { white-space: nowrap; }
-.downloads-table .download-filename { max-width: 380px; overflow: hidden; text-overflow: ellipsis; }
-.download-action { display: inline-flex; align-items: center; gap: 6px; padding: 8px; }
-.download-action:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
 
 .cte-links summary { cursor: pointer; white-space: nowrap; padding: 6px 0; }
 .cte-links summary:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }

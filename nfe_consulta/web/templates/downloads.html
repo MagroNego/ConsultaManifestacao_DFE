@@ -1,16 +1,20 @@
 {% extends "base.html" %}
 {% block title %}Downloads{% endblock %}
 {% block content %}
-<section class="card">
-  <h1>Downloads</h1>
-  <p class="muted">Arquivos disponíveis por 24 horas após a geração. Horários de Brasília.</p>
+<section class="page-heading">
+  <div>
+    <h1>Downloads</h1>
+    <p>Arquivos disponíveis por 24 horas após a geração.</p>
+  </div>
+</section>
+<section class="card consultation-card">
   {% if error %}<div class="alert error" role="alert">{{ error }}</div>{% endif %}
   {% if items %}
   <div class="table-wrap"><table class="query-table downloads-table">
-    <thead><tr><th>Ações</th><th>Arquivo</th><th>Documentos processados</th><th>Período</th><th>Gerado em</th><th>Expira em</th><th>Tamanho</th></tr></thead>
+    <thead><tr><th>Ações</th><th>Documentos processados</th><th>Período</th><th>Gerado em</th><th>Expira em</th><th>Tamanho</th></tr></thead>
     <tbody>{% for item in items %}<tr>
-      <td><a class="download-action" href="{{ url_for('archived_download', identifier=item.id) }}" aria-label="Baixar {{ item.filename }}" title="Baixar arquivo"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 16v4h16v-4" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Baixar</span></a></td>
-      <td class="download-filename">{{ item.filename }}</td><td>{{ item.documents }}</td><td>{{ item.period }}</td><td>{{ item.created_label }}</td><td>{{ item.expires_label }}</td><td>{{ item.size_label }}</td>
+      <td><a class="xml-icon-action" href="{{ url_for('archived_download', identifier=item.id) }}" aria-label="Baixar {{ item.filename }}" title="Baixar arquivo"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 16v4h16v-4" stroke-linecap="round" stroke-linejoin="round"/></svg></a></td>
+      <td>{{ item.documents }}</td><td>{{ item.period }}</td><td>{{ item.created_label }}</td><td>{{ item.expires_label }}</td><td>{{ item.size_label }}</td>
     </tr>{% endfor %}</tbody>
   </table></div>
   {% else %}<p class="muted">Nenhum arquivo recente. Os relatórios e XMLs baixados aparecerão aqui.</p>{% endif %}
