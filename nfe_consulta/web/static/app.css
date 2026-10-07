@@ -1317,3 +1317,5 @@ html[data-theme="dark"] .brand-logo-dark {
 .cte-links summary:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
 .cte-link-detail { padding: 10px 0; white-space: nowrap; font-size: 0.85rem; }
 .cte-link-detail + .cte-link-detail { border-top: 1px solid var(--border); }
+
+.consulta-page .result-table th, .consulta-page .result-table td { white-space: nowrap; }

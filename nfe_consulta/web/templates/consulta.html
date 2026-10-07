@@ -141,12 +141,12 @@
           <th>NF</th>
           <th>Série</th>
           <th>Emitente (nome/CNPJ)</th>
-          <th>CT-e</th>
           <th>Manifestação</th>
           <th>Data do evento</th>
           <th>Protocolo</th>
           <th>Chave NF-e</th>
           <th>NSU</th>
+          <th>CT-e</th>
           <th>Ações</th>
         </tr>
       </thead>
@@ -156,7 +156,6 @@
           <td>{{ evento.numero }}</td>
           <td>{{ evento.serie }}</td>
           <td>{{ evento.emitente or "—" }}</td>
-          <td>{{ cte_links(evento.ctes) }}</td>
           <td class="manifestation-cell">
             <strong>{{ evento.descricao }}</strong>
           </td>
@@ -164,6 +163,7 @@
           <td class="mono">{{ evento.protocolo or "—" }}</td>
           <td class="mono access-key">{{ evento.chave }}</td>
           <td class="mono">{{ evento.nsu }}</td>
+          <td>{{ cte_links(evento.ctes) }}</td>
           <td>{% if evento.chave in xml_keys|default([]) %}
             <div class="xml-row-actions">
               {% if user.can_export %}<a class="xml-icon-action" href="{{ url_for('xml_download', chave=evento.chave) }}" title="Baixar XML" aria-label="Baixar XML da nota {{ evento.numero }}">
