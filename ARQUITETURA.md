@@ -27,7 +27,7 @@ A distribuição grava documentos e cursor em transação. Uma rejeição 656 pr
 
 ## Autorização
 
-O middleware exige autenticação por padrão em todas as rotas, com exceções explícitas para login, static e healthz. Consultas são liberadas a contas ativas; exportações e download de XML exigem Fiscal/Administrador, incluindo checagens nas dependências de rota. Operações administrativas mantêm require_admin. Usuário e perfil vêm da sessão persistida, nunca de cabeçalhos do cliente. A migração de contas acrescenta role preservando hashes e administradores antigos e revoga as sessões anteriores.
+Consulta, Status, Emissão e exportações são públicos. O middleware e as dependências require_admin protegem importação, sincronização manual, configurações e histórico administrativo. Usuário administrativo e perfil vêm da sessão persistida, nunca de cabeçalhos do cliente.
 
 A alteração de perfil ou estado usa transação IMMEDIATE para preservar o último administrador ativo e revoga sessões. Senhas são hashes PBKDF2; tokens de sessão são armazenados como SHA-256. CSRF é vinculado à sessão de todos os perfis.
 
@@ -35,10 +35,12 @@ A alteração de perfil ou estado usa transação IMMEDIATE para preservar o úl
 
 Execute **um processo com um worker**, pois a trava de sincronização é local ao processo. SQLite/SQLCipher deve ficar preferencialmente no disco local do servidor. Aumentar workers não cria coordenação entre instâncias.
 
-Consulta e exportação são operações locais. O histórico depende dos documentos disponibilizados e recebidos pelo serviço de distribuição. A aplicação não apresenta autorização/cancelamento da NF-e e não transmite manifestações.
+Consulta e exportação são operações locais. O histórico depende dos documentos disponibilizados e recebidos pelo serviço de distribuição. A situação Cancelada usa informacoes_nfe.cancelada, alimentada pela distribuição e pela importação de cancelamentos homologados. A aplicação não presume autorização atual e não transmite manifestações ou cancelamentos.
 
 A fila SMTP persiste por evento/destinatário. A confirmação do servidor de e-mail e a gravação do envio não são uma transação única; a entrega pode se repetir após uma interrupção nessa etapa.
 
 ## Validação e publicação
 
 A suíte automatizada cobre banco, consultas, filtros, exportações, sessões, CSRF, uploads, alertas, bloqueio SEFAZ e agendamento. Os testes não usam certificado de produção nem servidores externos. O fluxo de publicação executa a suíte em Windows e Linux antes de criar a release e anexar o ZIP e seu checksum SHA-256.
+
+`cancelamento.py` centraliza a leitura de retornos homologados e a consulta da situação. `xml_cancelamentos` conserva protocolo, data e XML do cancelamento; `informacoes_nfe.cancelada` é a fonte compartilhada por Emissão, Consulta e relatórios. A importação não altera cursores NSU nem cria manifestações. Bancos antigos sem essas tabelas continuam consultáveis; a criação é feita na importação. Importação idempotente e recebimento de uma nota original nunca reduzem uma situação cancelada para não cancelada.

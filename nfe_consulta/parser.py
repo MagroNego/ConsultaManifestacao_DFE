@@ -39,4 +39,5 @@ def parse_retorno_consulta(xml_str: str, chave: str) -> ResultadoConsulta:
         status_motivo=motivo,
         protocolo_nfe=protocolo,
         manifestacoes=tuple(manifestacoes),
+        cancelada=status in (101, 151),
     )

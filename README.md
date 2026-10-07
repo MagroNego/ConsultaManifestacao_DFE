@@ -18,7 +18,7 @@ Aplicação Web para consultar manifestações de NF-e, exportar relatórios Exc
 - Download do XML original na consulta de manifestações, associado pela chave de acesso.
 - Interface em português, com modos claro e escuro.
 
-Consulta, Status e exportações usam o banco local e não fazem chamadas à SEFAZ. A aplicação consulta manifestações; não emite eventos de manifestação nem apresenta a situação de autorização ou cancelamento das notas.
+Consulta, Status e exportações usam o banco local e não fazem chamadas à SEFAZ. A aplicação consulta manifestações e reconhece cancelamentos de NF-e registrados no banco por NSU ou pela importação de XML homologado. Não emite eventos de manifestação ou cancelamento.
 
 ## Instalação no Windows
 
@@ -58,7 +58,7 @@ O leitor foi integrado a partir de [Leitor_XML_Saida](https://github.com/MagroNe
 
 ## Administração e segurança
 
-Consulta, Status, XML e exportações não exigem login. **Admin** exige uma conta administrativa: importação de XML, sincronização manual, configuração e histórico são protegidos no servidor, inclusive por URLs diretas. `CONFIGURAR_ADMIN.cmd` cria ou redefine a conta escolhida, preserva as demais e faz backup do banco de contas antes de alterar uma instalação existente.
+Consulta, Status, Emissão e exportações não exigem login. **Admin** exige uma conta administrativa: importação de XML, sincronização manual, configuração e histórico são protegidos no servidor, inclusive por URLs diretas. `CONFIGURAR_ADMIN.cmd` cria ou redefine a conta escolhida, preserva as demais e faz backup do banco de contas antes de alterar uma instalação existente.
 
 A senha fica como hash em `dados/admin_accounts.db` (ou `NFE_ADMIN_ACCOUNTS_PATH`). Sessões são mantidas no servidor, expiram por inatividade e são revogadas no logout ou na redefinição da senha. O cookie é `HttpOnly` e `SameSite=Strict`; em HTTPS também usa `Secure`. Em HTTP local, o login funciona sem esse atributo; use HTTPS no servidor definitivo.
 
@@ -107,8 +107,10 @@ A aba **Downloads** guarda cópias dos relatórios Excel/CSV e dos XMLs baixados
 
 ### CT-e vinculado à NF-e
 
-Consulta e XML exibem os vínculos de CT-e recebidos na distribuição da NF-e, com situação autorizado/cancelado e, quando disponíveis, número, chave e transportadora. As exportações Excel/CSV e a consulta por TXT incluem a coluna **CT-e vinculado**. Uma nota pode ter vários conhecimentos; cancelar um CT-e não cancela os demais nem a NF-e. Quando a SEFAZ envia somente um resumo, aparece **Vínculo identificado**, sem inventar uma chave ou correlacionar um cancelamento sem chave com outro CT-e.
+Consulta e Emissão exibem os vínculos de CT-e recebidos na distribuição da NF-e, com situação autorizado/cancelado e, quando disponíveis, número, chave e transportadora. As exportações Excel/CSV e a consulta por TXT incluem a coluna **CT-e vinculado**. Uma nota pode ter vários conhecimentos; cancelar um CT-e não cancela os demais nem a NF-e. Quando a SEFAZ envia somente um resumo, aparece **Vínculo identificado**, sem inventar uma chave ou correlacionar um cancelamento sem chave com outro CT-e.
 
 Os eventos 610600/610601 ficam na tabela `eventos_cte` do mesmo banco fiscal, separados das manifestações do destinatário. A migração ocorre na próxima abertura do banco para gravação/sincronização; a consulta de bancos antigos continua funcionando. A sincronização passa a guardar os eventos recebidos a partir desta versão. Eventos que versões anteriores ignoraram não são recuperados automaticamente: o aplicativo não reinicia o NSU, não altera o agendamento/cooldown e não consulta a SEFAZ ao abrir uma tabela. **Não localizado** significa que o banco local não recebeu esse vínculo, e não garante a inexistência de CT-e. Esta funcionalidade não importa nem baixa o XML completo do CT-e.
 
 Referência: [Boletim Técnico 2012/001 — CT-e Autorizado e Cancelado](https://hom.nfe.fazenda.gov.br/arearestrita/inicial/exibirArquivo.aspx?conteudo=Jk9wIgAv0nI%3D).
+
+A aba **Emissão** reúne notas, itens e retenções. Importar um cancelamento homologado no Admin marca a chave como **Cancelada** na Consulta, Emissão e nos novos relatórios. O evento pode ser importado antes da nota; duplicatas não desfazem o cancelamento. A ausência de registro é exibida como **Sem cancelamento registrado**, sem presumir autorização atual.

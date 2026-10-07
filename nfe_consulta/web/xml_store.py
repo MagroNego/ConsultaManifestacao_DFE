@@ -19,6 +19,7 @@ from openpyxl.utils import get_column_letter
 
 from nfe_consulta.seguranca_banco import abrir_banco
 from nfe_consulta.cte import linked_ctes, export_label
+from nfe_consulta.cancelamento import SCHEMA as CANCELLATION_SCHEMA, read_cancellation, save_cancellation, cancelled_keys, status_label
 from nfe_consulta.xml_reader import parse_nfe_xml, decimal_value, FIELDS_ITENS, FIELDS_RETIDO
 
 MAX_XML = 8 * 1024 * 1024
@@ -34,6 +35,7 @@ EXCEL_EXCLUDED_COLUMNS = frozenset({
 
 
 def _schema(conn):
+    conn.executescript(CANCELLATION_SCHEMA)
     conn.executescript("""
         CREATE TABLE IF NOT EXISTS xml_documentos (
             cnpj TEXT NOT NULL, chave TEXT NOT NULL, numero TEXT NOT NULL,
@@ -166,7 +168,7 @@ def import_batch(database_path, cnpj, paths, *, password=None, user="admin"):
     if not Path(database_path).is_file():
         raise ValueError("Configure o banco existente antes de importar.")
     conn = abrir_banco(database_path, password)
-    summary = dict(importadas=0, duplicadas=0, erros=0, itens=0, retencoes=0, registros=[])
+    summary = dict(importadas=0, duplicadas=0, cancelamentos=0, erros=0, itens=0, retencoes=0, registros=[])
     try:
         _schema(conn)
         # Um erro estrutural de ZIP/limite desfaz o lote; erros individuais ficam no registro.
@@ -177,12 +179,26 @@ def import_batch(database_path, cnpj, paths, *, password=None, user="admin"):
                     summary["registros"].append(dict(arquivo=name, status="Ignorado", mensagem=error))
                     continue
                 try:
-                    meta, rows, retained = read_document(data, cnpj)
+                    root = ET.fromstring(data, forbid_dtd=True, forbid_entities=True, forbid_external=True)
+                    cancellation = read_cancellation(root, cnpj)
+                    event_only = cancellation is not None and root.tag.rsplit('}', 1)[-1] != 'nfeProc'
+                    if not event_only:
+                        meta, rows, retained = read_document(data, cnpj)
                 except Exception:
                     summary["erros"] += 1
                     summary["registros"].append(dict(arquivo=name, status="Erro", mensagem="XML inválido, incompleto ou de outro emitente."))
                     continue
+                if event_only:
+                    added = save_cancellation(conn, cnpj, cancellation, data)
+                    summary['cancelamentos' if added else 'duplicadas'] += 1
+                    summary['registros'].append(dict(arquivo=name, status='Cancelamento' if added else 'Duplicada',
+                        mensagem='Cancelamento registrado pela chave da NF-e.' if added else 'Cancelamento já registrado.'))
+                    continue
                 chave = meta["chave"]
+                if cancellation is not None:
+                    summary['cancelamentos'] += save_cancellation(conn, cnpj, cancellation, data)
+                conn.execute('''INSERT INTO informacoes_nfe(cnpj,chave,emitente) VALUES (?,?,?)
+                    ON CONFLICT(cnpj,chave) DO UPDATE SET emitente=CASE WHEN informacoes_nfe.emitente='' THEN excluded.emitente ELSE informacoes_nfe.emitente END''', (cnpj, chave, meta['emitente']))
                 if conn.execute("SELECT 1 FROM xml_documentos WHERE cnpj=? AND chave=?", (cnpj, chave)).fetchone():
                     summary["duplicadas"] += 1
                     summary["registros"].append(dict(arquivo=name, status="Duplicada", mensagem="Chave já arquivada; original preservado."))
@@ -233,7 +249,7 @@ def query_report(database_path, cnpj, *, password=None, kind="notas", query="", 
     if kind not in ("notas", "itens", "retencoes") or page < 1 or len(query) > 200:
         raise ValueError("Filtro do leitor inválido.")
     fields = FIELDS_ITENS if kind == "itens" else FIELDS_RETIDO if kind == "retencoes" else FIELDS_NOTAS
-    columns = [*fields, "CT-e vinculado"]
+    columns = [*fields, "Situação", "CT-e vinculado"]
     empty = dict(rows=[], columns=columns, total=0, page=1, pages=0, notas=0)
     if not Path(database_path).is_file():
         return empty
@@ -272,7 +288,9 @@ def query_report(database_path, cnpj, *, password=None, kind="notas", query="", 
         lines = conn.execute(f"SELECT {select} FROM {source} WHERE {where}" + suffix, params if export else [*params, (page - 1) * 100]).fetchall()
         rows = [dict(zip(FIELDS_NOTAS, row)) for row in lines] if kind == "notas" else [json.loads(row[0]) for row in lines]
         ctes = linked_ctes(conn, cnpj, [row.get("Chave Acesso", "") for row in rows])
+        cancelled = cancelled_keys(conn, cnpj, [row.get('Chave Acesso', '') for row in rows])
         for row in rows:
+            row['Situação'] = status_label(row.get('Chave Acesso', '') in cancelled)
             row["CT-e vinculado"] = export_label(ctes.get(row.get("Chave Acesso", ""), ()))
         return dict(rows=rows, columns=columns, total=total, page=page, pages=pages, notas=conn.execute("SELECT COUNT(*) FROM xml_documentos WHERE cnpj=?", (cnpj,)).fetchone()[0])
     finally:

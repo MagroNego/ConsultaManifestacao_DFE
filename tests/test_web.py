@@ -584,7 +584,7 @@ def test_consulta_completa_filtra_por_data_e_manifestacao(tmp_path):
     assert resposta.status_code == 200
     assert "Operação não Realizada" in resposta.text
     assert "Fornecedor Teste" in resposta.text
-    assert "Cancelada" not in resposta.text
+    assert "Cancelada" in resposta.text
     assert 'name="canceladas"' not in resposta.text
     assert 'name="serie"' not in resposta.text
     assert "91780" in resposta.text
@@ -652,7 +652,8 @@ def test_exportacao_da_consulta_respeita_os_mesmos_filtros(tmp_path):
     assert ws["A5"].value == 91780
     assert ws["E5"].value == "Operação não Realizada"
     assert ws["J5"].value == "Fornecedor Teste"
-    assert ws.max_column == 11
+    assert ws.max_column == 12
+    assert ws['K4'].value == 'Situação'
     assert "Cancelamento" not in [c.value for c in ws[4]]
     assert ws["A6"].value is None
 

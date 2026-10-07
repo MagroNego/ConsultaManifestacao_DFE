@@ -2,13 +2,13 @@
 
 ## Acesso
 
-Abra o endereço do aplicativo. Consulta, Status, XML e exportações são públicos na rede. Ao abrir **Admin**, informe uma conta administrativa. A importação e as configurações exigem sessão válida, mesmo por endereço direto. Use **Sair do Admin** para encerrar a sessão. Operações públicas usam a identidade `usuario-interno`; operações administrativas registram a conta autenticada.
+Abra o endereço do aplicativo. Consulta, Status, Emissão e exportações são públicos na rede. Ao abrir **Admin**, informe uma conta administrativa. A importação e as configurações exigem sessão válida, mesmo por endereço direto. Use **Sair do Admin** para encerrar a sessão. Operações públicas usam a identidade `usuario-interno`; operações administrativas registram a conta autenticada.
 
 ## Consulta
 
 A tela **Consulta** pesquisa o histórico armazenado no banco. Os filtros são data inicial e final do evento, número da NF, chave de acesso e tipo de manifestação. A data final inclui todo o dia informado. Os resultados aparecem em páginas de até 100 registros.
 
-A tabela mostra número e série da nota, emitente, manifestação, data, protocolo, chave, NSU e recebimento no banco. Quando o documento recebido não informa a razão social, o emitente aparece pelo CNPJ extraído da chave.
+A tabela mostra número e série da nota, emitente, situação de cancelamento, manifestação, data, protocolo, chave, NSU, CT-e e ações. Quando o documento recebido não informa a razão social, o emitente aparece pelo CNPJ extraído da chave.
 
 A ausência de registro significa que o evento não foi localizado no histórico disponível. A consulta não verifica a situação atual da NF-e na SEFAZ.
 
@@ -16,13 +16,13 @@ A ausência de registro significa que o evento não foi localizado no histórico
 
 Use **Exportar Excel** após a consulta. A planilha inclui todos os registros dos mesmos filtros, inclusive os que estão em outras páginas. Chaves, protocolos e NSUs são preservados como texto.
 
-Colunas: Número NF, Série, Chave NF-e, Código, Manifestação, Data do evento, Protocolo, NSU, Recebido no banco (UTC) e Emitente. Para consultas acima de 200 mil eventos, refine os filtros antes de exportar.
+Colunas: Número NF, Série, Chave NF-e, Código, Manifestação, Data do evento, Protocolo, NSU, Recebido no banco (UTC), Emitente, Situação e CT-e vinculado. Para consultas acima de 200 mil eventos, refine os filtros antes de exportar.
 
 ## Consulta por arquivo
 
 Selecione um TXT com uma chave de 44 dígitos por linha e use **Gerar Excel por chaves**. O arquivo serve para recortar o histórico do banco; não dispara uma consulta pontual à SEFAZ. O limite é de 10 mil chaves e 2 MB por upload.
 
-## XMLs — lotes mensais
+## Emissão — XMLs e cancelamentos
 
 1. Baixe o lote mensal de XMLs completos no Synchro.
 2. Abra **Admin → Importar XML**, selecione o ZIP ou vários XMLs e clique **Importar e arquivar**.
@@ -31,11 +31,11 @@ Selecione um TXT com uma chave de 44 dígitos por linha e use **Gerar Excel por 
 
 O período do leitor filtra a **emissão da nota**. A consulta de manifestações continua filtrando a data do evento. A busca localiza número, chave e destinatário; nos itens também pesquisa o conteúdo fiscal e o produto. Os resultados têm 100 linhas por página. O Excel reúne Notas, Itens e Retencoes com os mesmos filtros e todas as páginas. O CSV exporta o relatório selecionado. Cada relatório tem limite de 100 mil linhas na exportação.
 
-Na tela **Consulta**, uma nota com XML importado mostra **Baixar XML** e **Ver itens**. Na aba XML, cada nota oferece XML, Itens e Manifestações. Notas sem evento de manifestação também podem ser arquivadas. O download entrega os bytes originais do documento.
+Na tela **Consulta**, uma nota com XML importado mostra **Baixar XML** e **Ver itens**. Na aba Emissão, cada nota oferece XML, Itens e Manifestações. Notas sem evento de manifestação também podem ser arquivadas. O download entrega os bytes originais do documento.
 
 Não há chamadas à SEFAZ na importação, leitura ou download; o certificado não é necessário. A importação não altera NSU, cooldown, agendamento ou manifestações.
 
-Limites: 100 MiB de arquivos por envio, 250 MiB descompactados no lote, 5.000 entradas por ZIP/documentos no lote e 8 MiB por XML. ZIPs podem ter subpastas, mas não devem ser protegidos por senha. Arquivos que não sejam XML, eventos, resumos e documentos de outro emitente são recusados com registro. Se houver ZIP estruturalmente inválido ou excesso de limite do lote, nenhuma nova nota daquele envio é gravada; divida ou corrija o lote. Erros em XMLs individuais permitem importar os demais arquivos válidos.
+Limites: 100 MiB de arquivos por envio, 250 MiB descompactados no lote, 5.000 entradas por ZIP/documentos no lote e 8 MiB por XML. ZIPs podem ter subpastas, mas não devem ser protegidos por senha. Arquivos que não sejam XML, eventos sem cancelamento homologado, resumos e documentos de outro emitente são recusados com registro. Se houver ZIP estruturalmente inválido ou excesso de limite do lote, nenhuma nova nota daquele envio é gravada; divida ou corrija o lote. Erros em XMLs individuais permitem importar os demais arquivos válidos.
 
 São aceitas NF-e modelo 55 completas, com ou sem envelope nfeProc, emitidas pelo CNPJ configurado no aplicativo. O leitor verifica a estrutura mínima e a correspondência da chave/emitente/número/série; não valida assinatura digital, schema fiscal completo nem autorização atual. Use o XML original autorizado obtido no sistema emissor.
 
@@ -87,6 +87,10 @@ Ao baixar pela aba Downloads, a barra mostra a porcentagem do arquivo recebida p
 
 ## CT-e vinculado
 
-Nas abas Consulta e XML, abra o indicador **CT-e vinculado** para ver os conhecimentos associados à nota. O indicador **CT-e cancelado** aparece quando todos os vínculos apresentados estão cancelados. Número, chave e transportadora aparecem somente quando recebidos no evento. Se houver somente um resumo, aparece **Vínculo identificado** ou um cancelamento sem chave; esse cancelamento não é atribuído automaticamente a outro conhecimento. O Excel/CSV também inclui esses dados.
+Nas abas Consulta e Emissão, abra o indicador **CT-e vinculado** para ver os conhecimentos associados à nota. O indicador **CT-e cancelado** aparece quando todos os vínculos apresentados estão cancelados. Número, chave e transportadora aparecem somente quando recebidos no evento. Se houver somente um resumo, aparece **Vínculo identificado** ou um cancelamento sem chave; esse cancelamento não é atribuído automaticamente a outro conhecimento. O Excel/CSV também inclui esses dados.
 
 As informações chegam pela sincronização habitual. Depois de atualizar e reiniciar o aplicativo, aguarde a próxima sincronização permitida. Eventos ignorados por versões anteriores não são recuperados automaticamente. **Não localizado** indica ausência de vínculo no banco local, não ausência definitiva de CT-e na SEFAZ.
+
+O Admin aceita XMLs completos de NF-e e XMLs de cancelamento homologado, individualmente ou no ZIP. O evento pode chegar antes da nota. Cancelamentos são ligados pela chave de acesso, preservam o XML original e aparecem na coluna **Situação** da Consulta, Emissão, itens, retenções e novos relatórios Excel/CSV, inclusive na consulta por TXT. Reenviar a nota não remove o cancelamento. Um pedido sem retorno, rejeitado, não vinculado ou de homologação não altera a situação. Cancelamentos já recebidos via NSU usam a mesma informação.
+
+**Sem cancelamento registrado** significa apenas que o banco não possui esse registro; não confirma autorização atual. Se o arquivo contém apenas a nota autorizada e não traz o cancelamento, importe também o XML do evento. Em buscas por chave ou número, a Consulta mostra o cancelamento mesmo sem manifestações. A importação não altera o NSU nem faz chamadas à SEFAZ. Relatórios já gerados são cópias do momento da geração; gere outro para refletir novas importações.

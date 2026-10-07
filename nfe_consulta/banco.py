@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from nfe_consulta.seguranca_banco import abrir_banco
 from nfe_consulta.cte import SCHEMA as CTE_SCHEMA, save_events, linked_ctes
+from nfe_consulta.cancelamento import cancelled_keys
 
 from nfe_consulta.modelos import (
     Manifestacao,
@@ -399,4 +400,5 @@ class BancoManifestacoes:
             protocolo_nfe=None,
             manifestacoes=eventos,
             ctes=linked_ctes(self.conexao, cnpj, [chave]).get(chave, ()) if cnpj else (),
+            cancelada=chave in cancelled_keys(self.conexao, cnpj, [chave]),
         )

@@ -30,7 +30,7 @@ def test_numero_serie_e_chave_como_texto_no_excel(tmp_path):
     assert ws["C5"].value == "001"
     assert ws["D5"].value == "Ciência da Operação"
     assert ws["E5"].value == "03/08/2026 11:47 UTC-03:00"
-    assert ws.auto_filter.ref == "A4:K5"
+    assert ws.auto_filter.ref == "A4:L5"
     assert ws.freeze_panes == "D5"
     textos = " ".join(str(c.value or "") for row in ws.iter_rows() for c in row)
     assert "Cobertura:" not in textos

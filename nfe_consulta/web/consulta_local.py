@@ -9,6 +9,7 @@ from pathlib import Path
 
 from nfe_consulta.seguranca_banco import abrir_banco
 from nfe_consulta.cte import linked_ctes
+from nfe_consulta.cancelamento import cancelled_keys, status_label, lookup_cancelled
 
 
 TIPOS_MANIFESTACAO = {
@@ -66,6 +67,11 @@ class EventoNota:
     recebido_em: str = ""
     emitente: str = ""
     ctes: tuple = ()
+    cancelada: bool = False
+
+    @property
+    def situacao(self):
+        return status_label(self.cancelada)
 
     @property
     def data_label(self) -> str:
@@ -82,6 +88,7 @@ class ResultadoEventos:
     total: int
     pagina: int
     por_pagina: int
+    notas_canceladas: tuple = ()
 
     @property
     def paginas(self) -> int:
@@ -296,14 +303,17 @@ def consultar_eventos(
             [*parametros, por_pagina, offset],
         ).fetchall()
         ctes = linked_ctes(conexao, cnpj, [line[0] for line in linhas])
+        cancelled = cancelled_keys(conexao, cnpj, [line[0] for line in linhas])
+        cancelled_notes = lookup_cancelled(conexao, cnpj, key=filtros.chave, number=filtros.numero, series=filtros.serie)
     finally:
         conexao.close()
 
     return ResultadoEventos(
-        eventos=tuple(replace(_evento_da_linha(linha), ctes=ctes.get(linha[0], ())) for linha in linhas),
+        eventos=tuple(replace(_evento_da_linha(linha), ctes=ctes.get(linha[0], ()), cancelada=linha[0] in cancelled) for linha in linhas),
         total=total,
         pagina=pagina_efetiva,
         por_pagina=por_pagina,
+        notas_canceladas=cancelled_notes,
     )
 
 
@@ -351,10 +361,11 @@ def consultar_eventos_exportacao(
             parametros,
         ).fetchall()
         ctes = linked_ctes(conexao, cnpj, [line[0] for line in linhas])
+        cancelled = cancelled_keys(conexao, cnpj, [line[0] for line in linhas])
     finally:
         conexao.close()
 
-    return tuple(replace(_evento_da_linha(linha), ctes=ctes.get(linha[0], ())) for linha in linhas)
+    return tuple(replace(_evento_da_linha(linha), ctes=ctes.get(linha[0], ()), cancelada=linha[0] in cancelled) for linha in linhas)
 
 
 def consultar_numero_nota(

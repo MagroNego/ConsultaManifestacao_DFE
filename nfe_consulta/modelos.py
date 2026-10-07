@@ -70,6 +70,7 @@ class ResultadoConsulta:
     manifestacoes: tuple  # tuple[Manifestacao, ...]
     erro: Optional[str] = None
     ctes: tuple = ()
+    cancelada: bool = False
 
 
 @dataclass(frozen=True)

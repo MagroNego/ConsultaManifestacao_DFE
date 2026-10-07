@@ -1,10 +1,10 @@
 {% from "cte_links.html" import cte_links %}
 {% extends "base.html" %}
-{% block title %}XML · Consulta de Manifestação{% endblock %}
+{% block title %}Emissão · Consulta de Manifestação{% endblock %}
 {% block page_class %} xml-page{% endblock %}
 {% block content %}
 <section class="page-heading">
-  <div><h1>XML</h1></div>
+  <div><h1>Emissão</h1></div>
   <span class="status-dot ok">{{ result.notas }} nota{{ '' if result.notas == 1 else 's' }} arquivada{{ '' if result.notas == 1 else 's' }}</span>
 </section>
 {% if error %}<div class="alert error">{{ error }}</div>{% endif %}
@@ -39,7 +39,7 @@
   {% if result.rows %}
   <div class="table-wrap result-table-wrap"><table class="query-table result-table{% if tipo == 'notas' %} xml-notes-table{% endif %}"><thead><tr>
     {% if tipo == 'notas' %}
-    <th>Ações</th><th>Número de nota</th><th>Data emissão</th><th>Destinatário</th><th class="xml-value">Valor da nota</th><th>CT-e</th>
+    <th>Ações</th><th>Número de nota</th><th>Data emissão</th><th>Destinatário</th><th class="xml-value">Valor da nota</th><th>Situação</th><th>CT-e</th>
     {% else %}{% for column in result.columns %}<th>{{ column }}</th>{% endfor %}{% endif %}
   </tr></thead><tbody>
     {% for row in result.rows %}<tr>
@@ -59,8 +59,9 @@
       <td>{{ row['Data Emissao']|date_br }}</td>
       <td>{{ row['Destinatario Razao'] }}</td>
       <td class="xml-value">R$ {{ '{:,.2f}'.format(row['Vl. Nota']|float).replace(',', '_').replace('.', ',').replace('_', '.') }}</td>
+      <td><span class="note-status{% if row['Situação'] == 'Cancelada' %} cancelled{% endif %}">{{ row['Situação'] }}</span></td>
       <td>{{ cte_links(ctes.get(row["Chave Acesso"], ())) }}</td>
-      {% else %}{% for column in result.columns %}<td {% if column == 'Chave Acesso' %}class="mono access-key"{% endif %}>{% if column == 'Data Emissao' %}{{ row.get(column, '')|date_br }}{% else %}{{ row.get(column, '') }}{% endif %}</td>{% endfor %}{% endif %}
+      {% else %}{% for column in result.columns %}<td {% if column == 'Chave Acesso' %}class="mono access-key"{% endif %}>{% if column == 'Data Emissao' %}{{ row.get(column, '')|date_br }}{% elif column == 'Situação' %}<span class="note-status{% if row[column] == 'Cancelada' %} cancelled{% endif %}">{{ row[column] }}</span>{% else %}{{ row.get(column, '') }}{% endif %}</td>{% endfor %}{% endif %}
     </tr>{% endfor %}
   </tbody></table></div>
   {% if result.pages > 1 %}<nav class="pagination" aria-label="Paginação dos XMLs">

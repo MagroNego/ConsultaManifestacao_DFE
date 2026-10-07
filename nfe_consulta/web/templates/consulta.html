@@ -133,6 +133,7 @@
     {% endif %}
   </div>
 
+  {% for nota in resultado.notas_canceladas %}<p class="note-status cancelled cancellation-notice">NF {{ nota.numero }} · Série {{ nota.serie }} · Cancelada <span class="mono">{{ nota.chave }}</span></p>{% endfor %}
   {% if resultado.eventos %}
   <div class="table-wrap result-table-wrap">
     <table class="query-table result-table">
@@ -141,6 +142,7 @@
           <th>NF</th>
           <th>Série</th>
           <th>Emitente (nome/CNPJ)</th>
+          <th>Situação</th>
           <th>Manifestação</th>
           <th>Data do evento</th>
           <th>Protocolo</th>
@@ -156,6 +158,7 @@
           <td>{{ evento.numero }}</td>
           <td>{{ evento.serie }}</td>
           <td>{{ evento.emitente or "—" }}</td>
+          <td><span class="note-status{% if evento.cancelada %} cancelled{% endif %}">{{ evento.situacao }}</span></td>
           <td class="manifestation-cell">
             <strong>{{ evento.descricao }}</strong>
           </td>

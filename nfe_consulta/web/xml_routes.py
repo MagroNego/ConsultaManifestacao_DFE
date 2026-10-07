@@ -114,7 +114,7 @@ def register_xml_routes(app, settings, render, database_path):
             for upload in files:
                 await upload.close()
         app.state.audit.write(request, user, "xml_import", "ok", lote=summary["id"],
-            importadas=summary["importadas"], duplicadas=summary["duplicadas"], erros=summary["erros"])
+            importadas=summary["importadas"], cancelamentos=summary["cancelamentos"], duplicadas=summary["duplicadas"], erros=summary["erros"])
         return RedirectResponse(request.url_for("atualizar_page").include_query_params(lote=summary["id"]), status_code=303)
 
     @app.get("/xml/arquivo/{chave}")

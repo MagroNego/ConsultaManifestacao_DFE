@@ -154,9 +154,10 @@ def test_txt_workbook_includes_cte_preserves_manifestation(tmp_path):
     gravar_xlsx(str(output), [result], 'local')
     ws = load_workbook(output).active
     assert ws['D5'].value == 'Sem evento localizado'
-    assert ws['K4'].value == 'CT-e vinculado'
-    assert ws['K5'].value == 'Vínculo identificado · chave não informada'
-    assert ws['K5'].data_type == 's'
+    assert ws['K4'].value == 'Situação'
+    assert ws['L4'].value == 'CT-e vinculado'
+    assert ws['L5'].value == 'Vínculo identificado · chave não informada'
+    assert ws['L5'].data_type == 's'
 
 
 def test_xml_empty_installation_keeps_empty_state(tmp_path):

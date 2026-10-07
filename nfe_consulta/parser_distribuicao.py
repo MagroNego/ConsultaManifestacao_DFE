@@ -13,6 +13,7 @@ from nfe_consulta.modelos import (
 )
 from nfe_consulta.parser import DESCRICOES
 from nfe_consulta.cte import parse_event
+from nfe_consulta.cancelamento import read_cancellation
 
 MAX_SOAP_BYTES = 32 * 1024 * 1024
 MAX_DOCZIP_BYTES = 2 * 1024 * 1024
@@ -89,11 +90,20 @@ def _informacao_nota(xml_bytes: bytes) -> InformacaoNota | None:
         chave = inf_nfe.attrib.get("Id", "").removeprefix("NFe") if inf_nfe is not None else ""
         emit = next((e for e in root.iter() if _nome_local(e.tag) == "emit"), None)
         emitente = _primeiro_texto(emit, "xNome")[:100] if emit is not None else ""
-        cancelada = False
+        try:
+            cancelada = read_cancellation(root, chave[6:20]) is not None
+        except ValueError:
+            return None
     elif tipo in {"resEvento", "procEventoNFe"} and _primeiro_texto(root, "tpEvento") == "110111":
         chave = _primeiro_texto(root, "chNFe")
         emitente = ""
-        cancelada = True
+        if tipo == 'procEventoNFe':
+            try:
+                cancelada = read_cancellation(root, chave[6:20]) is not None
+            except ValueError:
+                return None
+        else:
+            cancelada = True
     else:
         return None
     if len(chave) != 44 or not chave.isdigit():
