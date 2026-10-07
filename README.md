@@ -113,4 +113,4 @@ Os eventos 610600/610601 ficam na tabela `eventos_cte` do mesmo banco fiscal, se
 
 Referência: [Boletim Técnico 2012/001 — CT-e Autorizado e Cancelado](https://hom.nfe.fazenda.gov.br/arearestrita/inicial/exibirArquivo.aspx?conteudo=Jk9wIgAv0nI%3D).
 
-A aba **Emissão** reúne notas, itens e retenções. Importar um cancelamento homologado no Admin marca a chave como **Cancelada** na Consulta, Emissão e nos novos relatórios. O evento pode ser importado antes da nota; duplicatas não desfazem o cancelamento. A ausência de registro é exibida como **Sem cancelamento registrado**, sem presumir autorização atual.
+A aba **Emissão** reúne notas, itens e retenções. Importar um cancelamento homologado no Admin marca a chave como **Cancelada** na Consulta, Emissão e nos novos relatórios. O evento pode ser importado antes da nota; duplicatas não desfazem o cancelamento. A situação exibida usa a regra local: **Cancelada** quando há cancelamento registrado e **Autorizada** nos demais casos. Essa classificação não realiza uma consulta atual à SEFAZ.

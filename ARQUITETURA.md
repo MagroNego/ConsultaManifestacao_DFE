@@ -35,7 +35,7 @@ A alteração de perfil ou estado usa transação IMMEDIATE para preservar o úl
 
 Execute **um processo com um worker**, pois a trava de sincronização é local ao processo. SQLite/SQLCipher deve ficar preferencialmente no disco local do servidor. Aumentar workers não cria coordenação entre instâncias.
 
-Consulta e exportação são operações locais. O histórico depende dos documentos disponibilizados e recebidos pelo serviço de distribuição. A situação Cancelada usa informacoes_nfe.cancelada, alimentada pela distribuição e pela importação de cancelamentos homologados. A aplicação não presume autorização atual e não transmite manifestações ou cancelamentos.
+Consulta e exportação são operações locais. O histórico depende dos documentos disponibilizados e recebidos pelo serviço de distribuição. A situação Cancelada usa informacoes_nfe.cancelada, alimentada pela distribuição e pela importação de cancelamentos homologados. A situação exibida é Autorizada nos demais casos, por regra do banco local. A aplicação não consulta autorização atual e não transmite manifestações ou cancelamentos.
 
 A fila SMTP persiste por evento/destinatário. A confirmação do servidor de e-mail e a gravação do envio não são uma transação única; a entrega pode se repetir após uma interrupção nessa etapa.
 

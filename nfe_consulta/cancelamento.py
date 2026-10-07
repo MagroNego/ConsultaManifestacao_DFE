@@ -122,7 +122,8 @@ def cancelled_keys(conn, cnpj, keys):
 
 
 def status_label(cancelled):
-    return 'Cancelada' if cancelled else 'Sem cancelamento registrado'
+    """Rótulo binário da interface, conforme a situação conhecida no banco local."""
+    return 'Cancelada' if cancelled else 'Autorizada'
 
 
 def lookup_cancelled(conn, cnpj, *, key=None, number=None, series=None):

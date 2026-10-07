@@ -78,7 +78,7 @@ def test_request_rejection_invalid_protocol_and_mismatch_do_not_cancel(tmp_path,
     web['criar_banco'](cfg.database_path)
     result = batch(cfg, tmp_path, [helpers['xml'](), payload])
     assert result['importadas'] == 1 and result['erros'] == 1 and result['cancelamentos'] == 0
-    assert xml_store.query_report(cfg.database_path, CNPJ_PADRAO)['rows'][0]['Situação'] == 'Sem cancelamento registrado'
+    assert xml_store.query_report(cfg.database_path, CNPJ_PADRAO)['rows'][0]['Situação'] == 'Autorizada'
 
 
 def test_all_ui_and_reports_use_same_cancellation_flag(tmp_path):
