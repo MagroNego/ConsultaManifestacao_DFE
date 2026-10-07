@@ -102,3 +102,9 @@ Em **Consulta** e **Emissão**, o filtro **Situação** oferece **Todas**, **Aut
 Em **Admin → Alterar situação de notas**, informe números ou chaves de acesso, uma por linha, e o motivo. **Marcar como cancelada** atualiza a situação local na Consulta, Emissão e nos novos relatórios. São aceitas até 100 notas existentes no banco da empresa; números ambíguos exigem a chave. Se qualquer nota for inválida ou não encontrada, nenhuma nota do pedido é alterada.
 
 **Remover marcação manual** desfaz somente a correção interna. Um cancelamento recebido pelo NSU ou XML continua válido. Reimportações preservam a marcação manual. O histórico no banco registra usuário, motivo, ação e data; os XMLs originais e eventos da SEFAZ são preservados. Essa função não transmite um evento à SEFAZ. Arquivos já gerados permanecem com a situação existente na geração; gere um novo relatório após a alteração.
+
+### Filtro e tela de itens
+
+Na Emissão, **Item** pesquisa descrição, código ou NCM dos produtos. Em notas e retenções, mostra os documentos que contêm o produto; no relatório de itens, mostra apenas as linhas correspondentes. O filtro combina com datas, busca e situação e acompanha as exportações.
+
+O ícone **Itens** de uma nota abre uma tela própria, com os dados da nota, filtro de produtos e exportação dos seus itens. **Voltar** retorna à Emissão com os filtros e a página anteriores, restaurando a posição de rolagem quando o navegador permite armazenamento de sessão.

@@ -23,10 +23,37 @@ def register_xml_routes(app, settings, render, database_path):
     def filters(inicio, fim):
         return normalizar_filtros(data_inicial=inicio, data_final=fim)
 
+    def return_url(value, request):
+        from urllib.parse import urlsplit
+        parsed = urlsplit(value)
+        expected = request.url_for('xml_page').path
+        if parsed.scheme or parsed.netloc or parsed.path != expected or any(c in value for c in '\r\n\\'):
+            return expected
+        return parsed.path + ('?' + parsed.query if parsed.query else '')
+
+    @app.get("/xml/itens/{chave}")
+    async def xml_items(request: Request, chave: str, user: Annotated[WebUser, Depends(require_user)],
+                        item: str = "", pagina: int = 1, voltar: str = ""):
+        if len(chave) != 44 or not chave.isascii() or not chave.isdigit():
+            raise HTTPException(400, 'Chave de acesso inválida.')
+        try:
+            note = await run_in_threadpool(store.query_report, database_path(settings), CNPJ_PADRAO,
+                password=settings.current_database_password(), note_key=chave)
+            if not note['rows']:
+                raise HTTPException(404, 'Nota não encontrada no arquivo local.')
+            result = await run_in_threadpool(store.query_report, database_path(settings), CNPJ_PADRAO,
+                password=settings.current_database_password(), kind='itens', note_key=chave,
+                item_query=item, page=pagina)
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        return render(request, 'xml.html', user, result=result, tipo='itens', q='',
+            inicio='', fim='', situacao='', item=item, error=None, ctes={},
+            detail=note['rows'][0], note_key=chave, back_url=return_url(voltar, request))
+
     @app.get("/xml")
     async def xml_page(request: Request, user: Annotated[WebUser, Depends(require_user)],
                        tipo: str = "notas", q: str = "", data_inicial: str = "",
-                       data_final: str = "", pagina: int = 1, lote: int | None = None, situacao: str = ""):
+                       data_final: str = "", pagina: int = 1, lote: int | None = None, situacao: str = "", item: str = ""):
         error = None
         result = dict(rows=[], columns=[], total=0, page=1, pages=0, notas=0)
         history, batch = [], None
@@ -36,7 +63,7 @@ def register_xml_routes(app, settings, render, database_path):
             selected = filters(data_inicial, data_final)
             result = await run_in_threadpool(store.query_report, database_path(settings), CNPJ_PADRAO,
                 password=settings.current_database_password(), kind=tipo, query=q,
-                inicio=selected.data_inicial, fim=selected.data_final, page=pagina, situacao=situacao)
+                inicio=selected.data_inicial, fim=selected.data_final, page=pagina, situacao=situacao, item_query=item)
             def read_ctes():
                 conn = abrir_banco(database_path(settings), settings.current_database_password(), somente_leitura=True)
                 try:
@@ -55,7 +82,7 @@ def register_xml_routes(app, settings, render, database_path):
         return render(request, "xml.html", user, result=result, tipo=tipo, q=q,
             inicio=selected.data_inicial_br if selected else data_inicial,
             fim=selected.data_final_br if selected else data_final,
-            history=history, batch=batch, error=error, ctes=ctes, situacao=situacao)
+            history=history, batch=batch, error=error, ctes=ctes, situacao=situacao, item=item)
 
     @app.post("/xml/importar")
     async def xml_import(request: Request, user: Annotated[WebUser, Depends(require_admin)]):
@@ -139,20 +166,20 @@ def register_xml_routes(app, settings, render, database_path):
     @app.get("/xml/exportar")
     async def xml_export(request: Request, user: Annotated[WebUser, Depends(require_export)],
                          formato: str = "xlsx", tipo: str = "itens", q: str = "",
-                         data_inicial: str = "", data_final: str = "", lote: int | None = None, situacao: str = ""):
+                         data_inicial: str = "", data_final: str = "", lote: int | None = None, situacao: str = "", item: str = "", chave: str = ""):
         if formato not in ("xlsx", "csv") or tipo not in ("notas", "itens", "retencoes"):
             raise HTTPException(400, "Formato ou relatório inválido.")
         def generate():
             selected = filters(data_inicial, data_final)
             kwargs = dict(password=settings.current_database_password(), query=q,
-                          inicio=selected.data_inicial, fim=selected.data_final, export=True, situacao=situacao)
+                          inicio=selected.data_inicial, fim=selected.data_final, export=True, situacao=situacao, item_query=item, note_key=chave)
             if formato == "csv":
                 report = store.query_report(database_path(settings), CNPJ_PADRAO, kind=tipo, **kwargs)
                 data = store.export_csv(report)
                 metadata_rows = report["rows"]
             else:
                 reports = [(title, store.query_report(database_path(settings), CNPJ_PADRAO, kind=kind, **kwargs))
-                    for title, kind in (("Notas", "notas"), ("Itens", "itens"), ("Retencoes", "retencoes"))]
+                    for title, kind in ((("Itens", "itens"),) if chave else (("Notas", "notas"), ("Itens", "itens"), ("Retencoes", "retencoes")))]
                 metadata_rows = [row for _, report in reports for row in report["rows"]]
                 data = store.export_excel(reports)
             return data, len({row["Chave Acesso"] for row in metadata_rows}), period_label(

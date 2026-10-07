@@ -245,8 +245,8 @@ def download_xml(database_path, cnpj, chave, *, password=None):
         conn.close()
 
 
-def query_report(database_path, cnpj, *, password=None, kind="notas", query="", inicio=None, fim=None, page=1, export=False, situacao=""):
-    if kind not in ("notas", "itens", "retencoes") or page < 1 or len(query) > 200 or situacao not in ('', 'autorizada', 'cancelada'):
+def query_report(database_path, cnpj, *, password=None, kind="notas", query="", inicio=None, fim=None, page=1, export=False, situacao="", item_query="", note_key=""):
+    if kind not in ("notas", "itens", "retencoes") or page < 1 or len(query) > 200 or situacao not in ('', 'autorizada', 'cancelada') or len(item_query) > 200 or (note_key and not re.fullmatch(r'[0-9]{44}', note_key)):
         raise ValueError("Filtro do leitor inválido.")
     fields = FIELDS_ITENS if kind == "itens" else FIELDS_RETIDO if kind == "retencoes" else FIELDS_NOTAS
     columns = [*fields, "Situação", "CT-e vinculado"]
@@ -259,6 +259,20 @@ def query_report(database_path, cnpj, *, password=None, kind="notas", query="", 
             return empty
         params = [cnpj]
         clauses = ["d.cnpj=?"]
+        if note_key:
+            clauses.append('d.chave=?')
+            params.append(note_key)
+        if item_query.strip():
+            def item_matches(data, needle):
+                row = json.loads(data)
+                return int(any(needle in str(row.get(field, '')).casefold() for field in ('Codigo', 'Descricao', 'NCM')))
+            conn.create_function('item_matches', 2, item_matches)
+            needle = item_query.strip().casefold()
+            if kind == 'itens':
+                clauses.append('item_matches(r.dados, ?)=1')
+            else:
+                clauses.append("EXISTS (SELECT 1 FROM xml_relatorio item WHERE item.cnpj=d.cnpj AND item.chave=d.chave AND item.tipo='itens' AND item_matches(item.dados, ?)=1)")
+            params.append(needle)
         if situacao:
             cancelled = cancellation_condition(conn, 'd')
             clauses.append(cancelled if situacao == 'cancelada' else f'NOT ({cancelled})')

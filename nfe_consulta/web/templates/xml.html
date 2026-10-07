@@ -1,18 +1,25 @@
 {% from "cte_links.html" import cte_links %}
 {% extends "base.html" %}
-{% block title %}Emissão · Consulta de Manifestação{% endblock %}
+{% block title %}{{ 'Itens da nota' if detail else 'Emissão' }} · Consulta de Manifestação{% endblock %}
 {% block page_class %} xml-page{% endblock %}
 {% block content %}
 <section class="page-heading">
-  <div><h1>Emissão</h1></div>
-  <span class="status-dot ok">{{ result.notas }} nota{{ '' if result.notas == 1 else 's' }} arquivada{{ '' if result.notas == 1 else 's' }}</span>
+  <div><h1>{{ 'Itens da nota ' ~ detail['Numero Nota'] if detail else 'Emissão' }}</h1></div>
+  {% if detail %}<a class="button secondary" href="{{ back_url }}" data-items-back>← Voltar</a>{% endif %}
+  {% if not detail %}<span class="status-dot ok">{{ result.notas }} nota{{ '' if result.notas == 1 else 's' }} arquivada{{ '' if result.notas == 1 else 's' }}</span>{% endif %}
 </section>
+{% if detail %}<section class="card">
+  <div class="meta-row"><span>Destinatário</span><strong>{{ detail['Destinatario Razao'] }}</strong></div>
+  <div class="meta-row"><span>Emissão</span><strong>{{ detail['Data Emissao']|date_br }}</strong></div>
+  <div class="meta-row"><span>Situação</span><strong>{{ detail['Situação'] }}</strong></div>
+</section>{% endif %}
 {% if error %}<div class="alert error">{{ error }}</div>{% endif %}
 <section class="card consultation-card">
-  <div class="card-title"><h2>Leitor XML</h2><span class="muted">Busca e relatórios usam o arquivo local.</span></div>
-  <form class="filters-form" action="{{ url_for('xml_page') }}" method="get">
+  <div class="card-title"><h2>{{ 'Filtrar itens' if detail else 'Leitor XML' }}</h2></div>
+  <form class="filters-form" action="{{ url_for('xml_items', chave=note_key) if detail else url_for('xml_page') }}" method="get">
+    {% if detail %}<input type="hidden" name="voltar" value="{{ back_url }}">{% endif %}
     <div class="filters-grid">
-      <label class="field"><span>Relatório</span><select name="tipo">
+      {% if not detail %}<label class="field"><span>Relatório</span><select name="tipo">
         <option value="notas" {% if tipo == 'notas' %}selected{% endif %}>Notas e arquivos</option>
         <option value="itens" {% if tipo == 'itens' %}selected{% endif %}>Itens e impostos</option>
         <option value="retencoes" {% if tipo == 'retencoes' %}selected{% endif %}>PIS/COFINS retidos</option>
@@ -25,8 +32,10 @@
       </select></label>
       <label class="field"><span>Emissão inicial</span><input type="text" name="data_inicial" value="{{ inicio }}" inputmode="numeric" maxlength="10" placeholder="dd/mm/aaaa" data-date-input></label>
       <label class="field"><span>Emissão final</span><input type="text" name="data_final" value="{{ fim }}" inputmode="numeric" maxlength="10" placeholder="dd/mm/aaaa" data-date-input></label>
+      {% endif %}
+      <label class="field"><span>Item</span><input type="search" name="item" value="{{ item }}" maxlength="200" placeholder="Descrição, código ou NCM"></label>
     </div>
-    <div class="filter-actions"><button class="button primary" type="submit">Consultar XMLs</button><a class="button secondary" href="{{ url_for('xml_page') }}">Limpar filtros</a></div>
+    <div class="filter-actions"><button class="button primary" type="submit">{{ 'Filtrar itens' if detail else 'Consultar XMLs' }}</button><a class="button secondary" href="{{ url_for('xml_items', chave=note_key).include_query_params(voltar=back_url) if detail else url_for('xml_page') }}">Limpar filtros</a></div>
   </form>
 </section>
 <section class="card results-card">
@@ -35,6 +44,8 @@
     {% if result.total and user.can_export %}
     <form action="{{ url_for('xml_export') }}" method="get" data-processing-form data-download-form>
       <input type="hidden" name="tipo" value="{{ tipo }}"><input type="hidden" name="q" value="{{ q }}">
+      <input type="hidden" name="item" value="{{ item }}">
+      {% if detail %}<input type="hidden" name="chave" value="{{ note_key }}">{% endif %}
       <input type="hidden" name="situacao" value="{{ situacao }}">
       <input type="hidden" name="data_inicial" value="{{ inicio }}"><input type="hidden" name="data_final" value="{{ fim }}">
       {% if request.query_params.get('lote') %}<input type="hidden" name="lote" value="{{ request.query_params.get('lote') }}">{% endif %}
@@ -46,7 +57,7 @@
   <div class="table-wrap result-table-wrap"><table class="query-table result-table{% if tipo == 'notas' %} xml-notes-table{% endif %}"><thead><tr>
     {% if tipo == 'notas' %}
     <th>Ações</th><th>Número de nota</th><th>Data emissão</th><th>Destinatário</th><th class="xml-value">Valor da nota</th><th>Situação</th><th>CT-e</th>
-    {% else %}{% for column in result.columns %}<th>{{ column }}</th>{% endfor %}{% endif %}
+    {% else %}{% for column in result.columns if not detail or column not in ['Chave Acesso', 'Numero Nota', 'Serie', 'Data Emissao', 'Emitente CNPJ', 'Emitente Razao', 'Destinatario CNPJ', 'Destinatario Razao', 'Destinatario UF', 'Situação', 'CT-e vinculado'] %}<th>{{ column }}</th>{% endfor %}{% endif %}
   </tr></thead><tbody>
     {% for row in result.rows %}<tr>
       {% if tipo == 'notas' %}
@@ -54,7 +65,7 @@
         {% if user.can_export %}<a class="xml-icon-action" data-download-link href="{{ url_for('xml_download', chave=row['Chave Acesso']) }}" title="Baixar XML" aria-label="Baixar XML da nota {{ row['Numero Nota'] }}">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9zM14 3v6h6M9 12l-2 3 2 3M15 12l2 3-2 3"/></svg>
         </a>{% endif %}
-        <a class="xml-icon-action" href="{{ url_for('xml_page').include_query_params(tipo='itens', q=row['Chave Acesso']) }}" title="Itens" aria-label="Ver itens da nota {{ row['Numero Nota'] }}">
+        <a class="xml-icon-action" data-items-open href="{{ url_for('xml_items', chave=row['Chave Acesso']).include_query_params(voltar=request.url.path ~ ('?' ~ request.url.query if request.url.query else '')) }}" title="Itens" aria-label="Ver itens da nota {{ row['Numero Nota'] }}">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/></svg>
         </a>
         <a class="xml-icon-action" href="{{ url_for('consulta_page').include_query_params(chave=row['Chave Acesso']) }}" title="Manifestações" aria-label="Ver manifestações da nota {{ row['Numero Nota'] }}">
@@ -67,7 +78,7 @@
       <td class="xml-value">R$ {{ '{:,.2f}'.format(row['Vl. Nota']|float).replace(',', '_').replace('.', ',').replace('_', '.') }}</td>
       <td><span class="note-status{% if row['Situação'] == 'Cancelada' %} cancelled{% endif %}">{{ row['Situação'] }}</span></td>
       <td>{{ cte_links(ctes.get(row["Chave Acesso"], ())) }}</td>
-      {% else %}{% for column in result.columns %}<td {% if column == 'Chave Acesso' %}class="mono access-key"{% endif %}>{% if column == 'Data Emissao' %}{{ row.get(column, '')|date_br }}{% elif column == 'Situação' %}<span class="note-status{% if row[column] == 'Cancelada' %} cancelled{% endif %}">{{ row[column] }}</span>{% else %}{{ row.get(column, '') }}{% endif %}</td>{% endfor %}{% endif %}
+      {% else %}{% for column in result.columns if not detail or column not in ['Chave Acesso', 'Numero Nota', 'Serie', 'Data Emissao', 'Emitente CNPJ', 'Emitente Razao', 'Destinatario CNPJ', 'Destinatario Razao', 'Destinatario UF', 'Situação', 'CT-e vinculado'] %}<td {% if column == 'Chave Acesso' %}class="mono access-key"{% endif %}>{% if column == 'Data Emissao' %}{{ row.get(column, '')|date_br }}{% elif column == 'Situação' %}<span class="note-status{% if row[column] == 'Cancelada' %} cancelled{% endif %}">{{ row[column] }}</span>{% else %}{{ row.get(column, '') }}{% endif %}</td>{% endfor %}{% endif %}
     </tr>{% endfor %}
   </tbody></table></div>
   {% if result.pages > 1 %}<nav class="pagination" aria-label="Paginação dos XMLs">
@@ -75,6 +86,6 @@
     <span>Página {{ result.page }} de {{ result.pages }}</span>
     {% if result.page < result.pages %}<a href="{{ request.url.include_query_params(pagina=result.page + 1) }}">Próxima</a>{% endif %}
   </nav>{% endif %}
-  {% else %}<p class="muted">Nenhum XML corresponde aos filtros. Importe os arquivos em Admin ou ajuste a busca.</p>{% endif %}
+  {% else %}<p class="muted">{{ 'Nenhum item corresponde ao filtro.' if detail else 'Nenhum XML corresponde aos filtros. Importe os arquivos em Admin ou ajuste a busca.' }}</p>{% endif %}
 </section>
 {% endblock %}
