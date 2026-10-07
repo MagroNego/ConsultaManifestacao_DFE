@@ -15,7 +15,7 @@
 </section>{% endif %}
 {% if error %}<div class="alert error">{{ error }}</div>{% endif %}
 <section class="card consultation-card">
-  <div class="card-title"><h2>{{ 'Filtrar itens' if detail else 'Leitor XML' }}</h2></div>
+  <div class="card-title"><h2>{{ 'Filtrar itens' if detail else 'Vendas' }}</h2></div>
   <form class="filters-form" action="{{ url_for('xml_items', chave=note_key) if detail else url_for('xml_page') }}" method="get">
     {% if detail %}<input type="hidden" name="voltar" value="{{ back_url }}">{% endif %}
     <div class="filters-grid{% if detail %} item-detail-filter{% endif %}">
@@ -35,7 +35,7 @@
       {% endif %}
       <label class="field"><span>Item</span><input type="search" name="item" value="{{ item }}" maxlength="200" placeholder="Descrição, código ou NCM"></label>
     </div>
-    <div class="filter-actions"><button class="button primary" type="submit">{{ 'Filtrar itens' if detail else 'Consultar XMLs' }}</button><a class="button secondary" href="{{ url_for('xml_items', chave=note_key).include_query_params(voltar=back_url) if detail else url_for('xml_page') }}">Limpar filtros</a></div>
+    <div class="filter-actions"><button class="button primary" type="submit">{{ 'Filtrar itens' if detail else 'Consultar' }}</button><a class="button secondary" href="{{ url_for('xml_items', chave=note_key).include_query_params(voltar=back_url) if detail else url_for('xml_page') }}">Limpar filtros</a></div>
   </form>
 </section>
 <section class="card results-card">

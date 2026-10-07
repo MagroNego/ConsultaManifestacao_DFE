@@ -6,7 +6,6 @@
 <section class="page-heading">
   <div>
     <h1>Consulta</h1>
-    <p>Consulte o histórico de manifestações salvo no banco e exporte o mesmo resultado para Excel.</p>
   </div>
   <span class="status-dot {{ 'ok' if database_ready else 'bad' }}">
     {{ database_status_label or ("Banco disponível" if database_ready else "Banco indisponível") }}
