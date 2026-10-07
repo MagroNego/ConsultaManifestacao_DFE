@@ -91,7 +91,7 @@
           return;
         }
         form.classList.add("busy");
-        const button = form.querySelector('button[type="submit"]');
+        const button = event.submitter || form.querySelector('button[type="submit"]');
         if (button) {
           button.disabled = true;
           button.dataset.originalText = button.textContent;
@@ -103,6 +103,7 @@
         try {
           const method = (form.method || "get").toUpperCase();
           const data = new FormData(form);
+          if (event.submitter?.name) data.append(event.submitter.name, event.submitter.value);
           const url = new URL(form.action, window.location.href);
           const options = { method, credentials: "same-origin" };
           if (method === "GET") {
@@ -110,32 +111,7 @@
           } else {
             options.body = data;
           }
-          const response = await fetch(url, options);
-          const contentType = response.headers.get("Content-Type") || "";
-          if (!response.ok || contentType.includes("text/html")) {
-            let message = "Não foi possível gerar o arquivo. Tente novamente.";
-            if (contentType.includes("application/json")) {
-              const error = await response.json();
-              if (typeof error.detail === "string") message = error.detail;
-            } else if (contentType.includes("text/html")) {
-              const page = new DOMParser().parseFromString(await response.text(), "text/html");
-              message = page.querySelector(".alert.error")?.textContent?.trim() || message;
-            }
-            throw new Error(message);
-          }
-          const blob = await response.blob();
-          const disposition = response.headers.get("Content-Disposition") || "";
-          const encodedName = disposition.match(/filename\*=UTF-8''([^;]+)/i);
-          const plainName = disposition.match(/filename="([^"]+)"/i);
-          const filename = encodedName ? decodeURIComponent(encodedName[1]) : plainName?.[1] || "Relatorio.xlsx";
-          const objectUrl = URL.createObjectURL(blob);
-          const link = document.createElement("a");
-          link.href = objectUrl;
-          link.download = filename;
-          document.body.appendChild(link);
-          link.click();
-          link.remove();
-          setTimeout(() => URL.revokeObjectURL(objectUrl), 60000);
+          await window.nfeDownloads.download(url, options);
         } catch (error) {
           const notice = document.createElement("div");
           notice.className = "alert error";

@@ -3,10 +3,11 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const source = fs.readFileSync('nfe_consulta/web/static/app.js', 'utf8');
+const downloadSource = fs.readFileSync('nfe_consulta/web/static/downloads_ui.js', 'utf8');
 
-async function scenario(method, failure) {
+async function scenario(method, failure, csv = false) {
   const classes = new Set();
-  const button = { disabled: false, textContent: 'Gerar Excel', dataset: {} };
+  const button = { disabled: false, textContent: 'Gerar Excel', dataset: {}, ...(csv ? { name: 'formato', value: 'csv' } : {}) };
   const notices = [];
   const downloads = [];
   let submit, finish, request;
@@ -24,29 +25,35 @@ async function scenario(method, failure) {
   }
   const context = {
     URL: TestURL,
-    localStorage: { getItem: () => null },
-    window: { location: { href: 'http://test/consulta' }, matchMedia: () => ({ matches: false }) },
-    FormData: class { *[Symbol.iterator]() { yield ['numero', '123']; } },
+    localStorage: { getItem: () => null, setItem() {} },
+    window: { location: { href: 'http://test/consulta' }, matchMedia: () => ({ matches: false }), addEventListener() {} },
+    FormData: class {
+      constructor() { this.entries = [['numero', '123']]; }
+      append(key, value) { this.entries.push([key, value]); }
+      *[Symbol.iterator]() { yield* this.entries; }
+    },
     fetch: (url, options) => { request = { url, options }; return new Promise(resolve => { finish = resolve; }); },
     setTimeout: () => {},
     document: {
       documentElement: { dataset: {} },
       querySelector: () => null,
       querySelectorAll: selector => selector === '[data-processing-form]' ? [form] : [],
-      addEventListener: (name, fn) => fn(),
+      addEventListener: (name, fn) => { if (name === "DOMContentLoaded") fn(); },
       body: { appendChild: node => downloads.push(node) },
       createElement: () => ({ setAttribute() {}, click() { this.clicked = true; }, remove() {} }),
     },
   };
-  vm.runInNewContext(source, context);
+  const realm = vm.createContext(context);
+  vm.runInContext(downloadSource, realm);
+  vm.runInContext(source, realm);
   let prevented = false;
-  const pending = submit({ preventDefault() { prevented = true; } });
+  const pending = submit({ submitter: button, preventDefault() { prevented = true; } });
   assert.ok(prevented);
   assert.ok(button.disabled && classes.has('busy'));
   await submit({ preventDefault() {} }); // Duplicate submit must not send a second request.
   finish({
     ok: !failure,
-    headers: { get: key => key === 'Content-Type' ? failure ? 'application/json' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' : 'attachment; filename="Relatorio.xlsx"' },
+    headers: { get: key => key === 'Content-Type' ? failure ? 'application/json' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' : key === 'Content-Disposition' ? 'attachment; filename="Relatorio.xlsx"' : null },
     json: async () => ({ detail: 'O servidor está ocupado.' }),
     blob: async () => ({}),
   });
@@ -57,6 +64,7 @@ async function scenario(method, failure) {
   assert.equal(request.options.method, method.toUpperCase());
   if (method === 'get') assert.equal(request.url.searchParams.get('numero'), '123');
   else assert.ok(request.options.body);
+  if (csv) assert.ok([...request.options.body].some(([key, value]) => key === 'formato' && value === 'csv'));
   if (failure) {
     assert.equal(notices.length, 1);
     assert.equal(notices[0].textContent, 'O servidor está ocupado.');
@@ -71,5 +79,6 @@ async function scenario(method, failure) {
   await scenario('get', false);
   await scenario('post', false);
   await scenario('post', true);
-  process.stdout.write('3 download form scenarios passed\n');
+  await scenario('post', false, true);
+  process.stdout.write('4 download form scenarios passed\n');
 })().catch(error => { process.stderr.write(String(error)); process.exitCode = 1; });

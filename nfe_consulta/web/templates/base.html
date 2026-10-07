@@ -4,8 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Consulta de Manifestação{% endblock %}</title>
-  <link rel="stylesheet" href="{{ url_for('static', path='/app.css') }}?v={{ version }}-consulta-columns-7">
-  <script src="{{ url_for('static', path='/app.js') }}?v={{ version }}-export-queue-8" defer></script>
+  <link rel="stylesheet" href="{{ url_for('static', path='/app.css') }}?v={{ version }}-notifications-9">
+  <script src="{{ url_for('static', path='/downloads_ui.js') }}?v={{ version }}-notifications-9" defer></script>
+  <script src="{{ url_for('static', path='/app.js') }}?v={{ version }}-notifications-9" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -28,6 +29,16 @@
     </nav>
 
     <div class="account">
+      <div class="notifications">
+        <button class="theme-toggle notification-bell" type="button" data-notification-bell aria-label="Notificações" aria-expanded="false" aria-controls="notification-panel">
+          <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg>
+          <span class="notification-count" data-notification-count hidden>0</span>
+        </button>
+        <section id="notification-panel" class="notification-panel" data-notification-panel data-downloads-url="{{ url_for('downloads_page') }}" aria-label="Notificações recentes" hidden>
+          <div class="notification-heading"><strong>Notificações</strong><button type="button" data-notification-clear>Limpar</button></div>
+          <ul data-notification-list><li class="notification-empty">Nenhuma notificação recente.</li></ul>
+        </section>
+      </div>
       <button class="theme-toggle" type="button" data-theme-toggle aria-label="Alternar tema">
         <span data-theme-icon>◐</span>
       </button>
@@ -39,6 +50,8 @@
       {% endif %}
     </div>
   </header>
+
+  <div class="notification-toast" data-notification-toast role="status" aria-live="polite" hidden></div>
 
   <main class="page{% block page_class %}{% endblock %}">
     {% block content %}{% endblock %}

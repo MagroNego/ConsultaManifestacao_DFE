@@ -21,7 +21,7 @@
 
 {% if batch %}
 <div class="alert success">Lote processado: {{ batch.importadas }} importada(s), {{ batch.duplicadas }} duplicada(s), {{ batch.erros }} erro(s)/ignorada(s).
-  <a href="{{ url_for('xml_batch_log', lote=request.query_params.get('lote')) }}">Baixar registro do lote</a>
+  <a data-download-link href="{{ url_for('xml_batch_log', lote=request.query_params.get('lote')) }}">Baixar registro do lote</a>
   <a href="{{ url_for('xml_page') }}">Consultar XMLs</a>
 </div>
 {% endif %}

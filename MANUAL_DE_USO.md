@@ -79,6 +79,10 @@ A sincronização manual exige marcação da confirmação e confirmação final
 
 Abra **Downloads** para baixar novamente os arquivos gerados nas últimas 24 horas. A tabela informa os documentos processados, o período, a data de geração e a expiração. O prazo é contado a partir da geração e não muda quando o arquivo é baixado novamente. Após expirar, gere um novo relatório. Os registros de importação exigem acesso ao Admin. A exclusão das cópias não remove as notas do banco.
 
+O sininho ao lado do tema mostra **Processamento concluído** ou **Erro na geração** após uma solicitação de arquivo. Os avisos ficam neste navegador por até 24 horas, limitados aos 20 mais recentes. Abra o sininho para marcar os avisos como lidos ou use **Limpar** para removê-los.
+
+Ao baixar pela aba Downloads, a barra mostra a porcentagem do arquivo recebida pelo navegador. Quando a transferência termina, ela chega a **100%** e o navegador inicia o salvamento. Se a conexão for interrompida, aparece **Erro no download** e você pode tentar novamente.
+
 ## CT-e vinculado
 
 Nas abas Consulta e XML, abra o indicador **CT-e vinculado** para ver os conhecimentos associados à nota. O indicador **CT-e cancelado** aparece quando todos os vínculos apresentados estão cancelados. Número, chave e transportadora aparecem somente quando recebidos no evento. Se houver somente um resumo, aparece **Vínculo identificado** ou um cancelamento sem chave; esse cancelamento não é atribuído automaticamente a outro conhecimento. O Excel/CSV também inclui esses dados.

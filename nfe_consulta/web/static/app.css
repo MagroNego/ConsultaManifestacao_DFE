@@ -1319,3 +1319,28 @@ html[data-theme="dark"] .brand-logo-dark {
 .cte-link-detail + .cte-link-detail { border-top: 1px solid var(--border); }
 
 .consulta-page .result-table th, .consulta-page .result-table td { white-space: nowrap; }
+
+.notifications { position: relative; }
+.notification-bell { position: relative; }
+.notification-count { position: absolute; top: -5px; right: -5px; min-width: 18px; padding: 2px 4px; border-radius: 12px; background: var(--primary); color: var(--bg); font-size: 10px; line-height: 14px; }
+.notification-panel { position: absolute; top: calc(100% + 12px); right: 0; width: min(340px, calc(100vw - 32px)); padding: 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--panel); color: var(--text); box-shadow: var(--shadow); z-index: 30; }
+.notification-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.notification-heading button { padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel-soft); color: var(--text); cursor: pointer; }
+.notification-panel ul { padding: 0; margin: 12px 0 0; list-style: none; max-height: 320px; overflow-y: auto; }
+.notification-item { padding: 12px 0; border-top: 1px solid var(--border); }
+.notification-item a, .notification-item strong { display: block; color: var(--text); font-size: 13px; }
+.notification-item time, .notification-empty { color: var(--muted); font-size: 12px; }
+.notification-item time { display: block; margin-top: 4px; }
+.notification-error strong { color: var(--danger); }
+.notification-toast { position: fixed; top: 88px; right: 20px; max-width: calc(100vw - 40px); padding: 14px 18px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); color: var(--text); box-shadow: var(--shadow); z-index: 40; }
+.notification-toast[data-type="error"] { border-color: var(--danger); }
+.download-progress-cell { min-width: 155px; }
+.download-progress { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.download-progress progress { width: 95px; height: 7px; accent-color: var(--primary); }
+.download-progress[data-state="error"], .download-error { color: var(--danger); }
+.download-error { display: block; font-size: 12px; max-width: 240px; white-space: normal; }
+[data-download-link][aria-disabled="true"] { opacity: .5; cursor: progress; }
+.notification-panel[hidden], .notification-count[hidden], .notification-toast[hidden], .download-progress[hidden] { display: none; }
+@media (max-width: 620px) {
+  .notification-panel { position: fixed; top: 78px; right: 16px; }
+}
