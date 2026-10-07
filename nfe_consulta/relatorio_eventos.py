@@ -57,6 +57,8 @@ def _resumo_filtros(filtros: FiltrosEventos) -> str:
         itens.append(f"Chave: {filtros.chave}")
     if filtros.codigo:
         itens.append(TIPOS_MANIFESTACAO.get(filtros.codigo, filtros.codigo))
+    if filtros.situacao:
+        itens.append('Situação: ' + filtros.situacao.capitalize())
     return "  |  ".join(itens) if itens else "Todos os eventos do banco"
 
 

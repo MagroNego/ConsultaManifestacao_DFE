@@ -26,7 +26,7 @@ def register_xml_routes(app, settings, render, database_path):
     @app.get("/xml")
     async def xml_page(request: Request, user: Annotated[WebUser, Depends(require_user)],
                        tipo: str = "notas", q: str = "", data_inicial: str = "",
-                       data_final: str = "", pagina: int = 1, lote: int | None = None):
+                       data_final: str = "", pagina: int = 1, lote: int | None = None, situacao: str = ""):
         error = None
         result = dict(rows=[], columns=[], total=0, page=1, pages=0, notas=0)
         history, batch = [], None
@@ -36,7 +36,7 @@ def register_xml_routes(app, settings, render, database_path):
             selected = filters(data_inicial, data_final)
             result = await run_in_threadpool(store.query_report, database_path(settings), CNPJ_PADRAO,
                 password=settings.current_database_password(), kind=tipo, query=q,
-                inicio=selected.data_inicial, fim=selected.data_final, page=pagina)
+                inicio=selected.data_inicial, fim=selected.data_final, page=pagina, situacao=situacao)
             def read_ctes():
                 conn = abrir_banco(database_path(settings), settings.current_database_password(), somente_leitura=True)
                 try:
@@ -55,7 +55,7 @@ def register_xml_routes(app, settings, render, database_path):
         return render(request, "xml.html", user, result=result, tipo=tipo, q=q,
             inicio=selected.data_inicial_br if selected else data_inicial,
             fim=selected.data_final_br if selected else data_final,
-            history=history, batch=batch, error=error, ctes=ctes)
+            history=history, batch=batch, error=error, ctes=ctes, situacao=situacao)
 
     @app.post("/xml/importar")
     async def xml_import(request: Request, user: Annotated[WebUser, Depends(require_admin)]):
@@ -139,13 +139,13 @@ def register_xml_routes(app, settings, render, database_path):
     @app.get("/xml/exportar")
     async def xml_export(request: Request, user: Annotated[WebUser, Depends(require_export)],
                          formato: str = "xlsx", tipo: str = "itens", q: str = "",
-                         data_inicial: str = "", data_final: str = "", lote: int | None = None):
+                         data_inicial: str = "", data_final: str = "", lote: int | None = None, situacao: str = ""):
         if formato not in ("xlsx", "csv") or tipo not in ("notas", "itens", "retencoes"):
             raise HTTPException(400, "Formato ou relatório inválido.")
         def generate():
             selected = filters(data_inicial, data_final)
             kwargs = dict(password=settings.current_database_password(), query=q,
-                          inicio=selected.data_inicial, fim=selected.data_final, export=True)
+                          inicio=selected.data_inicial, fim=selected.data_final, export=True, situacao=situacao)
             if formato == "csv":
                 report = store.query_report(database_path(settings), CNPJ_PADRAO, kind=tipo, **kwargs)
                 data = store.export_csv(report)

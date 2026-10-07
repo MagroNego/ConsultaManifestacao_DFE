@@ -71,7 +71,7 @@
         >
       </label>
 
-      <label class="field filter-wide">
+      <label class="field">
         <span>Chave NF-e</span>
         <input
           type="text"
@@ -95,6 +95,11 @@
           {% endfor %}
         </select>
       </label>
+      <label class="field"><span>Situação</span><select name="situacao">
+        <option value="" {% if not filtros.situacao %}selected{% endif %}>Todas</option>
+        <option value="autorizada" {% if filtros.situacao == 'autorizada' %}selected{% endif %}>Autorizada</option>
+        <option value="cancelada" {% if filtros.situacao == 'cancelada' %}selected{% endif %}>Cancelada</option>
+      </select></label>
     </div>
     <div class="filter-actions">
       <a class="button secondary" href="{{ url_for('consulta_page') }}">Limpar</a>
@@ -128,6 +133,7 @@
       <input type="hidden" name="numero" value="{{ filtros.numero_texto }}">
       <input type="hidden" name="chave" value="{{ filtros.chave or '' }}">
       <input type="hidden" name="codigo" value="{{ filtros.codigo or '' }}">
+      <input type="hidden" name="situacao" value="{{ filtros.situacao }}">
       <button class="button secondary export-button" type="submit">Exportar Excel</button>
     </form>
     {% endif %}

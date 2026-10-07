@@ -28,6 +28,7 @@ class FiltrosEventos:
     serie: int | None = None
     chave: str | None = None
     codigo: str | None = None
+    situacao: str = ""
 
     @property
     def data_inicial_texto(self) -> str:
@@ -145,6 +146,7 @@ def normalizar_filtros(
     serie: str = "",
     chave: str = "",
     codigo: str = "",
+    situacao: str = "",
 ) -> FiltrosEventos:
     inicio = _parse_data(data_inicial, "Data inicial")
     fim = _parse_data(data_final, "Data final")
@@ -175,6 +177,8 @@ def normalizar_filtros(
     codigo_limpo = codigo.strip()
     if codigo_limpo and codigo_limpo not in TIPOS_MANIFESTACAO:
         raise ValueError("Tipo de manifestação inválido.")
+    if situacao not in ('', 'autorizada', 'cancelada'):
+        raise ValueError('Situação inválida.')
 
     return FiltrosEventos(
         data_inicial=inicio,
@@ -183,15 +187,20 @@ def normalizar_filtros(
         serie=serie_valor,
         chave=chave_limpa,
         codigo=codigo_limpo or None,
+        situacao=situacao,
     )
 
 
 def _where_eventos(
     cnpj: str,
     filtros: FiltrosEventos,
+    tem_informacoes: bool = True,
 ) -> tuple[str, list[object]]:
     clausulas = ["cnpj = ?"]
     parametros: list[object] = [cnpj]
+    if filtros.situacao:
+        cancelled = 'EXISTS (SELECT 1 FROM informacoes_nfe i WHERE i.cnpj=manifestacoes.cnpj AND i.chave=manifestacoes.chave AND i.cancelada=1)' if tem_informacoes else '0=1'
+        clausulas.append(cancelled if filtros.situacao == 'cancelada' else f'NOT ({cancelled})')
 
     if filtros.data_inicial:
         clausulas.append("data_evento >= ?")
@@ -271,7 +280,7 @@ def consultar_eventos(
     conexao = abrir_banco(database_path, password, somente_leitura=True)
     try:
         tem_informacoes = _tem_informacoes_nfe(conexao)
-        where, parametros = _where_eventos(cnpj, filtros)
+        where, parametros = _where_eventos(cnpj, filtros, tem_informacoes)
         campos_nota = _campos_nota(tem_informacoes)
         total = int(
             conexao.execute(
@@ -304,7 +313,7 @@ def consultar_eventos(
         ).fetchall()
         ctes = linked_ctes(conexao, cnpj, [line[0] for line in linhas])
         cancelled = cancelled_keys(conexao, cnpj, [line[0] for line in linhas])
-        cancelled_notes = lookup_cancelled(conexao, cnpj, key=filtros.chave, number=filtros.numero, series=filtros.serie)
+        cancelled_notes = lookup_cancelled(conexao, cnpj, key=filtros.chave, number=filtros.numero, series=filtros.serie) if filtros.situacao != 'autorizada' else ()
     finally:
         conexao.close()
 
@@ -329,7 +338,7 @@ def consultar_eventos_exportacao(
     conexao = abrir_banco(database_path, password, somente_leitura=True)
     try:
         tem_informacoes = _tem_informacoes_nfe(conexao)
-        where, parametros = _where_eventos(cnpj, filtros)
+        where, parametros = _where_eventos(cnpj, filtros, tem_informacoes)
         campos_nota = _campos_nota(tem_informacoes)
         total = int(
             conexao.execute(

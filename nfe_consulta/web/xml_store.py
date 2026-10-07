@@ -245,8 +245,8 @@ def download_xml(database_path, cnpj, chave, *, password=None):
         conn.close()
 
 
-def query_report(database_path, cnpj, *, password=None, kind="notas", query="", inicio=None, fim=None, page=1, export=False):
-    if kind not in ("notas", "itens", "retencoes") or page < 1 or len(query) > 200:
+def query_report(database_path, cnpj, *, password=None, kind="notas", query="", inicio=None, fim=None, page=1, export=False, situacao=""):
+    if kind not in ("notas", "itens", "retencoes") or page < 1 or len(query) > 200 or situacao not in ('', 'autorizada', 'cancelada'):
         raise ValueError("Filtro do leitor inválido.")
     fields = FIELDS_ITENS if kind == "itens" else FIELDS_RETIDO if kind == "retencoes" else FIELDS_NOTAS
     columns = [*fields, "Situação", "CT-e vinculado"]
@@ -259,6 +259,9 @@ def query_report(database_path, cnpj, *, password=None, kind="notas", query="", 
             return empty
         params = [cnpj]
         clauses = ["d.cnpj=?"]
+        if situacao:
+            cancelled = "EXISTS (SELECT 1 FROM informacoes_nfe i WHERE i.cnpj=d.cnpj AND i.chave=d.chave AND i.cancelada=1)" if _has_table(conn, 'informacoes_nfe') else '0=1'
+            clauses.append(cancelled if situacao == 'cancelada' else f'NOT ({cancelled})')
         for field, value in (("d.emissao>=?", inicio), ("d.emissao<=?", fim)):
             if value:
                 clauses.append(field)

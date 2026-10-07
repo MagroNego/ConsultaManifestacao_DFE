@@ -1291,7 +1291,7 @@ html[data-theme="dark"] .brand-logo-dark {
   margin-inline: auto;
 }
 
-.consulta-page .filters-grid {
+.consulta-page .filters-grid, .xml-page .filters-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
@@ -1300,13 +1300,13 @@ html[data-theme="dark"] .brand-logo-dark {
 }
 
 @media (max-width: 900px) {
-  .consulta-page .filters-grid {
+  .consulta-page .filters-grid, .xml-page .filters-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 620px) {
-  .consulta-page .filters-grid {
+  .consulta-page .filters-grid, .xml-page .filters-grid {
     grid-template-columns: 1fr;
   }
 }

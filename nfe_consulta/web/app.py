@@ -638,10 +638,11 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         chave: str = "",
         codigo: str = "",
         pagina: int = 1,
+        situacao: str = "",
     ):
         consultou = consultar == "1" or any(
             valor.strip()
-            for valor in (data_inicial, data_final, numero, serie, chave, codigo)
+            for valor in (data_inicial, data_final, numero, serie, chave, codigo, situacao)
         )
 
         if consultou:
@@ -653,6 +654,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                     serie=serie,
                     chave=chave,
                     codigo=codigo,
+                    situacao=situacao,
                 )
             except ValueError as exc:
                 return _render(
@@ -729,6 +731,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         serie: str = "",
         chave: str = "",
         codigo: str = "",
+        situacao: str = "",
     ):
         banco = _database_path(settings)
         database_state = _consulta_database_state(settings)
@@ -746,6 +749,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                 serie=serie,
                 chave=chave,
                 codigo=codigo,
+                situacao=situacao,
             )
             eventos = await run_in_threadpool(
                 consultar_eventos_exportacao,

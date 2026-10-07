@@ -18,6 +18,11 @@
         <option value="retencoes" {% if tipo == 'retencoes' %}selected{% endif %}>PIS/COFINS retidos</option>
       </select></label>
       <label class="field"><span>Busca</span><input type="text" name="q" value="{{ q }}" maxlength="200" placeholder="NF, chave, destinatário ou conteúdo"></label>
+      <label class="field"><span>Situação</span><select name="situacao">
+        <option value="" {% if not situacao %}selected{% endif %}>Todas</option>
+        <option value="autorizada" {% if situacao == 'autorizada' %}selected{% endif %}>Autorizada</option>
+        <option value="cancelada" {% if situacao == 'cancelada' %}selected{% endif %}>Cancelada</option>
+      </select></label>
       <label class="field"><span>Emissão inicial</span><input type="text" name="data_inicial" value="{{ inicio }}" inputmode="numeric" maxlength="10" placeholder="dd/mm/aaaa" data-date-input></label>
       <label class="field"><span>Emissão final</span><input type="text" name="data_final" value="{{ fim }}" inputmode="numeric" maxlength="10" placeholder="dd/mm/aaaa" data-date-input></label>
     </div>
@@ -30,6 +35,7 @@
     {% if result.total and user.can_export %}
     <form action="{{ url_for('xml_export') }}" method="get" data-processing-form data-download-form>
       <input type="hidden" name="tipo" value="{{ tipo }}"><input type="hidden" name="q" value="{{ q }}">
+      <input type="hidden" name="situacao" value="{{ situacao }}">
       <input type="hidden" name="data_inicial" value="{{ inicio }}"><input type="hidden" name="data_final" value="{{ fim }}">
       {% if request.query_params.get('lote') %}<input type="hidden" name="lote" value="{{ request.query_params.get('lote') }}">{% endif %}
       <div class="actions"><button class="button secondary" name="formato" value="xlsx" type="submit">EXCEL</button><button class="button secondary" name="formato" value="csv" type="submit">CSV</button></div>
