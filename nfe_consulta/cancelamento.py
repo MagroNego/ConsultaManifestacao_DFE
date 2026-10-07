@@ -9,6 +9,16 @@ CREATE TABLE IF NOT EXISTS informacoes_nfe (
     cnpj TEXT NOT NULL, chave TEXT NOT NULL, emitente TEXT NOT NULL DEFAULT '',
     cancelada INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(cnpj,chave)
 );
+CREATE TABLE IF NOT EXISTS cancelamentos_manuais (
+    cnpj TEXT NOT NULL, chave TEXT NOT NULL, usuario TEXT NOT NULL,
+    motivo TEXT NOT NULL, alterado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY(cnpj,chave)
+);
+CREATE TABLE IF NOT EXISTS historico_cancelamentos_manuais (
+    id INTEGER PRIMARY KEY, cnpj TEXT NOT NULL, chave TEXT NOT NULL,
+    usuario TEXT NOT NULL, motivo TEXT NOT NULL, acao TEXT NOT NULL,
+    alterado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 CREATE TABLE IF NOT EXISTS xml_cancelamentos (
     cnpj TEXT NOT NULL, chave TEXT NOT NULL, protocolo TEXT NOT NULL,
     data_evento TEXT NOT NULL, codigo_status TEXT NOT NULL, xml BLOB NOT NULL,
@@ -107,18 +117,84 @@ def save_cancellation(conn, cnpj, item, data):
     return cursor.rowcount > 0
 
 
+def _has_table(conn, name):
+    return bool(conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (name,)).fetchone())
+
+
+def cancellation_condition(conn, alias):
+    if alias not in {'d', 'manifestacoes'}:
+        raise ValueError('Alias inválido.')
+    parts = []
+    for table in ('informacoes_nfe', 'cancelamentos_manuais'):
+        if _has_table(conn, table):
+            status = ' AND i.cancelada=1' if table == 'informacoes_nfe' else ''
+            parts.append(f'EXISTS (SELECT 1 FROM {table} i WHERE i.cnpj={alias}.cnpj AND i.chave={alias}.chave{status})')
+    return '(' + ' OR '.join(parts) + ')' if parts else '0=1'
+
+
 def cancelled_keys(conn, cnpj, keys):
-    if not conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='informacoes_nfe'").fetchone():
-        return set()
     keys = list(set(keys))
     found = set()
-    for index in range(0, len(keys), 500):
-        batch = keys[index:index + 500]
-        marks = ','.join('?' for _ in batch)
-        scope = 'cnpj=? AND ' if cnpj else ''
-        params = (cnpj, *batch) if cnpj else tuple(batch)
-        found.update(row[0] for row in conn.execute(f'SELECT chave FROM informacoes_nfe WHERE {scope}cancelada=1 AND chave IN ({marks})', params))
+    for table in ('informacoes_nfe', 'cancelamentos_manuais'):
+        if not _has_table(conn, table):
+            continue
+        for index in range(0, len(keys), 500):
+            batch = keys[index:index + 500]
+            marks = ','.join('?' for _ in batch)
+            scope = 'cnpj=? AND ' if cnpj else ''
+            params = (cnpj, *batch) if cnpj else tuple(batch)
+            status = 'cancelada=1 AND ' if table == 'informacoes_nfe' else ''
+            found.update(row[0] for row in conn.execute(f'SELECT chave FROM {table} WHERE {scope}{status}chave IN ({marks})', params))
     return found
+
+
+def change_manual_status(database_path, cnpj, identifiers, *, user, reason, action='cancelar', password=None):
+    """Correção interna auditada; não cria nem remove um evento da SEFAZ."""
+    from nfe_consulta.seguranca_banco import abrir_banco
+    from pathlib import Path
+    if action not in {'cancelar', 'remover'}:
+        raise ValueError('Ação inválida.')
+    if len(identifiers) > 16384 or len(reason) > 500:
+        raise ValueError('Limite de texto excedido.')
+    tokens = list(dict.fromkeys(re.split(r'[\s,;]+', identifiers.strip())))
+    if not tokens or not tokens[0] or len(tokens) > 100:
+        raise ValueError('Informe entre 1 e 100 notas.')
+    if any(not re.fullmatch(r'[0-9]{1,9}|[0-9]{44}', token) for token in tokens):
+        raise ValueError('Informe somente números de nota ou chaves de 44 dígitos.')
+    reason = reason.strip()
+    if not reason:
+        raise ValueError('Informe o motivo da alteração.')
+    if not Path(database_path).is_file():
+        raise ValueError('Banco local não encontrado.')
+    conn = abrir_banco(database_path, password)
+    try:
+        # Resolver antes de criar tabelas evita alterar bancos em pedidos inválidos.
+        tables = [t for t in ('xml_documentos', 'informacoes_nfe', 'manifestacoes') if _has_table(conn, t)]
+        keys = set()
+        for token in tokens:
+            matches = set()
+            for table in tables:
+                clause = 'chave=?' if len(token) == 44 else 'CAST(SUBSTR(chave,26,9) AS INTEGER)=?'
+                value = token if len(token) == 44 else int(token)
+                matches.update(row[0] for row in conn.execute(f'SELECT DISTINCT chave FROM {table} WHERE cnpj=? AND {clause}', (cnpj, value)))
+            matches = {key for key in matches if re.fullmatch(r'[0-9]{44}', key) and key[20:22] == '55'}
+            if not matches:
+                raise ValueError(f'Nota {token} não encontrada no banco desta empresa.')
+            if len(matches) > 1:
+                raise ValueError(f'Número {token} corresponde a mais de uma nota. Informe a chave de acesso.')
+            keys.update(matches)
+        # Schema migration is separate; all status changes share one transaction.
+        conn.executescript(SCHEMA)
+        with conn:
+            for key in sorted(keys):
+                if action == 'cancelar':
+                    conn.execute("INSERT INTO cancelamentos_manuais(cnpj,chave,usuario,motivo) VALUES (?,?,?,?) ON CONFLICT(cnpj,chave) DO UPDATE SET usuario=excluded.usuario,motivo=excluded.motivo,alterado_em=CURRENT_TIMESTAMP", (cnpj, key, user, reason))
+                else:
+                    conn.execute('DELETE FROM cancelamentos_manuais WHERE cnpj=? AND chave=?', (cnpj, key))
+                conn.execute('INSERT INTO historico_cancelamentos_manuais(cnpj,chave,usuario,motivo,acao) VALUES (?,?,?,?,?)', (cnpj, key, user, reason, action))
+        return len(keys)
+    finally:
+        conn.close()
 
 
 def status_label(cancelled):
@@ -129,9 +205,13 @@ def status_label(cancelled):
 def lookup_cancelled(conn, cnpj, *, key=None, number=None, series=None):
     if not key and number is None:
         return ()
-    if not conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='informacoes_nfe'").fetchone():
+    sources = []
+    for table in ('informacoes_nfe', 'cancelamentos_manuais'):
+        if _has_table(conn, table):
+            sources.append(f"SELECT cnpj,chave FROM {table}" + (' WHERE cancelada=1' if table == 'informacoes_nfe' else ''))
+    if not sources:
         return ()
-    clauses = ['cnpj=?', 'cancelada=1']
+    clauses = ['cnpj=?']
     params = [cnpj]
     if key:
         clauses.append('chave=?')
@@ -143,4 +223,4 @@ def lookup_cancelled(conn, cnpj, *, key=None, number=None, series=None):
         clauses.append('CAST(SUBSTR(chave,23,3) AS INTEGER)=?')
         params.append(series)
     return tuple(dict(chave=row[0], numero=int(row[0][25:34]), serie=str(int(row[0][22:25])))
-                 for row in conn.execute('SELECT chave FROM informacoes_nfe WHERE ' + ' AND '.join(clauses) + ' ORDER BY chave LIMIT 20', params))
+                 for row in conn.execute('SELECT DISTINCT chave FROM (' + ' UNION '.join(sources) + ') WHERE ' + ' AND '.join(clauses) + ' ORDER BY chave LIMIT 20', params))

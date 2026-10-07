@@ -19,7 +19,7 @@ from openpyxl.utils import get_column_letter
 
 from nfe_consulta.seguranca_banco import abrir_banco
 from nfe_consulta.cte import linked_ctes, export_label
-from nfe_consulta.cancelamento import SCHEMA as CANCELLATION_SCHEMA, read_cancellation, save_cancellation, cancelled_keys, status_label
+from nfe_consulta.cancelamento import SCHEMA as CANCELLATION_SCHEMA, read_cancellation, save_cancellation, cancelled_keys, status_label, cancellation_condition
 from nfe_consulta.xml_reader import parse_nfe_xml, decimal_value, FIELDS_ITENS, FIELDS_RETIDO
 
 MAX_XML = 8 * 1024 * 1024
@@ -260,7 +260,7 @@ def query_report(database_path, cnpj, *, password=None, kind="notas", query="", 
         params = [cnpj]
         clauses = ["d.cnpj=?"]
         if situacao:
-            cancelled = "EXISTS (SELECT 1 FROM informacoes_nfe i WHERE i.cnpj=d.cnpj AND i.chave=d.chave AND i.cancelada=1)" if _has_table(conn, 'informacoes_nfe') else '0=1'
+            cancelled = cancellation_condition(conn, 'd')
             clauses.append(cancelled if situacao == 'cancelada' else f'NOT ({cancelled})')
         for field, value in (("d.emissao>=?", inicio), ("d.emissao<=?", fim)):
             if value:

@@ -96,3 +96,9 @@ O Admin aceita XMLs completos de NF-e e XMLs de cancelamento homologado, individ
 A situação mostra **Autorizada** ou **Cancelada**, conforme os registros do banco local. Um cancelamento registrado tem prioridade. Se o arquivo contém apenas a nota autorizada e não traz o cancelamento, importe também o XML do evento. Em buscas por chave ou número, a Consulta mostra o cancelamento mesmo sem manifestações. A importação não altera o NSU nem faz chamadas à SEFAZ. A classificação não consulta a autorização atual na SEFAZ. Relatórios já gerados são cópias do momento da geração; gere outro para refletir novas importações.
 
 Em **Consulta** e **Emissão**, o filtro **Situação** oferece **Todas**, **Autorizada** e **Cancelada**. Ele combina com datas e busca, permanece na paginação e é aplicado aos arquivos exportados. Em Emissão, a seleção vale para notas, itens e retenções; o Excel aplica a mesma situação a todas as abas. **Limpar** volta a mostrar todas as situações.
+
+### Alteração manual de situação
+
+Em **Admin → Alterar situação de notas**, informe números ou chaves de acesso, uma por linha, e o motivo. **Marcar como cancelada** atualiza a situação local na Consulta, Emissão e nos novos relatórios. São aceitas até 100 notas existentes no banco da empresa; números ambíguos exigem a chave. Se qualquer nota for inválida ou não encontrada, nenhuma nota do pedido é alterada.
+
+**Remover marcação manual** desfaz somente a correção interna. Um cancelamento recebido pelo NSU ou XML continua válido. Reimportações preservam a marcação manual. O histórico no banco registra usuário, motivo, ação e data; os XMLs originais e eventos da SEFAZ são preservados. Essa função não transmite um evento à SEFAZ. Arquivos já gerados permanecem com a situação existente na geração; gere um novo relatório após a alteração.

@@ -11,6 +11,7 @@ from nfe_consulta.web.sync_history import _tail_lines
 
 
 LABELS = {
+    "manual_note_status": "Situação manual de notas",
     "sefaz_sync": "Sincronização SEFAZ",
     "admin_accounts": "Acesso administrativo",
     "email_recipients": "Destinatários dos alertas",

@@ -9,7 +9,7 @@ from pathlib import Path
 
 from nfe_consulta.seguranca_banco import abrir_banco
 from nfe_consulta.cte import linked_ctes
-from nfe_consulta.cancelamento import cancelled_keys, status_label, lookup_cancelled
+from nfe_consulta.cancelamento import cancellation_condition, cancelled_keys, status_label, lookup_cancelled
 
 
 TIPOS_MANIFESTACAO = {
@@ -195,11 +195,12 @@ def _where_eventos(
     cnpj: str,
     filtros: FiltrosEventos,
     tem_informacoes: bool = True,
+    cancellation_sql: str | None = None,
 ) -> tuple[str, list[object]]:
     clausulas = ["cnpj = ?"]
     parametros: list[object] = [cnpj]
     if filtros.situacao:
-        cancelled = 'EXISTS (SELECT 1 FROM informacoes_nfe i WHERE i.cnpj=manifestacoes.cnpj AND i.chave=manifestacoes.chave AND i.cancelada=1)' if tem_informacoes else '0=1'
+        cancelled = cancellation_sql or ('EXISTS (SELECT 1 FROM informacoes_nfe i WHERE i.cnpj=manifestacoes.cnpj AND i.chave=manifestacoes.chave AND i.cancelada=1)' if tem_informacoes else '0=1')
         clausulas.append(cancelled if filtros.situacao == 'cancelada' else f'NOT ({cancelled})')
 
     if filtros.data_inicial:
@@ -280,7 +281,7 @@ def consultar_eventos(
     conexao = abrir_banco(database_path, password, somente_leitura=True)
     try:
         tem_informacoes = _tem_informacoes_nfe(conexao)
-        where, parametros = _where_eventos(cnpj, filtros, tem_informacoes)
+        where, parametros = _where_eventos(cnpj, filtros, tem_informacoes, cancellation_condition(conexao, 'manifestacoes'))
         campos_nota = _campos_nota(tem_informacoes)
         total = int(
             conexao.execute(
@@ -338,7 +339,7 @@ def consultar_eventos_exportacao(
     conexao = abrir_banco(database_path, password, somente_leitura=True)
     try:
         tem_informacoes = _tem_informacoes_nfe(conexao)
-        where, parametros = _where_eventos(cnpj, filtros, tem_informacoes)
+        where, parametros = _where_eventos(cnpj, filtros, tem_informacoes, cancellation_condition(conexao, 'manifestacoes'))
         campos_nota = _campos_nota(tem_informacoes)
         total = int(
             conexao.execute(

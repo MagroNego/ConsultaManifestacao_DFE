@@ -21,6 +21,7 @@ from starlette.background import BackgroundTask
 from starlette.concurrency import run_in_threadpool
 
 from nfe_consulta import __version__
+from nfe_consulta.cancelamento import change_manual_status
 from nfe_consulta.banco_config import carregar_caminho_banco, salvar_caminho_banco
 from nfe_consulta.config import CNPJ_PADRAO, NOME_PLANILHA, UF_PADRAO
 from nfe_consulta.certificado_arquivo import carregar_certificado_arquivo
@@ -337,12 +338,12 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                     headers={"Cache-Control": "no-store"})
             return JSONResponse({"detail": "Entre para acessar a área Admin."}, status_code=401,
                 headers={"Cache-Control": "no-store"})
-        if path in {"/excel", "/xml/importar", "/admin/login"} and request.method == "POST":
+        if path in {"/excel", "/xml/importar", "/admin/login", "/admin/notas/situacao"} and request.method == "POST":
             try:
                 size = int(request.headers.get("content-length", "0"))
             except ValueError:
                 return JSONResponse({"detail": "Tamanho da requisição inválido."}, status_code=400)
-            maximum = MAX_UPLOAD + 2 * 1024 * 1024 if path == "/xml/importar" else settings.max_upload_bytes + 65536 if path == "/excel" else 8192
+            maximum = MAX_UPLOAD + 2 * 1024 * 1024 if path == "/xml/importar" else settings.max_upload_bytes + 65536 if path == "/excel" else 65536 if path == "/admin/notas/situacao" else 8192
             if size > maximum:
                 return JSONResponse({"detail": "Requisição excede o limite."}, status_code=413)
 
@@ -1019,6 +1020,8 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         email_ok: str | None = None,
         email_sent: str | None = None,
         lote: int | None = None,
+        situacao_ok: int | None = None,
+        situacao_acao: str | None = None,
     ):
         try:
             status_web = await run_in_threadpool(_status_web, settings)
@@ -1048,7 +1051,9 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             batch=batch,
             status_web=status_web,
             success=(
-                "Sincronização concluída." if ok == "1"
+                f"Marcação manual removida de {situacao_ok} nota(s). Cancelamentos da SEFAZ permanecem válidos." if situacao_ok and situacao_acao == 'remover'
+                else f"{situacao_ok} nota(s) marcada(s) como Cancelada." if situacao_ok
+                else "Sincronização concluída." if ok == "1"
                 else "Certificado validado e configurado." if cert_ok == "1"
                 else "Banco validado e configurado." if db_ok == "1"
                 else "Destinatários dos alertas salvos." if email_ok == "1"
@@ -1064,6 +1069,35 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             email_recipients=email_recipients,
             smtp_ready=smtp_pronto(settings),
             email_pending=await run_in_threadpool(contar_pendentes, settings) if status_web.database_ready else None,
+        )
+
+    @app.post("/admin/notas/situacao")
+    async def alterar_situacao_notas(
+        request: Request,
+        user: Annotated[WebUser, Depends(require_admin)],
+        csrf: str = Form(...),
+        notas: str = Form(...),
+        motivo: str = Form(...),
+        acao: str = Form("cancelar"),
+    ):
+        validate_csrf(csrf, user, settings)
+        lock = app.state.sync_lock
+        if not lock.acquire(blocking=False):
+            raise HTTPException(status_code=409, detail="Aguarde a importação ou sincronização em andamento.")
+        try:
+            count = await run_in_threadpool(
+                change_manual_status, _database_path(settings), CNPJ_PADRAO, notas,
+                user=user.username, reason=motivo, action=acao,
+                password=settings.current_database_password(),
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        finally:
+            lock.release()
+        app.state.audit.write(request, user, "manual_note_status", "ok", count=count, operation=acao)
+        return RedirectResponse(
+            request.url_for("atualizar_page").include_query_params(situacao_ok=count, situacao_acao=acao),
+            status_code=303,
         )
 
     @app.post("/atualizar/alertas-email")

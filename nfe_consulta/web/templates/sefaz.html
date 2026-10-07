@@ -36,6 +36,27 @@
   </form>
 </details>
 
+<details class="card xml-import">
+  <summary>Alterar situação de notas</summary>
+  <form action="{{ url_for('alterar_situacao_notas') }}" method="post">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label class="field">
+      <span>Número da NF ou chave de acesso</span>
+      <textarea name="notas" rows="4" maxlength="16384" placeholder="Uma nota por linha" required></textarea>
+      <small class="muted">Até 100 notas. Se houver números repetidos, informe a chave de 44 dígitos.</small>
+    </label>
+    <label class="field">
+      <span>Motivo da alteração</span>
+      <input name="motivo" maxlength="500" required>
+    </label>
+    <p class="muted">A marcação manual vale na Consulta, Emissão e nos novos relatórios. Removê-la mantém os cancelamentos recebidos da SEFAZ.</p>
+    <div class="actions">
+      <button class="button primary" name="acao" value="cancelar" type="submit">Marcar como cancelada</button>
+      <button class="button" name="acao" value="remover" type="submit">Remover marcação manual</button>
+    </div>
+  </form>
+</details>
+
 <div class="admin-grid">
   <section class="card">
     <div class="card-title">
