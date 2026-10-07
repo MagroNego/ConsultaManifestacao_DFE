@@ -79,7 +79,9 @@ A sincronização manual exige marcação da confirmação e confirmação final
 
 Abra **Downloads** para baixar novamente os arquivos gerados nas últimas 24 horas. A tabela informa os documentos processados, o período, a data de geração e a expiração. O prazo é contado a partir da geração e não muda quando o arquivo é baixado novamente. Após expirar, gere um novo relatório. Os registros de importação exigem acesso ao Admin. A exclusão das cópias não remove as notas do banco.
 
-O sininho ao lado do tema mostra **Processamento concluído** ou **Erro na geração** após uma solicitação de arquivo. Os avisos ficam neste navegador por até 24 horas, limitados aos 20 mais recentes. Abra o sininho para marcar os avisos como lidos ou use **Limpar** para removê-los.
+Ao solicitar EXCEL ou CSV, você é direcionado a Downloads. A solicitação aparece imediatamente como **Na fila** ou **Gerando arquivo**, com uma barra de atividade. A tabela se atualiza automaticamente e libera o botão de baixar quando o arquivo está pronto. Você pode mudar de página sem cancelar a geração. A geração em andamento depende do processo do servidor; reiniciar o servidor interrompe as tarefas pendentes.
+
+O sininho ao lado do tema também acompanha **Na fila** e **Gerando arquivo** com uma barra de atividade, em qualquer aba. Quando termina, mostra **Processamento concluído** ou **Erro na geração** após uma solicitação de arquivo. Os avisos ficam neste navegador por até 24 horas, limitados aos 20 mais recentes. Abra o sininho para marcar os avisos como lidos ou use **Limpar** para removê-los.
 
 Ao baixar pela aba Downloads, a barra mostra a porcentagem do arquivo recebida pelo navegador. Quando a transferência termina, ela chega a **100%** e o navegador inicia o salvamento. Se a conexão for interrompida, aparece **Erro no download** e você pode tentar novamente.
 

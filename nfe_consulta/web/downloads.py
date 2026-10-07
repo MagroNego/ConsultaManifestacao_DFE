@@ -129,8 +129,13 @@ class DownloadArchive:
 
 async def archive_file(request, source, *, filename, media_type, documents, period, admin_only=False):
     try:
-        return await run_in_threadpool(request.app.state.downloads.save, source, filename=filename,
+        item = await run_in_threadpool(request.app.state.downloads.save, source, filename=filename,
             media_type=media_type, documents=documents, period=period, admin_only=admin_only)
+        from nfe_consulta.web.export_jobs import current_export_job
+        job = current_export_job.get()
+        if job is not None:
+            job.update(archive_id=item['id'], documents=documents, period=period)
+        return item
     except OSError as exc:
         raise HTTPException(503, 'Não foi possível arquivar o download. Confira espaço e permissões no servidor.') from exc
 

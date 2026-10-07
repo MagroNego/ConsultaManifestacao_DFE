@@ -1312,6 +1312,8 @@ html[data-theme="dark"] .brand-logo-dark {
 }
 
 .downloads-table th, .downloads-table td { white-space: nowrap; }
+.download-progress[data-generation-state="error"] { color: var(--danger); }
+.notification-item progress { width: 100%; height: 6px; accent-color: var(--primary); }
 
 .cte-links summary { cursor: pointer; white-space: nowrap; padding: 6px 0; }
 .cte-links summary:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }

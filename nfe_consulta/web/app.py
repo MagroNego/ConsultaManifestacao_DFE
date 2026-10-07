@@ -70,6 +70,7 @@ from nfe_consulta.web.xml_routes import register_xml_routes
 from nfe_consulta.web.xml_store import existing_keys, MAX_UPLOAD, import_history
 from nfe_consulta.web.xml_upload_limit import XmlUploadLimit
 from nfe_consulta.web.export_queue import ExportQueue, ExportQueueBusy
+from nfe_consulta.web.export_jobs import ExportJobs, current_export_job
 from nfe_consulta.web.downloads import DownloadArchive, archive_file, cleanup_loop, period_label
 
 
@@ -274,6 +275,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
     app.state.login_attempts = {}
     app.state.login_lock = threading.Lock()
     app.state.export_queue = ExportQueue()
+    app.state.export_jobs = ExportJobs()
     app.state.sync_lock = threading.Lock()
     app.state.audit = AuditLog(settings.audit_log)
     app.state.auto_sync_task = None
@@ -298,6 +300,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
 
     @app.on_event("shutdown")
     async def stop_auto_sync():
+        await app.state.export_jobs.close()
         cleanup = app.state.downloads_cleanup_task
         if cleanup is not None:
             cleanup.cancel()
@@ -336,9 +339,34 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                 return JSONResponse({"detail": "Requisição excede o limite."}, status_code=413)
 
         export_request = path in {"/excel", "/consulta/exportar", "/xml/exportar"}
+        if export_request and request.headers.get("x-nfe-background") == "1" and current_export_job.get() is None:
+            if request.method != ("POST" if path == "/excel" else "GET"):
+                return JSONResponse({"detail": "Método inválido."}, status_code=405)
+            body = bytearray()
+            async for chunk in request.stream():
+                body.extend(chunk)
+                if len(body) > settings.max_upload_bytes + 65536:
+                    return JSONResponse({"detail": "Requisição excede o limite."}, status_code=413)
+            period = "Não informado"
+            if request.method == "GET":
+                try:
+                    selected = normalizar_filtros(data_inicial=request.query_params.get("data_inicial", ""), data_final=request.query_params.get("data_final", ""))
+                    period = period_label(start=selected.data_inicial, end=selected.data_final)
+                except (TypeError, ValueError):
+                    pass
+            try:
+                job = app.state.export_jobs.start(app, request.scope, bytes(body), period=period)
+            except ExportQueueBusy as exc:
+                return JSONResponse({"detail": exc.detail}, status_code=exc.status_code,
+                    headers={"Retry-After": "15", "Cache-Control": "no-store"})
+            return JSONResponse({"job_id": job['id'], "downloads_url": str(request.url_for("downloads_page"))},
+                status_code=202, headers={"Cache-Control": "no-store"})
         if export_request:
             try:
                 async with app.state.export_queue.slot():
+                    job = current_export_job.get()
+                    if job is not None:
+                        job['status'] = 'generating'
                     response = await call_next(request)
             except ExportQueueBusy as exc:
                 return JSONResponse({"detail": exc.detail}, status_code=exc.status_code,
@@ -412,7 +440,25 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         except OSError:
             items = []
             error = "Não foi possível consultar os downloads. Confira a pasta de arquivos no servidor."
-        return _render(request, "downloads.html", user, items=items, error=error)
+        jobs = [job for job in app.state.export_jobs.list() if job['status'] != 'complete']
+        return _render(request, "downloads.html", user, items=items, jobs=jobs, error=error)
+
+    @app.get("/downloads/estado")
+    async def downloads_state(request: Request, user: Annotated[WebUser, Depends(current_user)], ids: str = ""):
+        records = app.state.export_jobs.list()
+        selected_ids = set(ids.split(',')[:20])
+        tracked = [dict(id=job['id'], status=job['status'], archive_id=job['archive_id'])
+                   for job in records if job['id'] in selected_ids]
+        found = {job['id'] for job in tracked}
+        tracked.extend(dict(id=identifier, status='unavailable', archive_id=None)
+                       for identifier in selected_ids - found)
+        try:
+            items = await run_in_threadpool(app.state.downloads.list, admin=user.is_admin)
+        except OSError:
+            raise HTTPException(503, "Não foi possível consultar os downloads.")
+        html = TEMPLATES.get_template('downloads_table.html').render(request=request, user=user,
+            items=items, jobs=[job for job in records if job['status'] != 'complete'])
+        return JSONResponse(dict(jobs=tracked, html=html), headers={"Cache-Control": "no-store"})
 
     @app.get("/downloads/{identifier}")
     async def archived_download(request: Request, identifier: str, user: Annotated[WebUser, Depends(current_user)]):

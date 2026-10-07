@@ -111,7 +111,7 @@
           } else {
             options.body = data;
           }
-          await window.nfeDownloads.download(url, options);
+          await window.nfeDownloads.generate(url, options);
         } catch (error) {
           const notice = document.createElement("div");
           notice.className = "alert error";

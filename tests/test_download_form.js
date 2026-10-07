@@ -10,6 +10,7 @@ async function scenario(method, failure, csv = false) {
   const button = { disabled: false, textContent: 'Gerar Excel', dataset: {}, ...(csv ? { name: 'formato', value: 'csv' } : {}) };
   const notices = [];
   const downloads = [];
+  const redirects = [];
   let submit, finish, request;
   const form = {
     method, action: 'http://test/excel',
@@ -26,7 +27,7 @@ async function scenario(method, failure, csv = false) {
   const context = {
     URL: TestURL,
     localStorage: { getItem: () => null, setItem() {} },
-    window: { location: { href: 'http://test/consulta' }, matchMedia: () => ({ matches: false }), addEventListener() {} },
+    window: { location: { href: 'http://test/consulta', assign: url => redirects.push(url) }, matchMedia: () => ({ matches: false }), addEventListener() {} },
     FormData: class {
       constructor() { this.entries = [['numero', '123']]; }
       append(key, value) { this.entries.push([key, value]); }
@@ -34,6 +35,7 @@ async function scenario(method, failure, csv = false) {
     },
     fetch: (url, options) => { request = { url, options }; return new Promise(resolve => { finish = resolve; }); },
     setTimeout: () => {},
+    clearTimeout() {},
     document: {
       documentElement: { dataset: {} },
       querySelector: () => null,
@@ -53,8 +55,9 @@ async function scenario(method, failure, csv = false) {
   await submit({ preventDefault() {} }); // Duplicate submit must not send a second request.
   finish({
     ok: !failure,
+    status: failure ? 429 : 202,
     headers: { get: key => key === 'Content-Type' ? failure ? 'application/json' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' : key === 'Content-Disposition' ? 'attachment; filename="Relatorio.xlsx"' : null },
-    json: async () => ({ detail: 'O servidor está ocupado.' }),
+    json: async () => failure ? ({ detail: 'O servidor está ocupado.' }) : ({ job_id: 'a'.repeat(32), downloads_url: 'http://test/downloads' }),
     blob: async () => ({}),
   });
   await pending;
@@ -62,6 +65,7 @@ async function scenario(method, failure, csv = false) {
   assert.equal(button.textContent, 'Gerar Excel');
   assert.equal(classes.has('busy'), false);
   assert.equal(request.options.method, method.toUpperCase());
+  assert.equal(request.options.headers['X-NFE-Background'], '1');
   if (method === 'get') assert.equal(request.url.searchParams.get('numero'), '123');
   else assert.ok(request.options.body);
   if (csv) assert.ok([...request.options.body].some(([key, value]) => key === 'formato' && value === 'csv'));
@@ -70,9 +74,8 @@ async function scenario(method, failure, csv = false) {
     assert.equal(notices[0].textContent, 'O servidor está ocupado.');
     assert.equal(downloads.length, 0);
   } else {
-    assert.equal(downloads.length, 1);
-    assert.equal(downloads[0].download, 'Relatorio.xlsx');
-    assert.ok(downloads[0].clicked);
+    assert.deepEqual(redirects, ['http://test/downloads']);
+    assert.equal(downloads.length, 0);
   }
 }
 (async () => {
