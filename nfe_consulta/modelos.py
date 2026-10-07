@@ -41,6 +41,20 @@ class Manifestacao:
 
 
 @dataclass(frozen=True)
+class EventoCTe:
+    chave_nfe: str
+    chave_cte: str
+    codigo: str
+    data: str
+    protocolo: str = ""
+    sequencia: str = ""
+    transportadora: str = ""
+    cnpj_transportadora: str = ""
+    nsu: str = ""
+    schema: str = ""
+
+
+@dataclass(frozen=True)
 class InformacaoNota:
     chave: str
     emitente: str = ""
@@ -55,6 +69,7 @@ class ResultadoConsulta:
     protocolo_nfe: Optional[str]
     manifestacoes: tuple  # tuple[Manifestacao, ...]
     erro: Optional[str] = None
+    ctes: tuple = ()
 
 
 @dataclass(frozen=True)
@@ -79,3 +94,4 @@ class RetornoDistribuicao:
     documentos_ignorados: int = 0
     ult_nsu_informado: bool = False
     informacoes_notas: tuple[InformacaoNota, ...] = ()
+    eventos_cte: tuple[EventoCTe, ...] = ()

@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime, timedelta, timezone
 from math import ceil
 from pathlib import Path
 
 from nfe_consulta.seguranca_banco import abrir_banco
+from nfe_consulta.cte import linked_ctes
 
 
 TIPOS_MANIFESTACAO = {
@@ -64,6 +65,7 @@ class EventoNota:
     nsu: str
     recebido_em: str = ""
     emitente: str = ""
+    ctes: tuple = ()
 
     @property
     def data_label(self) -> str:
@@ -293,11 +295,12 @@ def consultar_eventos(
             """,
             [*parametros, por_pagina, offset],
         ).fetchall()
+        ctes = linked_ctes(conexao, cnpj, [line[0] for line in linhas])
     finally:
         conexao.close()
 
     return ResultadoEventos(
-        eventos=tuple(_evento_da_linha(linha) for linha in linhas),
+        eventos=tuple(replace(_evento_da_linha(linha), ctes=ctes.get(linha[0], ())) for linha in linhas),
         total=total,
         pagina=pagina_efetiva,
         por_pagina=por_pagina,
@@ -347,10 +350,11 @@ def consultar_eventos_exportacao(
             """,
             parametros,
         ).fetchall()
+        ctes = linked_ctes(conexao, cnpj, [line[0] for line in linhas])
     finally:
         conexao.close()
 
-    return tuple(_evento_da_linha(linha) for linha in linhas)
+    return tuple(replace(_evento_da_linha(linha), ctes=ctes.get(linha[0], ())) for linha in linhas)
 
 
 def consultar_numero_nota(

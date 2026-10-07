@@ -104,3 +104,11 @@ O empacotador inclui apenas código, recursos estáticos, lançadores e document
 ### Downloads recentes
 
 A aba **Downloads** guarda cópias dos relatórios Excel/CSV e dos XMLs baixados por **24 horas após a geração**. Cada arquivo mostra a quantidade de documentos processados, o período do relatório, a geração e a expiração em horário de Brasília. Baixar novamente não renova o prazo. As cópias ficam em `dados/downloads`, fora do banco fiscal, e são removidas automaticamente. A quantidade representa notas distintas nos relatórios; os registros de importação ficam disponíveis apenas no Admin. O período usa o filtro informado ou as datas de emissão dos XMLs / eventos das manifestações; sem datas, aparece “Não informado”.
+
+### CT-e vinculado à NF-e
+
+Consulta e XML exibem os vínculos de CT-e recebidos na distribuição da NF-e, com situação autorizado/cancelado e, quando disponíveis, número, chave e transportadora. As exportações Excel/CSV e a consulta por TXT incluem a coluna **CT-e vinculado**. Uma nota pode ter vários conhecimentos; cancelar um CT-e não cancela os demais nem a NF-e. Quando a SEFAZ envia somente um resumo, aparece **Vínculo identificado**, sem inventar uma chave ou correlacionar um cancelamento sem chave com outro CT-e.
+
+Os eventos 610600/610601 ficam na tabela `eventos_cte` do mesmo banco fiscal, separados das manifestações do destinatário. A migração ocorre na próxima abertura do banco para gravação/sincronização; a consulta de bancos antigos continua funcionando. A sincronização passa a guardar os eventos recebidos a partir desta versão. Eventos que versões anteriores ignoraram não são recuperados automaticamente: o aplicativo não reinicia o NSU, não altera o agendamento/cooldown e não consulta a SEFAZ ao abrir uma tabela. **Não localizado** significa que o banco local não recebeu esse vínculo, e não garante a inexistência de CT-e. Esta funcionalidade não importa nem baixa o XML completo do CT-e.
+
+Referência: [Boletim Técnico 2012/001 — CT-e Autorizado e Cancelado](https://hom.nfe.fazenda.gov.br/arearestrita/inicial/exibirArquivo.aspx?conteudo=Jk9wIgAv0nI%3D).

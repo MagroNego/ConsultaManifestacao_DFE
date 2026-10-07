@@ -652,7 +652,7 @@ def test_exportacao_da_consulta_respeita_os_mesmos_filtros(tmp_path):
     assert ws["A5"].value == 91780
     assert ws["E5"].value == "Operação não Realizada"
     assert ws["J5"].value == "Fornecedor Teste"
-    assert ws.max_column == 10
+    assert ws.max_column == 11
     assert "Cancelamento" not in [c.value for c in ws[4]]
     assert ws["A6"].value is None
 

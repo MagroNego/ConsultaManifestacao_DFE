@@ -2,6 +2,7 @@ import sqlite3
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from nfe_consulta.seguranca_banco import abrir_banco
+from nfe_consulta.cte import SCHEMA as CTE_SCHEMA, save_events, linked_ctes
 
 from nfe_consulta.modelos import (
     Manifestacao,
@@ -23,6 +24,7 @@ class BancoManifestacoes:
         self._criar_schema()
 
     def _criar_schema(self) -> None:
+        self.conexao.executescript(CTE_SCHEMA)
         self.conexao.executescript(
             """
             CREATE TABLE IF NOT EXISTS estado_distribuicao (
@@ -213,6 +215,7 @@ class BancoManifestacoes:
     def salvar_manifestacoes(self, cnpj: str, retorno: RetornoDistribuicao) -> int:
         inseridos = 0
         with self.conexao:
+            save_events(self.conexao, cnpj, retorno.eventos_cte)
             for info in retorno.informacoes_notas:
                 self.conexao.execute(
                     """INSERT INTO informacoes_nfe(cnpj, chave, emitente, cancelada)
@@ -254,6 +257,7 @@ class BancoManifestacoes:
             raise NfeErroResposta("Cursor NSU invalido ou anterior ao ja salvo; lote nao gravado")
         inseridos = 0
         with self.conexao:
+            save_events(self.conexao, cnpj, retorno.eventos_cte)
             for info in retorno.informacoes_notas:
                 self.conexao.execute(
                     """INSERT INTO informacoes_nfe(cnpj, chave, emitente, cancelada)
@@ -394,4 +398,5 @@ class BancoManifestacoes:
             status_motivo="Historico local da Distribuicao DF-e",
             protocolo_nfe=None,
             manifestacoes=eventos,
+            ctes=linked_ctes(self.conexao, cnpj, [chave]).get(chave, ()) if cnpj else (),
         )

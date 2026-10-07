@@ -78,3 +78,9 @@ A sincronização manual exige marcação da confirmação e confirmação final
 ## Downloads
 
 Abra **Downloads** para baixar novamente os arquivos gerados nas últimas 24 horas. A tabela informa os documentos processados, o período, a data de geração e a expiração. O prazo é contado a partir da geração e não muda quando o arquivo é baixado novamente. Após expirar, gere um novo relatório. Os registros de importação exigem acesso ao Admin. A exclusão das cópias não remove as notas do banco.
+
+## CT-e vinculado
+
+Nas abas Consulta e XML, abra o indicador **CT-e vinculado** para ver os conhecimentos associados à nota. O indicador **CT-e cancelado** aparece quando todos os vínculos apresentados estão cancelados. Número, chave e transportadora aparecem somente quando recebidos no evento. Se houver somente um resumo, aparece **Vínculo identificado** ou um cancelamento sem chave; esse cancelamento não é atribuído automaticamente a outro conhecimento. O Excel/CSV também inclui esses dados.
+
+As informações chegam pela sincronização habitual. Depois de atualizar e reiniciar o aplicativo, aguarde a próxima sincronização permitida. Eventos ignorados por versões anteriores não são recuperados automaticamente. **Não localizado** indica ausência de vínculo no banco local, não ausência definitiva de CT-e na SEFAZ.

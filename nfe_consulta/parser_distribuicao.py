@@ -12,6 +12,7 @@ from nfe_consulta.modelos import (
     RetornoDistribuicao,
 )
 from nfe_consulta.parser import DESCRICOES
+from nfe_consulta.cte import parse_event
 
 MAX_SOAP_BYTES = 32 * 1024 * 1024
 MAX_DOCZIP_BYTES = 2 * 1024 * 1024
@@ -117,6 +118,7 @@ def parse_retorno_distribuicao(xml_str: str) -> RetornoDistribuicao:
 
     manifestacoes = []
     informacoes_notas = []
+    eventos_cte = []
     ignorados = 0
     total_documentos = 0
     for doc_zip in root.iter():
@@ -140,11 +142,14 @@ def parse_retorno_distribuicao(xml_str: str) -> RetornoDistribuicao:
             raise NfeErroResposta(f"docZip invalido no NSU {nsu}: {exc}") from exc
 
         evento = parse_documento_distribuido(xml_documento, nsu, schema)
+        cte = parse_event(ET.fromstring(xml_documento), nsu, schema)
+        if cte is not None:
+            eventos_cte.append(cte)
         info = _informacao_nota(xml_documento)
         if info is not None:
             informacoes_notas.append(info)
         if evento is None:
-            if info is None:
+            if info is None and cte is None:
                 ignorados += 1
         else:
             manifestacoes.append(evento)
@@ -162,4 +167,5 @@ def parse_retorno_distribuicao(xml_str: str) -> RetornoDistribuicao:
         documentos_ignorados=ignorados,
         ult_nsu_informado=bool(ult_nsu and ult_nsu.isdigit()),
         informacoes_notas=tuple(informacoes_notas),
+        eventos_cte=tuple(eventos_cte),
     )

@@ -1,3 +1,4 @@
+{% from "cte_links.html" import cte_links %}
 {% extends "base.html" %}
 {% block title %}Consulta · Manifestação NF-e{% endblock %}
 {% block page_class %} consulta-page{% endblock %}
@@ -140,6 +141,7 @@
           <th>NF</th>
           <th>Série</th>
           <th>Emitente (nome/CNPJ)</th>
+          <th>CT-e</th>
           <th>Manifestação</th>
           <th>Data do evento</th>
           <th>Protocolo</th>
@@ -154,6 +156,7 @@
           <td>{{ evento.numero }}</td>
           <td>{{ evento.serie }}</td>
           <td>{{ evento.emitente or "—" }}</td>
+          <td>{{ cte_links(evento.ctes) }}</td>
           <td class="manifestation-cell">
             <strong>{{ evento.descricao }}</strong>
           </td>

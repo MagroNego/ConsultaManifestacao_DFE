@@ -15,6 +15,8 @@ from nfe_consulta.web.auth import WebUser, current_user, require_admin, require_
 from nfe_consulta.web.consulta_local import normalizar_filtros
 from nfe_consulta.web import xml_store as store
 from nfe_consulta.web.downloads import archive_file, period_label
+from nfe_consulta.cte import linked_ctes
+from nfe_consulta.seguranca_banco import abrir_banco
 
 
 def register_xml_routes(app, settings, render, database_path):
@@ -29,11 +31,20 @@ def register_xml_routes(app, settings, render, database_path):
         result = dict(rows=[], columns=[], total=0, page=1, pages=0, notas=0)
         history, batch = [], None
         selected = None
+        ctes = {}
         try:
             selected = filters(data_inicial, data_final)
             result = await run_in_threadpool(store.query_report, database_path(settings), CNPJ_PADRAO,
                 password=settings.current_database_password(), kind=tipo, query=q,
                 inicio=selected.data_inicial, fim=selected.data_final, page=pagina)
+            def read_ctes():
+                conn = abrir_banco(database_path(settings), settings.current_database_password(), somente_leitura=True)
+                try:
+                    return linked_ctes(conn, CNPJ_PADRAO, [row.get("Chave Acesso", "") for row in result["rows"]])
+                finally:
+                    conn.close()
+            if tipo == "notas" and result["rows"]:
+                ctes = await run_in_threadpool(read_ctes)
             if user.is_admin:
                 history, batch = await run_in_threadpool(store.import_history, database_path(settings),
                     password=settings.current_database_password(), batch_id=lote)
@@ -44,7 +55,7 @@ def register_xml_routes(app, settings, render, database_path):
         return render(request, "xml.html", user, result=result, tipo=tipo, q=q,
             inicio=selected.data_inicial_br if selected else data_inicial,
             fim=selected.data_final_br if selected else data_final,
-            history=history, batch=batch, error=error)
+            history=history, batch=batch, error=error, ctes=ctes)
 
     @app.post("/xml/importar")
     async def xml_import(request: Request, user: Annotated[WebUser, Depends(require_admin)]):

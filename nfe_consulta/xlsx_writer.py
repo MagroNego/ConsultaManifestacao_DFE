@@ -9,12 +9,13 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
+from nfe_consulta.cte import export_label
 from nfe_consulta.validacao import numero_e_serie
 
 
 HEADERS = [
     "Chave NF-e", "Número", "Série", "Manifestação", "Data do evento",
-    "Protocolo", "Código", "Eventos", "Histórico", "Erro",
+    "Protocolo", "Código", "Eventos", "Histórico", "Erro", "CT-e vinculado",
 ]
 DESCRICOES = {
     "210200": "Confirmação da Operação",
@@ -68,6 +69,7 @@ def gravar_xlsx(caminho: str, resultados: list, cobertura: str) -> None:
             "\n".join(f"{_data_exibicao(e.data)} · {DESCRICOES.get(e.codigo, e.descricao)} · {e.protocolo}"
                       for e in resultado.manifestacoes),
             resultado.erro or "",
+            export_label(resultado.ctes),
         ]
         for coluna, valor in enumerate(valores, 1):
             celula = ws.cell(indice, coluna, valor)
@@ -80,10 +82,10 @@ def gravar_xlsx(caminho: str, resultados: list, cobertura: str) -> None:
         ws.cell(indice, 8).number_format = "0"
         ws.row_dimensions[indice].height = min(70, max(30, 15 * len(resultado.manifestacoes)))
 
-    larguras = [49, 12, 9, 31, 26, 21, 12, 10, 58, 31]
+    larguras = [49, 12, 9, 31, 26, 21, 12, 10, 58, 31, 65]
     for i, largura in enumerate(larguras, 1):
         ws.column_dimensions[get_column_letter(i)].width = largura
-    ws.auto_filter.ref = f"A4:J{max(4, 4 + len(resultados))}"
+    ws.auto_filter.ref = f"A4:K{max(4, 4 + len(resultados))}"
     ws.print_options.horizontalCentered = False
     ws.sheet_properties.pageSetUpPr.fitToPage = True
     ws.page_setup.fitToWidth = 1

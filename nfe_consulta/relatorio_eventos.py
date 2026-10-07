@@ -11,6 +11,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
+from nfe_consulta.cte import export_label
 from nfe_consulta.web.consulta_local import EventoNota, FiltrosEventos, TIPOS_MANIFESTACAO
 
 
@@ -25,6 +26,7 @@ HEADERS = [
     "NSU",
     "Recebido no banco (UTC)",
     "Emitente",
+    "CT-e vinculado",
 ]
 
 
@@ -91,6 +93,7 @@ def gravar_eventos_xlsx(
             evento.nsu,
             _excel_datetime(evento.recebido_em),
             evento.emitente,
+            export_label(evento.ctes),
         ]
 
         for coluna, valor in enumerate(valores, 1):
@@ -106,11 +109,11 @@ def gravar_eventos_xlsx(
             if isinstance(ws.cell(indice, coluna).value, datetime):
                 ws.cell(indice, coluna).number_format = "dd/mm/yyyy hh:mm:ss"
 
-    larguras = [13, 9, 49, 12, 31, 22, 22, 17, 22, 42]
+    larguras = [13, 9, 49, 12, 31, 22, 22, 17, 22, 42, 65]
     for coluna, largura in enumerate(larguras, 1):
         ws.column_dimensions[get_column_letter(coluna)].width = largura
 
-    ws.auto_filter.ref = f"A4:J{max(4, 4 + len(eventos))}"
+    ws.auto_filter.ref = f"A4:K{max(4, 4 + len(eventos))}"
     ws.print_options.horizontalCentered = False
     ws.sheet_properties.pageSetUpPr.fitToPage = True
     ws.page_setup.fitToWidth = 1

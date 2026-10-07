@@ -18,6 +18,7 @@ from openpyxl.styles import Font, PatternFill
 from openpyxl.utils import get_column_letter
 
 from nfe_consulta.seguranca_banco import abrir_banco
+from nfe_consulta.cte import linked_ctes, export_label
 from nfe_consulta.xml_reader import parse_nfe_xml, decimal_value, FIELDS_ITENS, FIELDS_RETIDO
 
 MAX_XML = 8 * 1024 * 1024
@@ -231,7 +232,8 @@ def download_xml(database_path, cnpj, chave, *, password=None):
 def query_report(database_path, cnpj, *, password=None, kind="notas", query="", inicio=None, fim=None, page=1, export=False):
     if kind not in ("notas", "itens", "retencoes") or page < 1 or len(query) > 200:
         raise ValueError("Filtro do leitor inválido.")
-    columns = FIELDS_ITENS if kind == "itens" else FIELDS_RETIDO if kind == "retencoes" else FIELDS_NOTAS
+    fields = FIELDS_ITENS if kind == "itens" else FIELDS_RETIDO if kind == "retencoes" else FIELDS_NOTAS
+    columns = [*fields, "CT-e vinculado"]
     empty = dict(rows=[], columns=columns, total=0, page=1, pages=0, notas=0)
     if not Path(database_path).is_file():
         return empty
@@ -269,6 +271,9 @@ def query_report(database_path, cnpj, *, password=None, kind="notas", query="", 
             suffix += " LIMIT 100 OFFSET ?"
         lines = conn.execute(f"SELECT {select} FROM {source} WHERE {where}" + suffix, params if export else [*params, (page - 1) * 100]).fetchall()
         rows = [dict(zip(FIELDS_NOTAS, row)) for row in lines] if kind == "notas" else [json.loads(row[0]) for row in lines]
+        ctes = linked_ctes(conn, cnpj, [row.get("Chave Acesso", "") for row in rows])
+        for row in rows:
+            row["CT-e vinculado"] = export_label(ctes.get(row.get("Chave Acesso", ""), ()))
         return dict(rows=rows, columns=columns, total=total, page=page, pages=pages, notas=conn.execute("SELECT COUNT(*) FROM xml_documentos WHERE cnpj=?", (cnpj,)).fetchone()[0])
     finally:
         conn.close()
