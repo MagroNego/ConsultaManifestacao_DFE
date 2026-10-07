@@ -1349,3 +1349,16 @@ html[data-theme="dark"] .brand-logo-dark {
 @media (max-width: 620px) {
   .notification-panel { position: fixed; top: 78px; right: 16px; }
 }
+
+.xml-page .item-detail-filter {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.xml-page .item-detail-card {
+  padding: 20px 28px;
+  margin-bottom: 22px;
+}
+
+@media (max-width: 620px) {
+  .xml-page .item-detail-card { padding: 16px; }
+}

@@ -1,14 +1,14 @@
 {% from "cte_links.html" import cte_links %}
 {% extends "base.html" %}
-{% block title %}{{ 'Itens da nota' if detail else 'Emissão' }} · Consulta de Manifestação{% endblock %}
+{% block title %}{{ 'Itens | NF ' ~ '{:,}'.format(detail['Numero Nota']|int).replace(',', '.') if detail else 'Emissão' }} · Consulta de Manifestação{% endblock %}
 {% block page_class %} xml-page{% endblock %}
 {% block content %}
 <section class="page-heading">
-  <div><h1>{{ 'Itens da nota ' ~ detail['Numero Nota'] if detail else 'Emissão' }}</h1></div>
+  <div><h1>{{ 'Itens | NF ' ~ '{:,}'.format(detail['Numero Nota']|int).replace(',', '.') if detail else 'Emissão' }}</h1></div>
   {% if detail %}<a class="button secondary" href="{{ back_url }}" data-items-back>← Voltar</a>{% endif %}
   {% if not detail %}<span class="status-dot ok">{{ result.notas }} nota{{ '' if result.notas == 1 else 's' }} arquivada{{ '' if result.notas == 1 else 's' }}</span>{% endif %}
 </section>
-{% if detail %}<section class="card">
+{% if detail %}<section class="card item-detail-card">
   <div class="meta-row"><span>Destinatário</span><strong>{{ detail['Destinatario Razao'] }}</strong></div>
   <div class="meta-row"><span>Emissão</span><strong>{{ detail['Data Emissao']|date_br }}</strong></div>
   <div class="meta-row"><span>Situação</span><strong>{{ detail['Situação'] }}</strong></div>
@@ -18,7 +18,7 @@
   <div class="card-title"><h2>{{ 'Filtrar itens' if detail else 'Leitor XML' }}</h2></div>
   <form class="filters-form" action="{{ url_for('xml_items', chave=note_key) if detail else url_for('xml_page') }}" method="get">
     {% if detail %}<input type="hidden" name="voltar" value="{{ back_url }}">{% endif %}
-    <div class="filters-grid">
+    <div class="filters-grid{% if detail %} item-detail-filter{% endif %}">
       {% if not detail %}<label class="field"><span>Relatório</span><select name="tipo">
         <option value="notas" {% if tipo == 'notas' %}selected{% endif %}>Notas e arquivos</option>
         <option value="itens" {% if tipo == 'itens' %}selected{% endif %}>Itens e impostos</option>
