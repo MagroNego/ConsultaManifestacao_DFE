@@ -158,7 +158,7 @@ async def executar_sincronizacao_automatica(
     *,
     dia_agendado: date | None = None,
     janela_agendada: datetime | None = None,
-) -> None:
+) -> datetime | None:
     """Executa uma sincronização automática respeitando lock, cooldown e persistência."""
     settings = app.state.settings
     dia = dia_agendado or datetime.now().astimezone().date()
@@ -186,14 +186,14 @@ async def executar_sincronizacao_automatica(
                 "ignorado",
                 reason="cooldown",
             )
-            return
+            return await asyncio.to_thread(proxima_tentativa_permitida, settings)
         except NfeConsumoIndevidoErro:
             app.state.audit.write_system(
                 "sefaz_sync_auto",
                 "erro",
                 reason="consumo_indevido_656",
             )
-            return
+            return await asyncio.to_thread(proxima_tentativa_permitida, settings)
         except Exception as exc:
             app.state.audit.write_system(
                 "sefaz_sync_auto",
@@ -271,6 +271,7 @@ async def loop_sincronizacao_automatica(app) -> None:
         agora = agora_brasilia()
         janela, proxima = janelas_diarias(agora)
         recuperacao = await asyncio.to_thread(proxima_recuperacao_nsu, settings)
+        adiada = None
         app.state.auto_sync_next_at = proxima
         if janela.date() == agora.date() and janela.weekday() in settings.auto_sync_weekdays:
             try:
@@ -284,15 +285,31 @@ async def loop_sincronizacao_automatica(app) -> None:
             else:
                 if (ultima is None or ultima < janela
                         or (recuperacao is not None and recuperacao <= agora)):
-                    await executar_sincronizacao_automatica(app, janela_agendada=janela)
+                    adiada = await executar_sincronizacao_automatica(app, janela_agendada=janela)
         agora = agora_brasilia()
         # Rejeições com cursor recuperável retomam após a pausa, sem esperar
         # pela próxima janela de 08:00/15:00 e sem repetir durante o bloqueio.
         recuperacao = await asyncio.to_thread(proxima_recuperacao_nsu, settings)
         if recuperacao is not None:
             proxima = min(proxima, max(recuperacao, agora + timedelta(seconds=60)))
-            app.state.auto_sync_next_at = proxima
+        if adiada is not None:
+            proxima = min(proxima, max(adiada, agora + timedelta(seconds=1)))
+        app.state.auto_sync_next_at = proxima
         await asyncio.sleep(max(1.0, (proxima - agora).total_seconds()))
+
+
+def proxima_tentativa_permitida(settings) -> datetime | None:
+    """Reagenda uma tentativa bloqueada, inclusive 656 sem NSU recuperável."""
+    from nfe_consulta.web.status_view import read_web_status
+
+    try:
+        status = read_web_status(
+            caminho_banco_configurado(settings), CNPJ_PADRAO,
+            password=settings.current_database_password(),
+        )
+    except Exception:
+        return None
+    return status.available_at
 
 
 def proxima_recuperacao_nsu(settings) -> datetime | None:

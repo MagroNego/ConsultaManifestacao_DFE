@@ -345,3 +345,63 @@ def test_distribuicao_parcial_nao_conclui_janela(monkeypatch):
     asyncio.run(scheduler.executar_sincronizacao_automatica(
         app, janela_agendada=scheduler.horario_unico(date(2026, 9, 30), 8, 0)))
     assert registros == []
+
+
+@pytest.mark.parametrize("hora,minuto,erro", [
+    (8, 39, "cooldown"),
+    (15, 60, "656"),
+])
+def test_loop_retoma_janela_bloqueada_ao_liberar(tmp_path, monkeypatch, hora, minuto, erro):
+    from datetime import timedelta
+    from nfe_consulta.banco import BancoManifestacoes
+    from nfe_consulta.modelos import NfeConsumoIndevidoErro, NfeLimiteConsultaErro
+
+    inicio = scheduler.horario_unico(date(2026, 10, 8), hora, 0)
+    liberacao = inicio + timedelta(minutes=minuto)
+    caminho = tmp_path / "banco.db"
+    banco = BancoManifestacoes(str(caminho))
+    # Reproduz o bloqueio persistido sem qualquer recuperação de NSU.
+    with banco.conexao:
+        banco.conexao.execute(
+            "INSERT INTO controle_sincronizacao VALUES (?, ?, ?)",
+            (scheduler.CNPJ_PADRAO, (liberacao - timedelta(hours=1)).isoformat(), liberacao.isoformat()),
+        )
+        if erro == "656":
+            banco.conexao.execute("INSERT INTO pausa_distribuicao VALUES (?, ?, ?)",
+                                  (scheduler.CNPJ_PADRAO, liberacao.isoformat(), "656"))
+    banco.fechar()
+    cfg = SimpleNamespace(database_path=caminho, database_path_file=tmp_path / "ausente",
+                          current_database_password=lambda: None, auto_sync_once_date=None,
+                          auto_sync_weekdays=tuple(range(7)), auto_sync_max_lotes=50,
+                          sync_cooldown_minutes=60)
+    agora, chamadas, esperas, concluidas = [inicio], [], [], []
+    audit = SimpleNamespace(write_system=lambda *args, **kwargs: None)
+    app = SimpleNamespace(state=SimpleNamespace(settings=cfg, sync_lock=threading.Lock(), audit=audit))
+    monkeypatch.setattr(scheduler, "agora_brasilia", lambda: agora[0])
+    monkeypatch.setattr(scheduler, "ultima_janela_concluida", lambda _: concluidas[-1] if concluidas else None)
+    monkeypatch.setattr(scheduler, "registrar_janela_concluida", lambda _, janela: concluidas.append(janela))
+
+    def sincronizar(*args, **kwargs):
+        chamadas.append(agora[0])
+        if len(chamadas) == 1:
+            if erro == "656":
+                raise NfeConsumoIndevidoErro("656 sem ultNSU")
+            raise NfeLimiteConsultaErro("cooldown")
+        assert agora[0] >= liberacao
+        return SimpleNamespace(lotes=1, eventos_novos=1, ult_nsu="10", max_nsu="10",
+                               completo=True, cache=False)
+
+    async def dormir(segundos):
+        esperas.append(segundos)
+        if len(esperas) > 1:
+            raise asyncio.CancelledError
+        assert app.state.auto_sync_next_at == liberacao
+        agora[0] += timedelta(seconds=segundos)
+
+    monkeypatch.setattr(scheduler, "sincronizar_configurado", sincronizar)
+    monkeypatch.setattr(scheduler.asyncio, "sleep", dormir)
+    with pytest.raises(asyncio.CancelledError):
+        asyncio.run(scheduler.loop_sincronizacao_automatica(app))
+    assert chamadas == [inicio, liberacao]
+    assert esperas[0] == minuto * 60
+    assert concluidas == [inicio]
