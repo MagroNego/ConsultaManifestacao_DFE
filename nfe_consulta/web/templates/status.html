@@ -33,6 +33,10 @@
       <strong class="metric-value">
         {% if not status_web.database_ready %}
           Indisponível
+        {% elif status_web.nsu_gaps %}
+          Histórico pendente de conferência
+        {% elif status_web.pending_responses %}
+          Lote pendente de gravação
         {% elif not status_web.updated_at %}
           Sem sincronização
         {% elif status_web.complete %}
@@ -59,6 +63,16 @@
   <div class="alert error compact">
     {{ status_web.pause_reason }}
   </div>
+  {% endif %}
+  {% for local, remoto, retomado in status_web.nsu_gaps %}
+  <div class="alert compact">
+    Divergência de NSU: banco {{ local }} · SEFAZ {{ remoto }}.
+    {% if retomado %}A consulta foi retomada.{% else %}Na próxima sincronização permitida, o app usará o NSU informado pela SEFAZ.{% endif %}
+    Os documentos do intervalo permanecem pendentes de conferência; não foram marcados como importados.
+  </div>
+  {% endfor %}
+  {% if status_web.pending_responses %}
+  <div class="alert compact">{{ status_web.pending_responses }} resposta(s) da SEFAZ preservada(s) no banco aguardam processamento. O app tentará recuperá-las antes de uma nova consulta.</div>
   {% endif %}
 </section>
 <section class="card status-summary">

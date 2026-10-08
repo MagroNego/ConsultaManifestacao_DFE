@@ -270,6 +270,7 @@ async def loop_sincronizacao_automatica(app) -> None:
     while True:
         agora = agora_brasilia()
         janela, proxima = janelas_diarias(agora)
+        recuperacao = await asyncio.to_thread(proxima_recuperacao_nsu, settings)
         app.state.auto_sync_next_at = proxima
         if janela.date() == agora.date() and janela.weekday() in settings.auto_sync_weekdays:
             try:
@@ -281,10 +282,33 @@ async def loop_sincronizacao_automatica(app) -> None:
                     reason=f"schedule_state_{type(exc).__name__}",
                 )
             else:
-                if ultima is None or ultima < janela:
+                if (ultima is None or ultima < janela
+                        or (recuperacao is not None and recuperacao <= agora)):
                     await executar_sincronizacao_automatica(app, janela_agendada=janela)
         agora = agora_brasilia()
+        # Rejeições com cursor recuperável retomam após a pausa, sem esperar
+        # pela próxima janela de 08:00/15:00 e sem repetir durante o bloqueio.
+        recuperacao = await asyncio.to_thread(proxima_recuperacao_nsu, settings)
+        if recuperacao is not None:
+            proxima = min(proxima, max(recuperacao, agora + timedelta(seconds=60)))
+            app.state.auto_sync_next_at = proxima
         await asyncio.sleep(max(1.0, (proxima - agora).total_seconds()))
+
+
+def proxima_recuperacao_nsu(settings) -> datetime | None:
+    from nfe_consulta.web.status_view import read_web_status
+
+    try:
+        status = read_web_status(
+            caminho_banco_configurado(settings), CNPJ_PADRAO,
+            password=settings.current_database_password(),
+        )
+    except Exception:
+        # A rotina principal já registra falhas de banco/configuração.
+        return None
+    if any(retomado is None for _, _, retomado in status.nsu_gaps):
+        return status.available_at or agora_brasilia()
+    return None
 
 
 def janelas_diarias(agora: datetime) -> tuple[datetime, datetime]:

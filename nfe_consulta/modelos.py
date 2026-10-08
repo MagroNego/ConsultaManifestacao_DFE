@@ -23,7 +23,9 @@ class NfeErroResposta(NfeConsultaErro):
 
 
 class NfeConsumoIndevidoErro(NfeErroComunicacao):
-    pass
+    def __init__(self, message: str, *, ult_nsu: str | None = None):
+        super().__init__(message)
+        self.ult_nsu = ult_nsu
 
 
 class NfeLimiteConsultaErro(NfeConsultaErro):

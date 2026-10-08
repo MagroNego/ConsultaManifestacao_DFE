@@ -48,7 +48,9 @@ NFE_AUTO_SYNC_MAX_LOTES=50
 
 A conclusão de cada janela é registrada no banco para evitar repetição após reiniciar. Se o servidor voltar depois de um horário programado, recupera apenas a janela mais recente ainda não concluída. Falhas e resultados parciais são retomados na próxima janela, respeitando o cooldown persistente. Após reiniciar, recupera apenas a janela mais recente do dia atual; antes das 08:00, aguarda a primeira janela. A rotina manual e a automática compartilham a mesma trava e o mesmo cursor NSU.
 
-O cooldown padrão é **60 minutos**. A configuração antiga de cooldown é ignorada: o servidor usa 60 minutos. Bloqueios já persistidos são preservados até expirar. A rejeição 656 registra uma pausa sem avançar o cursor com base na rejeição.
+O cooldown padrão é **60 minutos**. A configuração antiga de cooldown é ignorada: o servidor usa 60 minutos. Bloqueios já persistidos são preservados até expirar. A rejeição 656 mantém o cursor dos lotes gravados e registra separadamente um NSU de recuperação quando a SEFAZ informa um número válido maior. Com a rotina automática ativa, a consulta é retomada após a pausa/cooldown, sem esperar a próxima janela diária. A retomada usa esse NSU e mantém o intervalo como **histórico pendente de conferência** no Status: não afirma que os documentos desse intervalo foram importados. Rejeições sem NSU válido não provocam ajuste de cursor.
+
+As respostas de distribuição são preservadas na tabela `respostas_distribuicao` do próprio banco fiscal antes da interpretação. Após falha de leitura/gravação ou reinício, respostas pendentes são processadas antes de nova chamada à SEFAZ. O processamento do lote, o cursor e a confirmação da resposta são gravados na mesma transação. O XML da resposta é removido após processamento confirmado; ficam o horário, o NSU enviado e o resultado. XML inválido permanece pendente para investigação, sem avanço silencioso. A tabela `recuperacoes_nsu` registra divergências e a data de retomada. Esta proteção vale para respostas recebidas a partir desta versão; não recupera respostas perdidas por versões anteriores ou que não chegaram ao servidor.
 
 ## Lotes mensais de XML
 

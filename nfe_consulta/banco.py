@@ -35,6 +35,28 @@ class BancoManifestacoes:
                 atualizado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
+            CREATE TABLE IF NOT EXISTS respostas_distribuicao (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                cnpj TEXT NOT NULL,
+                nsu_enviado TEXT NOT NULL,
+                resposta_xml TEXT,
+                recebido_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                processado_em TEXT,
+                resultado TEXT NOT NULL DEFAULT 'pendente',
+                detalhe TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_respostas_distribuicao_pendentes
+                ON respostas_distribuicao(cnpj, processado_em);
+            CREATE TABLE IF NOT EXISTS recuperacoes_nsu (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                cnpj TEXT NOT NULL,
+                nsu_local TEXT NOT NULL,
+                nsu_sefaz TEXT NOT NULL,
+                registrado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                retomado_em TEXT,
+                UNIQUE(cnpj, nsu_local, nsu_sefaz)
+            );
+
             CREATE TABLE IF NOT EXISTS manifestacoes (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 cnpj TEXT NOT NULL,
@@ -118,6 +140,47 @@ class BancoManifestacoes:
             (cnpj,),
         ).fetchone()
         return linha if linha else (NSU_INICIAL, NSU_INICIAL)
+
+    def preservar_resposta(self, cnpj: str, enviado: str, xml: str) -> int:
+        with self.conexao:
+            cursor = self.conexao.execute(
+                "INSERT INTO respostas_distribuicao(cnpj, nsu_enviado, resposta_xml) VALUES (?, ?, ?)",
+                (cnpj, enviado, xml),
+            )
+        return cursor.lastrowid
+
+    def respostas_pendentes(self, cnpj: str) -> list:
+        return self.conexao.execute(
+            "SELECT id, nsu_enviado, resposta_xml FROM respostas_distribuicao "
+            "WHERE cnpj=? AND processado_em IS NULL ORDER BY id", (cnpj,),
+        ).fetchall()
+
+    def finalizar_resposta(self, identificador: int, resultado: str, detalhe: str = "") -> None:
+        # O XML só é descartado após processamento confirmado. Mantém diagnóstico.
+        self.conexao.execute(
+            "UPDATE respostas_distribuicao SET processado_em=CURRENT_TIMESTAMP, "
+            "resultado=?, detalhe=?, resposta_xml=NULL WHERE id=?",
+            (resultado, detalhe[:1000], identificador),
+        )
+
+    def registrar_recuperacao_nsu(self, cnpj: str, enviado: str, informado: str | None) -> None:
+        # Nunca recua o cursor, nem usa texto de xMotivo como fonte do NSU.
+        local, _ = self.obter_estado(cnpj)
+        if (informado is None or not informado.isascii() or not informado.isdigit()
+                or len(informado) > 15 or int(informado) <= max(int(local), int(enviado))):
+            return
+        self.conexao.execute(
+            "INSERT OR IGNORE INTO recuperacoes_nsu(cnpj, nsu_local, nsu_sefaz) VALUES (?, ?, ?)",
+            (cnpj, local.zfill(15), informado.zfill(15)),
+        )
+
+    def nsu_para_consulta(self, cnpj: str) -> str:
+        local, _ = self.obter_estado(cnpj)
+        row = self.conexao.execute(
+            "SELECT nsu_sefaz FROM recuperacoes_nsu WHERE cnpj=? AND retomado_em IS NULL "
+            "ORDER BY CAST(nsu_sefaz AS INTEGER) DESC LIMIT 1", (cnpj,),
+        ).fetchone()
+        return row[0] if row and int(row[0]) > int(local) else local
 
     def pausa_ativa(self, cnpj: str) -> str | None:
         linha = self.conexao.execute(
@@ -250,6 +313,7 @@ class BancoManifestacoes:
     def salvar_retorno(
         self, cnpj: str, retorno: RetornoDistribuicao,
         destinatarios_alerta: tuple[str, ...] = (),
+        *, resposta_id: int | None = None,
     ) -> int:
         anterior, _ = self.obter_estado(cnpj)
         if (not retorno.ult_nsu.isdigit() or not retorno.max_nsu.isdigit()
@@ -295,6 +359,13 @@ class BancoManifestacoes:
                 """,
                 (cnpj, retorno.ult_nsu, retorno.max_nsu),
             )
+            self.conexao.execute(
+                "UPDATE recuperacoes_nsu SET retomado_em=CURRENT_TIMESTAMP "
+                "WHERE cnpj=? AND retomado_em IS NULL AND CAST(nsu_sefaz AS INTEGER)<=?",
+                (cnpj, int(retorno.ult_nsu)),
+            )
+            if resposta_id is not None:
+                self.finalizar_resposta(resposta_id, str(retorno.status_codigo))
         return inseridos
 
     def notificacoes_pendentes(self, limite: int = 100) -> list[tuple]:

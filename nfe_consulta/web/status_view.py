@@ -20,10 +20,13 @@ class WebStatus:
     next_attempt: datetime | None
     pause_until: datetime | None
     pause_reason: str | None
+    nsu_gaps: tuple = ()
+    pending_responses: int = 0
 
     @property
     def complete(self) -> bool:
-        return bool(self.ult_nsu and self.max_nsu and self.ult_nsu == self.max_nsu)
+        return bool(self.ult_nsu and self.max_nsu and self.ult_nsu == self.max_nsu
+                    and not self.nsu_gaps and not self.pending_responses)
 
     @property
     def cooldown_active(self) -> bool:
@@ -126,6 +129,24 @@ def read_web_status(
             if "no such table" not in str(exc).lower():
                 raise
             pausa = None
+        try:
+            gaps = conexao.execute(
+                "SELECT nsu_local, nsu_sefaz, retomado_em FROM recuperacoes_nsu "
+                "WHERE cnpj=? ORDER BY id DESC", (cnpj,),
+            ).fetchall()
+        except Exception as exc:
+            if "no such table" not in str(exc).lower():
+                raise
+            gaps = ()
+        try:
+            pending = conexao.execute(
+                "SELECT COUNT(*) FROM respostas_distribuicao WHERE cnpj=? AND processado_em IS NULL",
+                (cnpj,),
+            ).fetchone()[0]
+        except Exception as exc:
+            if "no such table" not in str(exc).lower():
+                raise
+            pending = 0
     finally:
         conexao.close()
 
@@ -138,4 +159,6 @@ def read_web_status(
         next_attempt=_iso(controle[1]) if controle else None,
         pause_until=_iso(pausa[0]) if pausa else None,
         pause_reason=pausa[1] if pausa else None,
+        nsu_gaps=tuple(gaps),
+        pending_responses=pending,
     )

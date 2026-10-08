@@ -1,6 +1,8 @@
 import json
 import os
 import subprocess
+from contextlib import contextmanager
+from contextvars import ContextVar
 from xml.sax.saxutils import escape
 
 from nfe_consulta.certificado_windows import _powershell_executavel
@@ -22,6 +24,18 @@ SOAP_ACTION = (
     "http://www.portalfiscal.inf.br/nfe/wsdl/"
     "NFeDistribuicaoDFe/nfeDistDFeInteresse"
 )
+
+# A resposta é preservada antes do parser; o contexto isola chamadas concorrentes.
+_response_sink = ContextVar("distribuicao_response_sink", default=None)
+
+
+@contextmanager
+def preservar_resposta(sink):
+    token = _response_sink.set(sink)
+    try:
+        yield
+    finally:
+        _response_sink.reset(token)
 
 
 def _motivo_exibivel(motivo: str) -> str:
@@ -45,7 +59,8 @@ def _erro_consumo_indevido(
             diagnostico += " | ultNSU da SEFAZ: não informado na rejeição"
     return NfeConsumoIndevidoErro(
         f"SEFAZ retornou 656 | xMotivo: {motivo}{diagnostico} "
-        "| Aguarde uma hora antes de tentar novamente."
+        "| Aguarde uma hora antes de tentar novamente.",
+        ult_nsu=(retorno.ult_nsu if retorno.ult_nsu_informado else None),
     )
 
 
@@ -182,6 +197,9 @@ def consultar_distribuicao(
 ) -> RetornoDistribuicao:
     dist_dfe = montar_dist_nsu(cnpj, c_uf_autor, ult_nsu)
     resposta = _enviar_soap_windows(montar_soap(dist_dfe), certificado)
+    sink = _response_sink.get()
+    if sink is not None:
+        sink(resposta)
     retorno = parse_retorno_distribuicao(resposta)
     if retorno.status_codigo == 656:
         raise _erro_consumo_indevido(retorno, ult_nsu_enviado=ult_nsu)

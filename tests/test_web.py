@@ -583,7 +583,7 @@ def test_consulta_completa_filtra_por_data_e_manifestacao(tmp_path):
 
     assert resposta.status_code == 200
     assert "Operação não Realizada" in resposta.text
-    assert "Fornecedor Teste" in resposta.text
+    assert "Fornecedor Teste" not in resposta.text  # Emitente removido da tabela de consulta.
     assert "Cancelada" in resposta.text
     assert 'name="canceladas"' not in resposta.text
     assert 'name="serie"' not in resposta.text
