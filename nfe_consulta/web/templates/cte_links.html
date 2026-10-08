@@ -3,7 +3,7 @@
 <details class="cte-links">
   <summary>{% if items|selectattr("status", "equalto", "Cancelado")|list|length == items|length %}CT-e cancelado{% else %}CT-e vinculado{% endif %}</summary>
   {% for item in items %}<div class="cte-link-detail">
-    <strong>{{ item.label }}</strong>
+    <span class="cte-link-label">{{ item.label }}</span>
     {% if item.chave %}<div class="mono">{{ item.chave }}</div>{% endif %}
     {% if item.transportadora or item.cnpj_transportadora %}<div>{{ item.transportadora }} {{ item.cnpj_transportadora }}</div>{% endif %}
     {% if item.data %}<div>{{ item.data|date_br }}</div>{% endif %}

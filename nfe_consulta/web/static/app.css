@@ -1364,3 +1364,14 @@ html[data-theme="dark"] .brand-logo-dark {
 }
 
 .manifestations-detail .filters-form { max-width: none; }
+
+.cte-links .cte-link-detail {
+  white-space: nowrap;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.cte-links .cte-link-label {
+  white-space: nowrap;
+  display: block;
+  font-weight: 500;
+}
