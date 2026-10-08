@@ -152,7 +152,6 @@
         <tr>
           <th>NF</th>
           <th>Série</th>
-          <th>Emitente (nome/CNPJ)</th>
           <th>Situação</th>
           <th>Manifestação</th>
           <th>Data do evento</th>
@@ -168,7 +167,6 @@
         <tr>
           <td>{{ evento.numero }}</td>
           <td>{{ evento.serie }}</td>
-          <td>{{ evento.emitente or "—" }}</td>
           <td><span class="note-status{% if evento.cancelada %} cancelled{% endif %}">{{ evento.situacao }}</span></td>
           <td class="manifestation-cell">
             <strong>{{ evento.descricao }}</strong>
