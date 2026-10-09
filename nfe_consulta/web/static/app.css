@@ -1375,3 +1375,17 @@ html[data-theme="dark"] .brand-logo-dark {
   display: block;
   font-weight: 500;
 }
+
+/* Tamanho uniforme nos resultados da consulta e nas manifestações. */
+.consulta-page .result-table tbody td {
+  height: 60px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.consulta-page .result-table tbody td .mono,
+.consulta-page .result-table tbody td strong,
+.consulta-page .result-table tbody td small,
+.consulta-page .result-table tbody td .note-status {
+  font-size: inherit;
+}
