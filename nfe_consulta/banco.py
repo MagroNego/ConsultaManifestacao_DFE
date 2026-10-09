@@ -293,6 +293,14 @@ class BancoManifestacoes:
             self.conexao.rollback()
             raise
 
+    def prorrogar_cooldown(self, cnpj: str, minutos: int) -> None:
+        """Conta a próxima janela após o término, sem reduzir prazo já salvo."""
+        proxima = (datetime.now(timezone.utc) + timedelta(minutes=minutos)).isoformat(timespec="seconds")
+        with self.conexao:
+            self.conexao.execute(
+                "UPDATE controle_sincronizacao SET proxima_tentativa_em=? "
+                "WHERE cnpj=? AND proxima_tentativa_em<?", (proxima, cnpj, proxima))
+
     def sincronizacao_recente_e_completa(self, cnpj: str) -> bool:
         linha = self.conexao.execute(
             "SELECT ult_nsu, max_nsu, atualizado_em FROM estado_distribuicao "
@@ -403,7 +411,8 @@ class BancoManifestacoes:
             if consulta_nsu_id is not None:
                 self.conexao.execute("UPDATE consultas_nsu SET resultado='recebido' WHERE id=?", (consulta_nsu_id,))
             if resposta_id is not None:
-                self.finalizar_resposta(resposta_id, str(retorno.status_codigo))
+                self.finalizar_resposta(resposta_id, str(retorno.status_codigo),
+                    f"ultNSU={retorno.ult_nsu}; maxNSU={retorno.max_nsu}; documentos={len(retorno.documentos)}")
         return inseridos
 
     def notificacoes_pendentes(self, limite: int = 100) -> list[tuple]:

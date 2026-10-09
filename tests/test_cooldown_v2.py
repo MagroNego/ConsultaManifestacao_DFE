@@ -52,3 +52,21 @@ def test_cooldown_de_duas_horas_persiste_no_banco(tmp_path, monkeypatch):
         assert 7199 <= segundos <= 7201
     finally:
         reaberto.fechar()
+
+
+def test_cooldown_prorrogado_sem_reduzir_prazo_existente(tmp_path):
+    from datetime import datetime, timedelta, timezone
+    banco = BancoManifestacoes(str(tmp_path / 'cooldown.db'))
+    try:
+        inicio = datetime.now(timezone.utc) - timedelta(minutes=30)
+        banco.registrar_tentativa_sincronizacao(CNPJ, 60, agora=inicio)
+        banco.prorrogar_cooldown(CNPJ, 60)
+        ultima, proxima = banco.obter_janela_sincronizacao(CNPJ)
+        assert proxima > datetime.now(timezone.utc) + timedelta(minutes=59)
+        assert ultima < datetime.now(timezone.utc) - timedelta(minutes=29)
+        banco.registrar_tentativa_sincronizacao(CNPJ, 120)
+        _, antes = banco.obter_janela_sincronizacao(CNPJ)
+        banco.prorrogar_cooldown(CNPJ, 60)
+        assert banco.obter_janela_sincronizacao(CNPJ)[1] == antes
+    finally:
+        banco.fechar()

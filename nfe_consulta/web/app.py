@@ -1376,6 +1376,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                 manifestacoes_recuperadas=getattr(resumo, "manifestacoes_recuperadas", None),
                 ult_nsu=resumo.ult_nsu,
                 max_nsu=resumo.max_nsu,
+                somente_recuperacao=getattr(resumo, "somente_recuperacao", False),
                 completo=resumo.completo,
                 cache=resumo.cache,
                 cooldown_minutos=settings.sync_cooldown_minutes,

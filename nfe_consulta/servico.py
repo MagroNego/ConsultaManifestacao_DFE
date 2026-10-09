@@ -173,16 +173,19 @@ def sincronizar_banco(
         )
         banco.reservar_sincronizacao(cnpj, parametros.cooldown_minutos)
 
-        return sincronizar(
-            banco,
-            cnpj,
-            c_uf,
-            certificado,
-            max_lotes=parametros.max_lotes,
-            progresso_fn=progresso_sincronizacao,
-            destinatarios_alerta=parametros.destinatarios_alerta,
-            recuperar_lacunas=True,
-        )
+        try:
+            return sincronizar(
+                banco,
+                cnpj,
+                c_uf,
+                certificado,
+                max_lotes=parametros.max_lotes,
+                progresso_fn=progresso_sincronizacao,
+                destinatarios_alerta=parametros.destinatarios_alerta,
+                recuperar_lacunas=True,
+            )
+        finally:
+            banco.prorrogar_cooldown(cnpj, parametros.cooldown_minutos)
     finally:
         banco.fechar()
 

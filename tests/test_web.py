@@ -146,7 +146,7 @@ def test_admin_pode_disparar_atualizacao_sefaz(tmp_path, monkeypatch):
 
     chamadas = []
 
-    def fake_sync(parametros):
+    def fake_sync(parametros, **kwargs):
         chamadas.append(parametros)
         return SimpleNamespace(
             lotes=1,
@@ -422,7 +422,7 @@ def test_sincronizacao_web_usa_certificado_configurado_em_arquivo(tmp_path, monk
     app = create_app(cfg)
     chamadas = []
 
-    def fake_sync(parametros):
+    def fake_sync(parametros, **kwargs):
         chamadas.append(parametros)
         return SimpleNamespace(
             lotes=1,

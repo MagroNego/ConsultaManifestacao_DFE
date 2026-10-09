@@ -93,14 +93,14 @@ def test_sincronizacao_parcial_tenta_entregar_fila_no_finally(monkeypatch, tmp_p
     )
     chamadas = []
 
-    def falha(parametros):
+    def falha(parametros, **kwargs):
         chamadas.append(parametros.destinatarios_alerta)
         raise RuntimeError("falha após lote gravado")
 
     monkeypatch.setattr(sync_runtime, "sincronizar_banco", falha)
     monkeypatch.setattr(sync_runtime, "enviar_pendentes", lambda *args: chamadas.append("entrega"))
     with pytest.raises(RuntimeError):
-        sync_runtime.sincronizar_configurado(settings, audit=object())
+        sync_runtime.sincronizar_configurado(settings, audit=SimpleNamespace(write_system=lambda *args, **kwargs: None))
     assert chamadas == [("fiscal@empresa.com.br",), "entrega"]
 
 
@@ -170,8 +170,37 @@ def test_arquivo_de_email_invalido_nao_interrompe_consulta_sefaz(monkeypatch, tm
         current_database_password=lambda: None,
     )
     chamados = []
-    monkeypatch.setattr(sync_runtime, "sincronizar_banco", lambda params: chamados.append(params.destinatarios_alerta))
+    monkeypatch.setattr(sync_runtime, "sincronizar_banco", lambda params, **kwargs: chamados.append(params.destinatarios_alerta))
     monkeypatch.setattr(sync_runtime, "enviar_pendentes", lambda *args: None)
     audit = SimpleNamespace(write_system=lambda *args, **kwargs: None)
     sync_runtime.sincronizar_configurado(settings, audit=audit)
     assert chamados == [()]
+
+
+def test_diagnostico_correlaciona_processo_banco_e_lote_sem_senhas(tmp_path, monkeypatch):
+    from nfe_consulta.sincronizacao import ResumoSincronizacao
+    caminho = tmp_path / 'eventos.db'
+    b = BancoManifestacoes(str(caminho))
+    b.fechar()
+    settings = SimpleNamespace(
+        database_path=caminho, database_path_file=tmp_path/'db-path.txt',
+        certificate_path_file=tmp_path/'cert-path.txt',
+        certificate_password_file=tmp_path/'cert-password.txt',
+        certificate_thumbprint=None, certificate_store='CurrentUser',
+        sync_cooldown_minutes=60, email_recipients_file=tmp_path/'recipients.json',
+        current_database_password=lambda: None)
+    registros = []
+    audit = SimpleNamespace(write_system=lambda action, result, **details: registros.append((action,result,details)))
+    def executar(params, *, progresso_sincronizacao):
+        progresso_sincronizacao(1, '000000000000010', '000000000000020', 0)
+        return ResumoSincronizacao(1,0,0,'000000000000010','000000000000020',False)
+    monkeypatch.setattr(sync_runtime, 'sincronizar_banco', executar)
+    monkeypatch.setattr(sync_runtime, 'enviar_pendentes', lambda *args: None)
+    sync_runtime.sincronizar_configurado(settings, audit=audit)
+    diagnosticos = [r for r in registros if r[0] == 'sefaz_sync_diagnostico']
+    assert [r[1] for r in diagnosticos] == ['iniciado','lote_gravado','concluido']
+    assert len({r[2]['execucao'] for r in diagnosticos}) == 1
+    assert diagnosticos[0][2]['banco'] == str(caminho.resolve())
+    assert diagnosticos[0][2]['pid'] > 0
+    assert diagnosticos[1][2]['ult_nsu'] == '000000000000010'
+    assert all('senha' not in chave and 'password' not in chave for r in diagnosticos for chave in r[2])

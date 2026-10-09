@@ -53,3 +53,13 @@ def test_historico_separa_origens_e_nao_inventa_contagem_antiga(tmp_path):
     assert (items[0].recovered_documents,items[0].recovered_events)==(10,1)
     assert items[1].current_documents is None
     assert items[1].recovered_events is None
+
+
+def test_historico_identifica_execucao_somente_recuperacao(tmp_path):
+    path = tmp_path / 'web_audit.log'
+    path.write_text('2026-10-09 16:50:00 '+json.dumps({
+        'action':'sefaz_sync_auto','result':'ok','completo':False,
+        'somente_recuperacao':True,'documentos_recuperados':20})+'\n')
+    item = read_sync_history(path)[0]
+    assert 'Recuperação de pendências' in item.detail
+    assert item.recovered_documents == 20

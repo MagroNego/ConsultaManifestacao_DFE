@@ -5,9 +5,9 @@ from nfe_consulta.parser_distribuicao import parse_retorno_distribuicao
 from nfe_consulta.modelos import NfeErroResposta
 
 
-def recuperar_intervalos(banco, cnpj, uf, certificado, destinatarios=(), limite=10, estatisticas=None):
-    if not 1 <= limite <= 10:
-        raise ValueError('Limite de recuperação deve estar entre 1 e 10')
+def recuperar_intervalos(banco, cnpj, uf, certificado, destinatarios=(), limite=20, estatisticas=None):
+    if not 1 <= limite <= 20:
+        raise ValueError('Limite de recuperação deve estar entre 1 e 20')
     if banco.pausa_ativa(cnpj):
         return 0
     inseridos = 0

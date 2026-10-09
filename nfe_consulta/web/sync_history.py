@@ -72,6 +72,8 @@ def read_sync_history(path: Path, limit: int = 10) -> tuple[SyncHistoryItem, ...
             incomplete = outcome == "ok" and payload.get("completo") is False
             if incomplete:
                 detail = "Ainda há lotes a consultar"
+            if outcome == "ok" and payload.get("somente_recuperacao") is True:
+                detail = "Recuperação de pendências; consulta de novos documentos adiada"
             if outcome == "ignorado":
                 detail = _REASONS.get(reason, "Tentativa não executada")
             items.append(SyncHistoryItem(

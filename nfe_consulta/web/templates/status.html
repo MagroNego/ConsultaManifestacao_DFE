@@ -79,7 +79,7 @@
     Divergência de NSU: banco {{ local }} · SEFAZ {{ remoto }}.
     {% if retomado %}A consulta foi retomada.{% else %}Na próxima sincronização permitida, o app usará o NSU informado pela SEFAZ.{% endif %}
     {% if status_web.recovery_pending %}
-    Recuperação automática em andamento: até 10 NSUs por execução, respeitando o bloqueio e os limites de consulta.
+    Recuperação automática em andamento: até 20 NSUs por execução, descontando as consultas pontuais da última hora, respeitando o bloqueio e os limites de consulta.
     {% else %}
     Há documentos que não puderam ser recuperados. O intervalo continua pendente de conferência.
     {% endif %}

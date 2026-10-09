@@ -116,3 +116,9 @@ Os eventos 610600/610601 ficam na tabela `eventos_cte` do mesmo banco fiscal, se
 Referência: [Boletim Técnico 2012/001 — CT-e Autorizado e Cancelado](https://hom.nfe.fazenda.gov.br/arearestrita/inicial/exibirArquivo.aspx?conteudo=Jk9wIgAv0nI%3D).
 
 A aba **Emissão** reúne notas, itens e retenções. Importar um cancelamento homologado no Admin marca a chave como **Cancelada** na Consulta, Emissão e nos novos relatórios. O evento pode ser importado antes da nota; duplicatas não desfazem o cancelamento. A situação exibida usa a regra local: **Cancelada** quando há cancelamento registrado e **Autorizada** nos demais casos. Essa classificação não realiza uma consulta atual à SEFAZ.
+
+### Recuperação de intervalos pendentes
+
+Quando existem NSUs pendentes, a execução prioriza somente a recuperação por `consNSU`, do mais antigo ao mais recente. A consulta de documentos novos por `distNSU` é adiada para outra execução, evitando que uma divergência nesse fluxo impeça a recuperação. São feitas até 20 consultas por execução, descontando `consNSU` e consultas por chave já reservadas na última hora neste banco. Este controle não conhece consultas de outras aplicações ou outros bancos. Uma rejeição 656 interrompe a execução e mantém a pausa de uma hora. O cooldown é prorrogado após o término da execução, para não contar apenas a partir do início. O histórico identifica execuções dedicadas à recuperação; elas não comprovam atualização de documentos novos.
+
+O log local registra `sefaz_sync_diagnostico` com um identificador da execução, PID, máquina, caminhos do banco/código, NSUs iniciais, cada lote gravado e resultado. Senhas e XMLs fiscais não entram nesse diagnóstico. O registro ajuda a comparar cópias e processos do NexusDFE; não identifica aplicações externas que consultem o mesmo CNPJ.

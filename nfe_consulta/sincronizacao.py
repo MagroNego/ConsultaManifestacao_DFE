@@ -20,6 +20,7 @@ class ResumoSincronizacao:
     manifestacoes_atuais: int = 0
     documentos_recuperados: int = 0
     manifestacoes_recuperadas: int = 0
+    somente_recuperacao: bool = False
 
 
 def sincronizar(
@@ -73,6 +74,24 @@ def sincronizar(
     pausa = banco.pausa_ativa(cnpj)
     if pausa:
         raise NfeErroComunicacao(pausa)
+    # Isola a recuperação: uma nova divergência no distNSU não deve impedir
+    # o recebimento das pendências. O cursor de distribuição permanece intacto.
+    if recuperar_lacunas and (banco.proximo_nsu_faltante(cnpj) is not None
+            or banco.conexao.execute(
+                "SELECT 1 FROM consultas_nsu WHERE cnpj=? AND resultado='pendente' LIMIT 1",
+                (cnpj,)).fetchone()):
+        from nfe_consulta.recuperacao_nsu import recuperar_intervalos
+        eventos_novos += recuperar_intervalos(
+            banco, cnpj, c_uf_autor, certificado, destinatarios_alerta,
+            estatisticas=recuperados)
+        return ResumoSincronizacao(
+            lotes, eventos_novos, ignorados, ult_nsu, max_nsu, False,
+            cache=not lotes and not recuperados.get('consultas') and not recuperados.get('documentos'),
+            documentos_atuais=documentos_atuais,
+            manifestacoes_atuais=eventos_novos-recuperados.get('manifestacoes', 0),
+            documentos_recuperados=recuperados.get('documentos', 0),
+            manifestacoes_recuperadas=recuperados.get('manifestacoes', 0),
+            somente_recuperacao=True)
     if (banco.nsu_para_consulta(cnpj) == ult_nsu
             and banco.sincronizacao_recente_e_completa(cnpj)):
         if recuperar_lacunas:

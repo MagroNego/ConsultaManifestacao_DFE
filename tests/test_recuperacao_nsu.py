@@ -103,6 +103,7 @@ def test_lote_recuperado_apos_falha_de_gravacao_sem_nova_chamada(tmp_path, monke
     assert len(chamados) == 1
     assert banco.obter_estado(CNPJ)[0] == "20".zfill(15)
     assert banco.respostas_pendentes(CNPJ) == []
+    assert "ultNSU=000000000000020" in banco.conexao.execute("SELECT detalhe FROM respostas_distribuicao").fetchone()[0]
     assert banco.conexao.execute("SELECT resposta_xml FROM respostas_distribuicao").fetchone()[0] is None
     banco.fechar()
 

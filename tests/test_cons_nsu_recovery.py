@@ -55,7 +55,7 @@ def test_656_pausa_e_preserva_intervalo(tmp_path,monkeypatch):
     assert b.obter_estado(CNPJ)[0]=='000000000000020'
     b.fechar()
 
-def test_limite_10_e_orcamento_compartilhado(tmp_path,monkeypatch):
+def test_orcamento_compartilhado(tmp_path,monkeypatch):
     _,b=banco(tmp_path,45);calls=[]
     def soap(xml,*a):
         n=xml.split('<NSU>')[1].split('</NSU>')[0];calls.append(n);return resposta(n)
@@ -152,11 +152,70 @@ def test_resumo_separa_consulta_atual_e_recuperacao(tmp_path,monkeypatch):
         return resposta(99)
     monkeypatch.setattr('nfe_consulta.distribuicao._enviar_soap_windows',soap)
     resumo=sincronizar(b,CNPJ,'33',None,recuperar_lacunas=True)
-    assert resumo.documentos_atuais==1
-    assert resumo.manifestacoes_atuais==1
+    assert resumo.somente_recuperacao
+    assert not resumo.completo
+    assert resumo.documentos_atuais==0
+    assert resumo.manifestacoes_atuais==0
     assert resumo.documentos_recuperados==1
     assert resumo.manifestacoes_recuperadas==1
-    assert resumo.eventos_novos==2
+    assert resumo.eventos_novos==1
     status=read_web_status(path,CNPJ)
     assert status.recovery_intervals==(('000000000000011','000000000000011',1,1),)
     b.fechar()
+
+
+def test_recuperacao_usa_20_e_nao_ultrapassa_na_segunda_execucao(tmp_path, monkeypatch):
+    _, b = banco(tmp_path, 45)
+    calls = []
+    def soap(xml, *args):
+        n = xml.split('<NSU>')[1].split('</NSU>')[0]
+        calls.append(n)
+        return resposta(n)
+    monkeypatch.setattr('nfe_consulta.distribuicao._enviar_soap_windows', soap)
+    try:
+        recuperar_intervalos(b, CNPJ, '33', None)
+        assert len(calls) == 20
+        recuperar_intervalos(b, CNPJ, '33', None)
+        assert len(calls) == 20
+        assert b.proximo_nsu_faltante(CNPJ) == '000000000000031'
+    finally:
+        b.fechar()
+
+
+def test_recuperacao_prioritaria_nao_dispara_dist_nsu_que_poderia_rejeitar(tmp_path, monkeypatch):
+    from nfe_consulta.sincronizacao import sincronizar
+    _, b = banco(tmp_path, 45)
+    with b.conexao:
+        b.conexao.execute("UPDATE estado_distribuicao SET atualizado_em=datetime('now','-2 hours')")
+    def soap(xml, *args):
+        assert '<consNSU>' in xml
+        return resposta(xml.split('<NSU>')[1].split('</NSU>')[0])
+    monkeypatch.setattr('nfe_consulta.distribuicao._enviar_soap_windows', soap)
+    try:
+        resumo = sincronizar(b, CNPJ, '33', None, recuperar_lacunas=True)
+        assert resumo.somente_recuperacao
+        assert resumo.documentos_recuperados == 20
+        assert resumo.documentos_atuais == 0
+        assert b.obter_estado(CNPJ) == ('000000000000020',)*2
+    finally:
+        b.fechar()
+
+
+def test_apos_recuperar_intervalo_volta_a_consultar_documentos_novos(tmp_path, monkeypatch):
+    from nfe_consulta.sincronizacao import sincronizar
+    _, b = banco(tmp_path, 11)
+    calls = []
+    def soap(xml, *args):
+        calls.append(xml)
+        return resposta(11) if '<consNSU>' in xml else resposta(99)
+    monkeypatch.setattr('nfe_consulta.distribuicao._enviar_soap_windows', soap)
+    try:
+        assert sincronizar(b, CNPJ, '33', None, recuperar_lacunas=True).somente_recuperacao
+        with b.conexao:
+            b.conexao.execute("UPDATE estado_distribuicao SET atualizado_em=datetime('now','-2 hours')")
+        resumo = sincronizar(b, CNPJ, '33', None, recuperar_lacunas=True)
+        assert not resumo.somente_recuperacao
+        assert resumo.documentos_atuais == 1
+        assert '<ultNSU>000000000000020</ultNSU>' in calls[-1]
+    finally:
+        b.fechar()
