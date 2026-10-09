@@ -4,10 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}NexusDFE{% endblock %}</title>
-  <link rel="stylesheet" href="{{ url_for('static', path='/app.css') }}?v={{ version }}-table-size-17">
-  <script src="{{ url_for('static', path='/downloads_ui.js') }}?v={{ version }}-table-size-17" defer></script>
-  <script src="{{ url_for('static', path='/app.js') }}?v={{ version }}-table-size-17" defer></script>
-  <script src="{{ url_for('static', path='/items_navigation.js') }}?v={{ version }}-table-size-17" defer></script>
+  <link rel="stylesheet" href="{{ url_for('static', path='/app.css') }}?v={{ version }}-nexus-logo-18">
+  <script src="{{ url_for('static', path='/downloads_ui.js') }}?v={{ version }}-nexus-logo-18" defer></script>
+  <script src="{{ url_for('static', path='/app.js') }}?v={{ version }}-nexus-logo-18" defer></script>
+  <script src="{{ url_for('static', path='/items_navigation.js') }}?v={{ version }}-nexus-logo-18" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -16,9 +16,10 @@
         <img class="brand-logo brand-logo-light" src="{{ url_for('static', path='/img/yorozu-light.png') }}" alt="Yorozu">
         <img class="brand-logo brand-logo-dark" src="{{ url_for('static', path='/img/yorozu-dark.png') }}" alt="Yorozu">
       </a>
-      <div class="brand-copy">
-        <strong>NEXUSDFE</strong>
-      </div>
+      <a class="brand-copy" href="{{ url_for('consulta_page') }}" aria-label="NexusDFE">
+        <img class="brand-logo nexus-logo brand-logo-light" src="{{ url_for('static', path='/img/nexusdfe-light.png') }}" alt="NexusDFE">
+        <img class="brand-logo nexus-logo brand-logo-dark" src="{{ url_for('static', path='/img/nexusdfe-dark.png') }}" alt="NexusDFE">
+      </a>
     </div>
 
     <nav class="tabs" aria-label="Navegação principal">
