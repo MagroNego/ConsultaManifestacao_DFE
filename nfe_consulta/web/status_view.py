@@ -22,6 +22,9 @@ class WebStatus:
     pause_reason: str | None
     nsu_gaps: tuple = ()
     pending_responses: int = 0
+    recovery_pending: bool = False
+    recovery_received: int = 0
+    recovery_unavailable: int = 0
 
     @property
     def complete(self) -> bool:
@@ -138,6 +141,23 @@ def read_web_status(
             if "no such table" not in str(exc).lower():
                 raise
             gaps = ()
+        recovery_pending = False
+        recovery_received = recovery_unavailable = 0
+        try:
+            recovery_received = conexao.execute("SELECT COUNT(*) FROM consultas_nsu WHERE cnpj=? AND resultado='recebido'", (cnpj,)).fetchone()[0]
+            recovery_unavailable = conexao.execute("SELECT COUNT(*) FROM consultas_nsu WHERE cnpj=? AND resultado='indisponivel'", (cnpj,)).fetchone()[0]
+            from nfe_consulta.banco import BancoManifestacoes
+            leitor = object.__new__(BancoManifestacoes)
+            leitor.conexao = conexao
+            recovery_pending = leitor.proximo_nsu_faltante(cnpj) is not None
+            gaps = [g for g in gaps if conexao.execute(
+                "SELECT COUNT(*) FROM documentos_nsu WHERE cnpj=? AND CAST(nsu AS INTEGER)>? AND CAST(nsu AS INTEGER)<=?",
+                (cnpj, int(g[0]), int(g[1]))).fetchone()[0] < int(g[1])-int(g[0])]
+            recovery_pending = recovery_pending or bool(conexao.execute(
+                "SELECT 1 FROM consultas_nsu WHERE cnpj=? AND resultado='pendente' LIMIT 1", (cnpj,)).fetchone())
+        except Exception as exc:
+            if "no such table" not in str(exc).lower():
+                raise
         try:
             pending = conexao.execute(
                 "SELECT COUNT(*) FROM respostas_distribuicao WHERE cnpj=? AND processado_em IS NULL",
@@ -161,4 +181,7 @@ def read_web_status(
         pause_reason=pausa[1] if pausa else None,
         nsu_gaps=tuple(gaps),
         pending_responses=pending,
+        recovery_pending=recovery_pending,
+        recovery_received=recovery_received,
+        recovery_unavailable=recovery_unavailable,
     )

@@ -181,6 +181,7 @@ def sincronizar_banco(
             max_lotes=parametros.max_lotes,
             progresso_fn=progresso_sincronizacao,
             destinatarios_alerta=parametros.destinatarios_alerta,
+            recuperar_lacunas=True,
         )
     finally:
         banco.fechar()

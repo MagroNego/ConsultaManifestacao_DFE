@@ -75,6 +75,22 @@ def montar_dist_nsu(cnpj: str, c_uf_autor: str, ult_nsu: str) -> str:
     )
 
 
+def montar_cons_nsu(cnpj: str, c_uf_autor: str, nsu: str) -> str:
+    if not nsu.isascii() or not nsu.isdigit() or len(nsu) > 15:
+        raise ValueError("NSU invalido")
+    return montar_dist_nsu(cnpj, c_uf_autor, nsu).replace(
+        f"<distNSU><ultNSU>{nsu.zfill(15)}</ultNSU></distNSU>",
+        f"<consNSU><NSU>{nsu.zfill(15)}</NSU></consNSU>")
+
+
+def consultar_nsu(cnpj, c_uf_autor, nsu, certificado):
+    resposta = _enviar_soap_windows(montar_soap(montar_cons_nsu(cnpj, c_uf_autor, nsu)), certificado)
+    sink = _response_sink.get()
+    if sink is not None:
+        sink(resposta)
+    return parse_retorno_distribuicao(resposta)
+
+
 def montar_cons_chave(cnpj: str, c_uf_autor: str, chave: str) -> str:
     return (
         '<distDFeInt xmlns="http://www.portalfiscal.inf.br/nfe" versao="1.01">'

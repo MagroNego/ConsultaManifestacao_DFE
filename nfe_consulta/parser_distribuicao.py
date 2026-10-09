@@ -131,6 +131,7 @@ def parse_retorno_distribuicao(xml_str: str) -> RetornoDistribuicao:
     eventos_cte = []
     ignorados = 0
     total_documentos = 0
+    documentos = []
     for doc_zip in root.iter():
         if _nome_local(doc_zip.tag) != "docZip":
             continue
@@ -139,6 +140,10 @@ def parse_retorno_distribuicao(xml_str: str) -> RetornoDistribuicao:
             raise NfeErroResposta("Resposta da SEFAZ com mais de 50 documentos")
         nsu = doc_zip.attrib.get("NSU", "")
         schema = doc_zip.attrib.get("schema", "")
+        if not nsu.isascii() or not nsu.isdigit() or len(nsu) > 15:
+            raise NfeErroResposta("docZip sem NSU valido")
+        if any(d[0] == nsu.zfill(15) for d in documentos):
+            raise NfeErroResposta("NSU repetido no lote recebido")
         try:
             texto_base64 = "".join((doc_zip.text or "").split())
             if len(texto_base64) > ((MAX_DOCZIP_BYTES + 2) // 3) * 4 + 4:
@@ -164,6 +169,9 @@ def parse_retorno_distribuicao(xml_str: str) -> RetornoDistribuicao:
         else:
             manifestacoes.append(evento)
 
+        documentos.append((nsu.zfill(15), schema, xml_documento,
+                           "manifestacao" if evento else "cte" if cte else "nota" if info else "ignorado"))
+
     ult_nsu = _primeiro_texto(root, "ultNSU")
     max_nsu = _primeiro_texto(root, "maxNSU")
     if status in (137, 138) and (not ult_nsu.isdigit() or not max_nsu.isdigit()):
@@ -178,4 +186,5 @@ def parse_retorno_distribuicao(xml_str: str) -> RetornoDistribuicao:
         ult_nsu_informado=bool(ult_nsu and ult_nsu.isdigit()),
         informacoes_notas=tuple(informacoes_notas),
         eventos_cte=tuple(eventos_cte),
+        documentos=tuple(documentos),
     )

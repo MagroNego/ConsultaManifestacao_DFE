@@ -28,6 +28,18 @@ class BancoManifestacoes:
         self.conexao.executescript(CTE_SCHEMA)
         self.conexao.executescript(
             """
+            CREATE TABLE IF NOT EXISTS documentos_nsu (
+                cnpj TEXT NOT NULL, nsu TEXT NOT NULL, schema_xml TEXT NOT NULL,
+                xml BLOB NOT NULL, classificacao TEXT NOT NULL,
+                recebido_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY(cnpj, nsu)
+            );
+            CREATE TABLE IF NOT EXISTS consultas_nsu (
+                id INTEGER PRIMARY KEY, cnpj TEXT NOT NULL, nsu TEXT NOT NULL,
+                tentado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                resposta_xml TEXT, resultado TEXT NOT NULL DEFAULT 'pendente'
+            );
+            CREATE INDEX IF NOT EXISTS idx_consultas_nsu ON consultas_nsu(cnpj, nsu);
             CREATE TABLE IF NOT EXISTS estado_distribuicao (
                 cnpj TEXT PRIMARY KEY,
                 ult_nsu TEXT NOT NULL,
@@ -182,6 +194,21 @@ class BancoManifestacoes:
         ).fetchone()
         return row[0] if row and int(row[0]) > int(local) else local
 
+    def proximo_nsu_faltante(self, cnpj: str) -> str | None:
+        linha = self.conexao.execute("""
+            WITH candidatos(n) AS (
+                SELECT CAST(nsu_local AS INTEGER)+1 FROM recuperacoes_nsu WHERE cnpj=?
+                UNION SELECT CAST(d.nsu AS INTEGER)+1 FROM documentos_nsu d
+                    JOIN recuperacoes_nsu g ON g.cnpj=d.cnpj AND d.nsu>=g.nsu_local AND d.nsu<g.nsu_sefaz WHERE d.cnpj=?
+                UNION SELECT CAST(nsu AS INTEGER)+1 FROM consultas_nsu WHERE cnpj=?
+            ) SELECT MIN(n) FROM candidatos
+            WHERE EXISTS (SELECT 1 FROM recuperacoes_nsu g WHERE g.cnpj=?
+                AND n>CAST(g.nsu_local AS INTEGER) AND n<=CAST(g.nsu_sefaz AS INTEGER))
+            AND NOT EXISTS (SELECT 1 FROM documentos_nsu d WHERE d.cnpj=? AND CAST(d.nsu AS INTEGER)=n)
+            AND NOT EXISTS (SELECT 1 FROM consultas_nsu a WHERE a.cnpj=? AND CAST(a.nsu AS INTEGER)=n AND a.resultado IN ('pendente','recebido','indisponivel'))
+            """, (cnpj,)*6).fetchone()
+        return str(linha[0]).zfill(15) if linha[0] is not None else None
+
     def pausa_ativa(self, cnpj: str) -> str | None:
         linha = self.conexao.execute(
             "SELECT ate_utc, motivo FROM pausa_distribuicao WHERE cnpj = ?", (cnpj,)
@@ -279,6 +306,10 @@ class BancoManifestacoes:
     def salvar_manifestacoes(self, cnpj: str, retorno: RetornoDistribuicao) -> int:
         inseridos = 0
         with self.conexao:
+            for nsu, schema, xml, classificacao in retorno.documentos:
+                self.conexao.execute(
+                    "INSERT OR IGNORE INTO documentos_nsu(cnpj,nsu,schema_xml,xml,classificacao) VALUES (?,?,?,?,?)",
+                    (cnpj, nsu, schema, xml, classificacao))
             save_events(self.conexao, cnpj, retorno.eventos_cte)
             for info in retorno.informacoes_notas:
                 self.conexao.execute(
@@ -313,7 +344,7 @@ class BancoManifestacoes:
     def salvar_retorno(
         self, cnpj: str, retorno: RetornoDistribuicao,
         destinatarios_alerta: tuple[str, ...] = (),
-        *, resposta_id: int | None = None,
+        *, resposta_id: int | None = None, atualizar_estado: bool = True, consulta_nsu_id: int | None = None,
     ) -> int:
         anterior, _ = self.obter_estado(cnpj)
         if (not retorno.ult_nsu.isdigit() or not retorno.max_nsu.isdigit()
@@ -322,6 +353,10 @@ class BancoManifestacoes:
             raise NfeErroResposta("Cursor NSU invalido ou anterior ao ja salvo; lote nao gravado")
         inseridos = 0
         with self.conexao:
+            for nsu, schema, xml, classificacao in retorno.documentos:
+                self.conexao.execute(
+                    "INSERT OR IGNORE INTO documentos_nsu(cnpj,nsu,schema_xml,xml,classificacao) VALUES (?,?,?,?,?)",
+                    (cnpj, nsu, schema, xml, classificacao))
             save_events(self.conexao, cnpj, retorno.eventos_cte)
             for info in retorno.informacoes_notas:
                 self.conexao.execute(
@@ -348,22 +383,25 @@ class BancoManifestacoes:
                             "VALUES (?, ?)",
                             (cursor.lastrowid, destinatario),
                         )
-            self.conexao.execute(
-                """
-                INSERT INTO estado_distribuicao(cnpj, ult_nsu, max_nsu)
-                VALUES (?, ?, ?)
-                ON CONFLICT(cnpj) DO UPDATE SET
-                    ult_nsu = excluded.ult_nsu,
-                    max_nsu = excluded.max_nsu,
-                    atualizado_em = CURRENT_TIMESTAMP
-                """,
-                (cnpj, retorno.ult_nsu, retorno.max_nsu),
-            )
+            if atualizar_estado:
+                self.conexao.execute(
+                    """
+                    INSERT INTO estado_distribuicao(cnpj, ult_nsu, max_nsu)
+                    VALUES (?, ?, ?)
+                    ON CONFLICT(cnpj) DO UPDATE SET
+                        ult_nsu = excluded.ult_nsu,
+                        max_nsu = excluded.max_nsu,
+                        atualizado_em = CURRENT_TIMESTAMP
+                    """,
+                    (cnpj, retorno.ult_nsu, retorno.max_nsu),
+                )
             self.conexao.execute(
                 "UPDATE recuperacoes_nsu SET retomado_em=CURRENT_TIMESTAMP "
                 "WHERE cnpj=? AND retomado_em IS NULL AND CAST(nsu_sefaz AS INTEGER)<=?",
                 (cnpj, int(retorno.ult_nsu)),
             )
+            if consulta_nsu_id is not None:
+                self.conexao.execute("UPDATE consultas_nsu SET resultado='recebido' WHERE id=?", (consulta_nsu_id,))
             if resposta_id is not None:
                 self.finalizar_resposta(resposta_id, str(retorno.status_codigo))
         return inseridos
@@ -437,7 +475,8 @@ class BancoManifestacoes:
             for chave in chaves
             if not self.chave_consultada_na_ultima_hora(cnpj, chave)
         }
-        usadas = self.consultas_na_ultima_hora(cnpj)
+        usadas = self.consultas_na_ultima_hora(cnpj) + self.conexao.execute(
+            "SELECT COUNT(*) FROM consultas_nsu WHERE cnpj=? AND tentado_em>=datetime('now','-1 hour')", (cnpj,)).fetchone()[0]
         if usadas + len(novas) > 20:
             disponiveis = max(0, 20 - usadas)
             raise NfeLimiteConsultaErro(

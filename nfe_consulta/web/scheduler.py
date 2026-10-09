@@ -328,7 +328,7 @@ def proxima_recuperacao_nsu(settings) -> datetime | None:
     except Exception:
         # A rotina principal já registra falhas de banco/configuração.
         return None
-    if any(retomado is None for _, _, retomado in status.nsu_gaps):
+    if status.recovery_pending or any(retomado is None for _, _, retomado in status.nsu_gaps):
         return status.available_at or agora_brasilia()
     return None
 

@@ -26,6 +26,7 @@ def sincronizar(
     max_lotes: int = 50,
     progresso_fn: Callable | None = None,
     destinatarios_alerta: tuple[str, ...] = (),
+    recuperar_lacunas: bool = False,
 ) -> ResumoSincronizacao:
     if max_lotes < 1:
         raise ValueError("max_lotes deve ser maior que zero")
@@ -67,6 +68,9 @@ def sincronizar(
         raise NfeErroComunicacao(pausa)
     if (banco.nsu_para_consulta(cnpj) == ult_nsu
             and banco.sincronizacao_recente_e_completa(cnpj)):
+        if recuperar_lacunas:
+            from nfe_consulta.recuperacao_nsu import recuperar_intervalos
+            eventos_novos += recuperar_intervalos(banco, cnpj, c_uf_autor, certificado, destinatarios_alerta)
         return ResumoSincronizacao(lotes, eventos_novos, ignorados, ult_nsu, max_nsu, True, not lotes)
     completo = False
 
@@ -107,6 +111,10 @@ def sincronizar(
         if retorno.status_codigo == 137 or ult_nsu == max_nsu:
             completo = True
             break
+
+    if recuperar_lacunas and completo:
+        from nfe_consulta.recuperacao_nsu import recuperar_intervalos
+        eventos_novos += recuperar_intervalos(banco, cnpj, c_uf_autor, certificado, destinatarios_alerta)
 
     return ResumoSincronizacao(
         lotes=lotes,

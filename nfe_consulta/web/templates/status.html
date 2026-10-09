@@ -40,7 +40,7 @@
         {% elif not status_web.updated_at %}
           Sem sincronização
         {% elif status_web.complete %}
-          Sincronizado
+          Sincronização atualizada
         {% else %}
           Parcial
         {% endif %}
@@ -64,11 +64,18 @@
     {{ status_web.pause_reason }}
   </div>
   {% endif %}
+  {% if status_web.recovery_received or status_web.recovery_unavailable %}
+  <div class="alert compact">Recuperação de intervalos: {{ status_web.recovery_received }} documento(s) recebido(s) · {{ status_web.recovery_unavailable }} NSU(s) sem documento disponível. A conferência cobre os intervalos registrados pelo app.</div>
+  {% endif %}
   {% for local, remoto, retomado in status_web.nsu_gaps %}
   <div class="alert compact">
     Divergência de NSU: banco {{ local }} · SEFAZ {{ remoto }}.
     {% if retomado %}A consulta foi retomada.{% else %}Na próxima sincronização permitida, o app usará o NSU informado pela SEFAZ.{% endif %}
-    Os documentos do intervalo permanecem pendentes de conferência; não foram marcados como importados.
+    {% if status_web.recovery_pending %}
+    Recuperação automática em andamento: até 10 NSUs por execução, respeitando o bloqueio e os limites de consulta.
+    {% else %}
+    Há documentos que não puderam ser recuperados. O intervalo continua pendente de conferência.
+    {% endif %}
   </div>
   {% endfor %}
   {% if status_web.pending_responses %}

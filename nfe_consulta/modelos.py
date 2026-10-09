@@ -98,3 +98,4 @@ class RetornoDistribuicao:
     ult_nsu_informado: bool = False
     informacoes_notas: tuple[InformacaoNota, ...] = ()
     eventos_cte: tuple[EventoCTe, ...] = ()
+    documentos: tuple = ()  # (NSU, schema, XML, classificação)
