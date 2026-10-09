@@ -158,6 +158,9 @@ def read_web_status(
         except Exception as exc:
             if "no such table" not in str(exc).lower():
                 raise
+            # Antes da primeira abertura para escrita, a migração aditiva
+            # ainda não criou as tabelas. As lacunas continuam na fila.
+            recovery_pending = bool(gaps)
         try:
             pending = conexao.execute(
                 "SELECT COUNT(*) FROM respostas_distribuicao WHERE cnpj=? AND processado_em IS NULL",

@@ -126,3 +126,17 @@ def test_integracao_sincronizacao_com_cache_recupera_lacuna(tmp_path,monkeypatch
     assert calls==[1]
     assert read_web_status(path,CNPJ).complete
     b.fechar()
+
+def test_banco_anterior_a_migracao_mantem_fila_e_acorda_agendador(tmp_path):
+    from types import SimpleNamespace
+    from nfe_consulta.web.scheduler import proxima_recuperacao_nsu
+    path,b=banco(tmp_path,11)
+    with b.conexao:
+        b.conexao.execute('DROP TABLE consultas_nsu')
+        b.conexao.execute('DROP TABLE documentos_nsu')
+    b.fechar()
+    status=read_web_status(path,CNPJ)
+    assert status.recovery_pending
+    assert status.nsu_gaps
+    settings=SimpleNamespace(database_path=path,database_path_file=tmp_path/'ausente',current_database_password=lambda:None)
+    assert proxima_recuperacao_nsu(settings) is not None
