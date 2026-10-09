@@ -1,6 +1,6 @@
-# Consulta de Manifestação NF-e
+# NexusDFE
 
-Aplicação Web para consultar manifestações de NF-e, exportar relatórios Excel e sincronizar o histórico com o serviço **NFeDistribuicaoDFe** do Ambiente Nacional da NF-e.
+**NexusDFE** é uma aplicação Web para consultar manifestações de NF-e, exportar relatórios Excel e sincronizar o histórico com o serviço **NFeDistribuicaoDFe** do Ambiente Nacional da NF-e.
 
 **Versão 2.4.0** · Python 3.11+ · Windows e Linux
 

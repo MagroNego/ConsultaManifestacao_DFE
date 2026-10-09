@@ -1,1 +1,1 @@
-"""Interface web corporativa da Consulta de Manifestação."""
+"""Interface web corporativa da NexusDFE."""
