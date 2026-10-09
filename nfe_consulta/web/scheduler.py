@@ -295,7 +295,12 @@ async def loop_sincronizacao_automatica(app) -> None:
         if adiada is not None:
             proxima = min(proxima, max(adiada, agora + timedelta(seconds=1)))
         app.state.auto_sync_next_at = proxima
-        await asyncio.sleep(max(1.0, (proxima - agora).total_seconds()))
+        espera = max(1.0, (proxima - agora).total_seconds())
+        # Uma tentativa manual pode registrar recuperação enquanto o agendador
+        # aguarda a janela diária. Releia o banco sem consultar a SEFAZ.
+        if recuperacao is None and adiada is None:
+            espera = min(espera, 60.0)
+        await asyncio.sleep(espera)
 
 
 def proxima_tentativa_permitida(settings) -> datetime | None:

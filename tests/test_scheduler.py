@@ -405,3 +405,34 @@ def test_loop_retoma_janela_bloqueada_ao_liberar(tmp_path, monkeypatch, hora, mi
     assert chamadas == [inicio, liberacao]
     assert esperas[0] == minuto * 60
     assert concluidas == [inicio]
+
+
+def test_recuperacao_manual_acorda_agendador_apos_janela_concluida(monkeypatch):
+    from datetime import timedelta
+
+    inicio = datetime(2026, 10, 9, 10, 40, tzinfo=timezone(timedelta(hours=-3)))
+    liberacao = inicio + timedelta(minutes=2)
+    agora, esperas, chamadas = [inicio], [], []
+    cfg = SimpleNamespace(auto_sync_once_date=None, auto_sync_weekdays=tuple(range(7)))
+    app = SimpleNamespace(state=SimpleNamespace(settings=cfg))
+    monkeypatch.setattr(scheduler, "agora_brasilia", lambda: agora[0])
+    monkeypatch.setattr(scheduler, "ultima_janela_concluida", lambda _: inicio.replace(hour=8, minute=0))
+    monkeypatch.setattr(scheduler, "proxima_recuperacao_nsu",
+                        lambda _: liberacao if esperas and not chamadas else None)
+
+    async def sincronizar(*args, **kwargs):
+        chamadas.append(agora[0])
+
+    async def dormir(segundos):
+        if chamadas:
+            raise asyncio.CancelledError
+        esperas.append(segundos)
+        assert segundos <= 60
+        agora[0] += timedelta(seconds=segundos)
+
+    monkeypatch.setattr(scheduler, "executar_sincronizacao_automatica", sincronizar)
+    monkeypatch.setattr(scheduler.asyncio, "sleep", dormir)
+    with pytest.raises(asyncio.CancelledError):
+        asyncio.run(scheduler.loop_sincronizacao_automatica(app))
+    assert chamadas == [liberacao]
+    assert esperas == [60, 60]
