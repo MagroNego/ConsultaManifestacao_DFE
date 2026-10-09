@@ -41,3 +41,15 @@ def test_historico_distingue_sincronizacao_parcial(tmp_path):
     item = read_sync_history(path)[0]
     assert item.result == "Parcial"
     assert "lotes" in item.detail
+
+def test_historico_separa_origens_e_nao_inventa_contagem_antiga(tmp_path):
+    path=tmp_path/'web_audit.log'
+    novo={'action':'sefaz_sync','result':'ok','eventos_novos':4,'documentos_atuais':12,'manifestacoes_atuais':3,'documentos_recuperados':10,'manifestacoes_recuperadas':1}
+    antigo={'action':'sefaz_sync','result':'ok','eventos_novos':8}
+    path.write_text('2026-10-09 12:00:00 '+json.dumps(antigo)+'\n2026-10-09 13:00:00 '+json.dumps(novo)+'\n')
+    items=read_sync_history(path)
+    assert items[0].result=='Execução concluída'
+    assert (items[0].current_documents,items[0].current_events)==(12,3)
+    assert (items[0].recovered_documents,items[0].recovered_events)==(10,1)
+    assert items[1].current_documents is None
+    assert items[1].recovered_events is None

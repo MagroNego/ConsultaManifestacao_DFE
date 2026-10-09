@@ -16,6 +16,10 @@ class ResumoSincronizacao:
     max_nsu: str
     completo: bool
     cache: bool = False
+    documentos_atuais: int = 0
+    manifestacoes_atuais: int = 0
+    documentos_recuperados: int = 0
+    manifestacoes_recuperadas: int = 0
 
 
 def sincronizar(
@@ -33,6 +37,8 @@ def sincronizar(
     lotes = 0
     eventos_novos = 0
     ignorados = 0
+    documentos_atuais = 0
+    recuperados = {}
 
     def rejeitar(exc, enviado, resposta_id=None):
         with banco.conexao:
@@ -61,6 +67,7 @@ def sincronizar(
             cnpj, retorno, destinatarios_alerta, resposta_id=resposta_id)
         lotes += 1
         ignorados += retorno.documentos_ignorados
+        documentos_atuais += len(retorno.documentos)
 
     ult_nsu, max_nsu = banco.obter_estado(cnpj)
     pausa = banco.pausa_ativa(cnpj)
@@ -70,8 +77,11 @@ def sincronizar(
             and banco.sincronizacao_recente_e_completa(cnpj)):
         if recuperar_lacunas:
             from nfe_consulta.recuperacao_nsu import recuperar_intervalos
-            eventos_novos += recuperar_intervalos(banco, cnpj, c_uf_autor, certificado, destinatarios_alerta)
-        return ResumoSincronizacao(lotes, eventos_novos, ignorados, ult_nsu, max_nsu, True, not lotes)
+            eventos_novos += recuperar_intervalos(banco, cnpj, c_uf_autor, certificado, destinatarios_alerta, estatisticas=recuperados)
+        return ResumoSincronizacao(lotes, eventos_novos, ignorados, ult_nsu, max_nsu, True,
+                                  not lotes and not recuperados.get('consultas') and not recuperados.get('documentos'),
+                                  documentos_atuais, eventos_novos-recuperados.get('manifestacoes',0),
+                                  recuperados.get('documentos',0), recuperados.get('manifestacoes',0))
     completo = False
 
     while lotes < max_lotes:
@@ -103,6 +113,7 @@ def sincronizar(
         lotes += 1
         eventos_novos += banco.salvar_retorno(cnpj, retorno, destinatarios_alerta, resposta_id=resposta_id)
         ignorados += retorno.documentos_ignorados
+        documentos_atuais += len(retorno.documentos)
         ult_nsu, max_nsu = retorno.ult_nsu, retorno.max_nsu
 
         if progresso_fn:
@@ -114,7 +125,7 @@ def sincronizar(
 
     if recuperar_lacunas and completo:
         from nfe_consulta.recuperacao_nsu import recuperar_intervalos
-        eventos_novos += recuperar_intervalos(banco, cnpj, c_uf_autor, certificado, destinatarios_alerta)
+        eventos_novos += recuperar_intervalos(banco, cnpj, c_uf_autor, certificado, destinatarios_alerta, estatisticas=recuperados)
 
     return ResumoSincronizacao(
         lotes=lotes,
@@ -123,4 +134,8 @@ def sincronizar(
         ult_nsu=ult_nsu,
         max_nsu=max_nsu,
         completo=completo,
+        documentos_atuais=documentos_atuais,
+        manifestacoes_atuais=eventos_novos-recuperados.get('manifestacoes',0),
+        documentos_recuperados=recuperados.get('documentos',0),
+        manifestacoes_recuperadas=recuperados.get('manifestacoes',0),
     )

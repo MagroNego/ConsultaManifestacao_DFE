@@ -140,3 +140,23 @@ def test_banco_anterior_a_migracao_mantem_fila_e_acorda_agendador(tmp_path):
     assert status.nsu_gaps
     settings=SimpleNamespace(database_path=path,database_path_file=tmp_path/'ausente',current_database_password=lambda:None)
     assert proxima_recuperacao_nsu(settings) is not None
+
+def test_resumo_separa_consulta_atual_e_recuperacao(tmp_path,monkeypatch):
+    from datetime import datetime, timedelta, timezone
+    from nfe_consulta.sincronizacao import sincronizar
+    path,b=banco(tmp_path,11)
+    with b.conexao:
+        b.conexao.execute("UPDATE estado_distribuicao SET atualizado_em=datetime('now','-2 hours')")
+    def soap(xml,*args):
+        if '<consNSU>' in xml:return resposta(11)
+        return resposta(99)
+    monkeypatch.setattr('nfe_consulta.distribuicao._enviar_soap_windows',soap)
+    resumo=sincronizar(b,CNPJ,'33',None,recuperar_lacunas=True)
+    assert resumo.documentos_atuais==1
+    assert resumo.manifestacoes_atuais==1
+    assert resumo.documentos_recuperados==1
+    assert resumo.manifestacoes_recuperadas==1
+    assert resumo.eventos_novos==2
+    status=read_web_status(path,CNPJ)
+    assert status.recovery_intervals==(('000000000000011','000000000000011',1,1),)
+    b.fechar()

@@ -28,6 +28,10 @@ class SyncHistoryItem:
     lots: int | None
     new_events: int | None
     detail: str
+    current_documents: int | None = None
+    current_events: int | None = None
+    recovered_documents: int | None = None
+    recovered_events: int | None = None
 
 
 def _tail_lines(path: Path, max_bytes: int = 6 * 1024 * 1024) -> list[str]:
@@ -74,9 +78,13 @@ def read_sync_history(path: Path, limit: int = 10) -> tuple[SyncHistoryItem, ...
                 when=timestamp,
                 origin="Automática" if payload["action"] == "sefaz_sync_auto" else "Manual",
                 result=("Parcial" if incomplete else
-                        {"ok": "Concluída", "erro": "Falhou", "ignorado": "Não executada"}[outcome]),
+                        {"ok": "Execução concluída", "erro": "Falhou", "ignorado": "Não executada"}[outcome]),
                 lots=payload.get("lotes") if isinstance(payload.get("lotes"), int) else None,
                 new_events=payload.get("eventos_novos") if isinstance(payload.get("eventos_novos"), int) else None,
                 detail=detail,
+                current_documents=payload.get('documentos_atuais') if type(payload.get('documentos_atuais')) is int else None,
+                current_events=payload.get('manifestacoes_atuais') if type(payload.get('manifestacoes_atuais')) is int else None,
+                recovered_documents=payload.get('documentos_recuperados') if type(payload.get('documentos_recuperados')) is int else None,
+                recovered_events=payload.get('manifestacoes_recuperadas') if type(payload.get('manifestacoes_recuperadas')) is int else None,
             ))
     return tuple(items)

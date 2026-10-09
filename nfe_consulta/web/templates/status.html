@@ -67,6 +67,13 @@
   {% if status_web.recovery_received or status_web.recovery_unavailable %}
   <div class="alert compact">Recuperação de intervalos: {{ status_web.recovery_received }} documento(s) recebido(s) · {{ status_web.recovery_unavailable }} NSU(s) sem documento disponível. A conferência cobre os intervalos registrados pelo app.</div>
   {% endif %}
+  {% for inicio, fim, recebidos, total in status_web.recovery_intervals %}
+  <div class="alert compact">
+    <strong>NSU {{ inicio }} a {{ fim }}</strong> · {{ recebidos }} de {{ total }} documentos recebidos
+    · {% if recebidos == total %}Intervalo recuperado{% elif status_web.recovery_pending %}Em recuperação{% else %}Pendências não resolvidas{% endif %}
+    <progress value="{{ recebidos }}" max="{{ total }}" style="display:block;width:100%;margin-top:8px" aria-label="Progresso do intervalo NSU {{ inicio }} a {{ fim }}">{{ recebidos }} de {{ total }}</progress>
+  </div>
+  {% endfor %}
   {% for local, remoto, retomado in status_web.nsu_gaps %}
   <div class="alert compact">
     Divergência de NSU: banco {{ local }} · SEFAZ {{ remoto }}.
@@ -84,15 +91,18 @@
 </section>
 <section class="card status-summary">
   <div class="card-title"><h2>Últimas sincronizações</h2></div>
+  <p class="muted">Atual: distNSU. Recuperação anterior: consNSU. Manifestações adicionadas são novas no banco, mesmo quando o evento é antigo. Execuções anteriores à atualização não têm contagem separada.</p>
   {% if sync_history %}
   <div class="table-wrap">
     <table class="query-table">
-      <thead><tr><th>Quando (servidor)</th><th>Origem</th><th>Resultado</th><th>Lotes</th><th>Manifestações novas</th><th>Detalhe</th></tr></thead>
+      <thead><tr><th>Quando (servidor)</th><th>Origem</th><th>Resultado</th><th>Lotes</th><th>Sincronização atual</th><th>Recuperação anterior</th><th>Total de manifestações adicionadas</th><th>Detalhe</th></tr></thead>
       <tbody>
       {% for item in sync_history %}
         <tr>
           <td>{{ item.when }}</td><td>{{ item.origin }}</td><td>{{ item.result }}</td>
           <td>{{ item.lots if item.lots is not none else '—' }}</td>
+          <td style="white-space:nowrap">{% if item.current_documents is not none %}{{ item.current_documents }} docs · {{ item.current_events }} manifestações{% else %}Sem registro separado{% endif %}</td>
+          <td style="white-space:nowrap">{% if item.recovered_documents is not none %}{{ item.recovered_documents }} docs · {{ item.recovered_events }} manifestações{% else %}Sem registro separado{% endif %}</td>
           <td>{{ item.new_events if item.new_events is not none else '—' }}</td>
           <td>{{ item.detail or '—' }}</td>
         </tr>

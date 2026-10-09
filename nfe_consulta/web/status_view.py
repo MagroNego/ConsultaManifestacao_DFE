@@ -25,6 +25,7 @@ class WebStatus:
     recovery_pending: bool = False
     recovery_received: int = 0
     recovery_unavailable: int = 0
+    recovery_intervals: tuple = ()
 
     @property
     def complete(self) -> bool:
@@ -143,6 +144,7 @@ def read_web_status(
             gaps = ()
         recovery_pending = False
         recovery_received = recovery_unavailable = 0
+        recovery_intervals = []
         try:
             recovery_received = conexao.execute("SELECT COUNT(*) FROM consultas_nsu WHERE cnpj=? AND resultado='recebido'", (cnpj,)).fetchone()[0]
             recovery_unavailable = conexao.execute("SELECT COUNT(*) FROM consultas_nsu WHERE cnpj=? AND resultado='indisponivel'", (cnpj,)).fetchone()[0]
@@ -150,6 +152,9 @@ def read_web_status(
             leitor = object.__new__(BancoManifestacoes)
             leitor.conexao = conexao
             recovery_pending = leitor.proximo_nsu_faltante(cnpj) is not None
+            for local, remoto, retomado in gaps:
+                recebidos = conexao.execute("SELECT COUNT(*) FROM documentos_nsu WHERE cnpj=? AND nsu>? AND nsu<=?", (cnpj,local,remoto)).fetchone()[0]
+                recovery_intervals.append((str(int(local)+1).zfill(15), remoto, recebidos, int(remoto)-int(local)))
             gaps = [g for g in gaps if conexao.execute(
                 "SELECT COUNT(*) FROM documentos_nsu WHERE cnpj=? AND CAST(nsu AS INTEGER)>? AND CAST(nsu AS INTEGER)<=?",
                 (cnpj, int(g[0]), int(g[1]))).fetchone()[0] < int(g[1])-int(g[0])]
@@ -161,6 +166,7 @@ def read_web_status(
             # Antes da primeira abertura para escrita, a migração aditiva
             # ainda não criou as tabelas. As lacunas continuam na fila.
             recovery_pending = bool(gaps)
+            recovery_intervals = [(str(int(g[0])+1).zfill(15),g[1],0,int(g[1])-int(g[0])) for g in gaps]
         try:
             pending = conexao.execute(
                 "SELECT COUNT(*) FROM respostas_distribuicao WHERE cnpj=? AND processado_em IS NULL",
@@ -187,4 +193,5 @@ def read_web_status(
         recovery_pending=recovery_pending,
         recovery_received=recovery_received,
         recovery_unavailable=recovery_unavailable,
+        recovery_intervals=tuple(recovery_intervals),
     )
