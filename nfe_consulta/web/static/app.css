@@ -1396,3 +1396,10 @@ html[data-theme="dark"] .brand-logo-dark {
   max-width: 100%;
   max-height: 56px;
 }
+
+.brand-divider {
+  width: 1px;
+  height: 28px;
+  flex: 0 0 1px;
+  background: var(--border);
+}
