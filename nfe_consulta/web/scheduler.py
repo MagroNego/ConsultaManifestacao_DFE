@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from nfe_consulta.janela_consulta import NfeJanelaConsultaErro, proxima_abertura
+
 import asyncio
 from datetime import date, datetime, time, timedelta, timezone
 from typing import Iterable
@@ -180,6 +182,9 @@ async def executar_sincronizacao_automatica(
                 max_lotes=settings.auto_sync_max_lotes,
                 audit=app.state.audit,
             )
+        except NfeJanelaConsultaErro:
+            app.state.audit.write_system("sefaz_sync_auto", "ignorado", reason="fora_janela")
+            return proxima_abertura(agora_brasilia())
         except NfeLimiteConsultaErro:
             app.state.audit.write_system(
                 "sefaz_sync_auto",
@@ -274,6 +279,11 @@ async def loop_sincronizacao_automatica(app) -> None:
 
     while True:
         agora = agora_brasilia()
+        abertura = proxima_abertura(agora)
+        if abertura > agora:
+            app.state.auto_sync_next_at = abertura
+            await asyncio.sleep(min(60.0, (abertura - agora).total_seconds()))
+            continue
         janela, proxima = janelas_diarias(agora)
         recuperacao = await asyncio.to_thread(proxima_recuperacao_nsu, settings)
         adiada = None
@@ -299,6 +309,7 @@ async def loop_sincronizacao_automatica(app) -> None:
             proxima = min(proxima, max(recuperacao, agora + timedelta(seconds=60)))
         if adiada is not None:
             proxima = min(proxima, max(adiada, agora + timedelta(seconds=1)))
+        proxima = proxima_abertura(proxima)
         app.state.auto_sync_next_at = proxima
         espera = max(1.0, (proxima - agora).total_seconds())
         # Uma tentativa manual pode registrar recuperação enquanto o agendador

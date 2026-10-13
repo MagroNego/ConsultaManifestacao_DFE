@@ -4,6 +4,8 @@ Toda a regra de orquestração fica aqui para manter HTTP, agendamento e
 persistência desacoplados das integrações fiscais.
 """
 
+from nfe_consulta.janela_consulta import exigir_janela
+
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
@@ -152,6 +154,7 @@ def sincronizar_banco(
     progresso_sincronizacao: ProgressoSincronizacao | None = None,
 ) -> ResumoSincronizacao:
     """Sincroniza somente o banco, sem depender de TXT ou gerar planilha."""
+    exigir_janela()
     banco_path = Path(parametros.banco).expanduser()
     if parametros.max_lotes < 1 or parametros.max_lotes > 500:
         raise ValueError("max_lotes deve estar entre 1 e 500.")

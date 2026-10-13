@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from nfe_consulta import janela_consulta
+from nfe_consulta.janela_consulta import BRASILIA, proxima_abertura
+
 import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -46,11 +49,14 @@ class WebStatus:
             value for value in (self.next_attempt, self.pause_until)
             if value is not None
         ]
-        return max(candidatos) if candidatos else None
+        agora = janela_consulta.agora_brasilia()
+        alvo = max([agora, *candidatos])
+        abertura = proxima_abertura(alvo)
+        return abertura if abertura > agora else (max(candidatos) if candidatos else None)
 
     @property
     def can_sync(self) -> bool:
-        agora = datetime.now(timezone.utc)
+        agora = janela_consulta.agora_brasilia()
         return self.database_ready and (
             self.available_at is None or self.available_at <= agora
         )
@@ -58,7 +64,7 @@ class WebStatus:
     def local_time(self, value: datetime | None) -> str:
         if value is None:
             return "Sem registro"
-        return value.astimezone().strftime("%d/%m/%Y %H:%M")
+        return value.astimezone(BRASILIA).strftime("%d/%m/%Y %H:%M")
 
     @property
     def updated_label(self) -> str:

@@ -9,6 +9,8 @@ from pathlib import Path
 
 
 _REASONS = {
+    "fora_janela": "Fora da janela de consultas: 08h às 18h (Brasília)",
+    "NfeJanelaConsultaErro": "Fora da janela de consultas: 08h às 18h (Brasília)",
     "consumo_indevido_656": "SEFAZ: consumo indevido (656)",
     "NfeConsumoIndevidoErro": "SEFAZ: consumo indevido (656)",
     "cooldown": "Intervalo entre consultas ainda ativo",

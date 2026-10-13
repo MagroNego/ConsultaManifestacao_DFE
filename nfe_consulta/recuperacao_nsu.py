@@ -1,4 +1,5 @@
 """Recuperação pontual de lacunas, sem alterar o cursor distNSU."""
+from nfe_consulta.janela_consulta import exigir_janela
 from dataclasses import replace
 from nfe_consulta.distribuicao import consultar_nsu, preservar_resposta, _erro_consumo_indevido
 from nfe_consulta.parser_distribuicao import parse_retorno_distribuicao
@@ -46,6 +47,7 @@ def recuperar_intervalos(banco, cnpj, uf, certificado, destinatarios=(), limite=
         processar(identificador, nsu, parse_retorno_distribuicao(xml))
 
     for _ in range(limite):
+        exigir_janela()
         banco.conexao.execute('BEGIN IMMEDIATE')
         try:
             usadas = banco.conexao.execute(

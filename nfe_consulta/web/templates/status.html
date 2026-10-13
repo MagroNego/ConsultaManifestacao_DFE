@@ -49,7 +49,7 @@
   </div>
 
   <div class="status-footer">
-    <span>Próxima sincronização permitida</span>
+    <span>Próxima sincronização permitida · janela das 08h às 18h (Brasília)</span>
     <strong>
       {% if status_web.can_sync %}
         Disponível
@@ -67,7 +67,7 @@
   {% for local, remoto, retomado in status_web.nsu_gaps %}
   <div class="alert compact">
     Divergência de NSU: banco {{ local }} · SEFAZ {{ remoto }}.
-    {% if retomado %}A consulta foi retomada.{% else %}Na próxima sincronização permitida, o app usará o NSU informado pela SEFAZ.{% endif %}
+    {% if retomado %}A consulta foi retomada.{% else %}O NSU informado na rejeição foi registrado para conferência; a distribuição mantém o último NSU gravado com sucesso.{% endif %}
     {% if status_web.recovery_pending %}
     Recuperação automática em andamento: até 20 NSUs por execução, descontando as consultas pontuais da última hora, respeitando o bloqueio e os limites de consulta.
     {% else %}

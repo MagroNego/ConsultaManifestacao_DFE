@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from nfe_consulta.janela_consulta import exigir_janela
+
 import os
 import socket
 from uuid import uuid4
@@ -26,6 +28,7 @@ def caminho_banco_configurado(settings: WebSettings):
 
 def sincronizar_configurado(settings: WebSettings, *, max_lotes: int = 50, audit=None):
     """Executa a mesma sincronização usada pela área administrativa."""
+    exigir_janela()
     banco = caminho_banco_configurado(settings)
     if not banco.is_file():
         raise FileNotFoundError(f"Banco configurado não encontrado: {banco}")

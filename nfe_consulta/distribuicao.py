@@ -1,3 +1,5 @@
+from nfe_consulta.janela_consulta import exigir_janela
+
 import json
 import os
 import subprocess
@@ -118,6 +120,7 @@ def _enviar_soap_windows(
     certificado: CertificadoWindows,
     endpoint: str = ENDPOINT_PRODUCAO,
 ) -> str:
+    exigir_janela()
     payload = json.dumps(
         {
             "url": endpoint,

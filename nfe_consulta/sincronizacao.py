@@ -1,3 +1,4 @@
+from nfe_consulta.janela_consulta import exigir_janela
 from dataclasses import dataclass
 from typing import Callable
 
@@ -104,6 +105,7 @@ def sincronizar(
     completo = False
 
     while lotes < max_lotes:
+        exigir_janela()
         anterior = banco.nsu_para_consulta(cnpj)
         resposta_id = None
 
