@@ -11,6 +11,7 @@ from typing import Iterable
 from nfe_consulta.config import CNPJ_PADRAO
 from nfe_consulta.modelos import NfeConsumoIndevidoErro, NfeLimiteConsultaErro
 from nfe_consulta.seguranca_banco import abrir_banco
+from nfe_consulta.web.sync_diagnostics import detalhes_erro
 from nfe_consulta.web.sync_runtime import (
     caminho_banco_configurado,
     sincronizar_configurado,
@@ -182,21 +183,23 @@ async def executar_sincronizacao_automatica(
                 max_lotes=settings.auto_sync_max_lotes,
                 audit=app.state.audit,
             )
-        except NfeJanelaConsultaErro:
-            app.state.audit.write_system("sefaz_sync_auto", "ignorado", reason="fora_janela")
+        except NfeJanelaConsultaErro as exc:
+            app.state.audit.write_system("sefaz_sync_auto", "ignorado", reason="fora_janela", **detalhes_erro(exc))
             return proxima_abertura(agora_brasilia())
-        except NfeLimiteConsultaErro:
+        except NfeLimiteConsultaErro as exc:
             app.state.audit.write_system(
                 "sefaz_sync_auto",
                 "ignorado",
                 reason="cooldown",
+                **detalhes_erro(exc),
             )
             return await asyncio.to_thread(proxima_tentativa_permitida, settings)
-        except NfeConsumoIndevidoErro:
+        except NfeConsumoIndevidoErro as exc:
             app.state.audit.write_system(
                 "sefaz_sync_auto",
                 "erro",
                 reason="consumo_indevido_656",
+                **detalhes_erro(exc),
             )
             return await asyncio.to_thread(proxima_tentativa_permitida, settings)
         except Exception as exc:
@@ -204,8 +207,9 @@ async def executar_sincronizacao_automatica(
                 "sefaz_sync_auto",
                 "erro",
                 reason=type(exc).__name__,
+                **detalhes_erro(exc),
             )
-            return
+            return proxima_abertura(janelas_diarias(agora_brasilia())[1])
 
         try:
             if resumo.completo:
@@ -218,7 +222,7 @@ async def executar_sincronizacao_automatica(
                 "sefaz_sync_auto", "erro",
                 reason=f"schedule_state_{type(exc).__name__}",
             )
-            return
+            return proxima_abertura(janelas_diarias(agora_brasilia())[1])
 
         app.state.audit.write_system(
             "sefaz_sync_auto",
@@ -297,6 +301,7 @@ async def loop_sincronizacao_automatica(app) -> None:
                     "sefaz_scheduler", "erro",
                     reason=f"schedule_state_{type(exc).__name__}",
                 )
+                adiada = proxima_abertura(proxima)
             else:
                 if (ultima is None or ultima < janela
                         or (recuperacao is not None and recuperacao <= agora)):
@@ -308,7 +313,9 @@ async def loop_sincronizacao_automatica(app) -> None:
         if recuperacao is not None:
             proxima = min(proxima, max(recuperacao, agora + timedelta(seconds=60)))
         if adiada is not None:
-            proxima = min(proxima, max(adiada, agora + timedelta(seconds=1)))
+            # Uma tentativa bloqueada/erro de configuração também limita a
+            # recuperação pendente; não repita a falha a cada minuto.
+            proxima = max(adiada, agora + timedelta(seconds=1))
         proxima = proxima_abertura(proxima)
         app.state.auto_sync_next_at = proxima
         espera = max(1.0, (proxima - agora).total_seconds())

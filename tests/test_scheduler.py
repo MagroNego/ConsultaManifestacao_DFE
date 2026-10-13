@@ -461,3 +461,31 @@ def test_reinicio_na_madrugada_recupera_janela_mais_recente(monkeypatch, hora, e
     assert len(chamadas) == 1
     assert chamadas[0].hour == esperada
     assert chamadas[0].day == (13 if hora == 0 else 14)
+
+
+@pytest.mark.parametrize("hora,proxima_hora", [(22, 1), (2, 22)])
+def test_erro_configuracao_aguarda_disparo_mesmo_com_recuperacao_pendente(monkeypatch, hora, proxima_hora):
+    from nfe_consulta.modelos import NfeErroCertificado
+    agora = scheduler.horario_unico(date(2026, 10, 14), hora, 10)
+    monkeypatch.setattr(scheduler, "agora_brasilia", lambda: agora)
+    monkeypatch.setattr(scheduler, "ultima_janela_concluida", lambda _: None)
+    monkeypatch.setattr(scheduler, "proxima_recuperacao_nsu", lambda _: agora)
+    chamadas, esperas, registros = [], [], []
+    def falhar(*args, **kwargs):
+        chamadas.append(1)
+        raise NfeErroCertificado("falha sensível")
+    async def parar(segundos):
+        esperas.append(segundos)
+        raise asyncio.CancelledError
+    monkeypatch.setattr(scheduler, "sincronizar_configurado", falhar)
+    monkeypatch.setattr(scheduler.asyncio, "sleep", parar)
+    cfg = SimpleNamespace(auto_sync_once_date=None, auto_sync_weekdays=tuple(range(7)), auto_sync_max_lotes=50)
+    app = SimpleNamespace(state=SimpleNamespace(settings=cfg, sync_lock=threading.Lock(),
+        audit=SimpleNamespace(write_system=lambda *args, **kwargs: registros.append((args, kwargs)))))
+    with pytest.raises(asyncio.CancelledError):
+        asyncio.run(scheduler.loop_sincronizacao_automatica(app))
+    assert chamadas == [1]
+    assert app.state.auto_sync_next_at.hour == proxima_hora
+    assert esperas[0] > 60
+    assert registros[0][1]['etapa'] == 'certificado'
+    assert 'sensível' not in repr(registros)
