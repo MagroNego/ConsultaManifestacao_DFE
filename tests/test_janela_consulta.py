@@ -10,11 +10,14 @@ from nfe_consulta.modelos import RetornoDistribuicao, NfeErroResposta
 
 
 @pytest.mark.parametrize('hora,minuto,esperada', [
-    (7, 59, '2026-10-13T08:00:00-03:00'),
-    (8, 0, '2026-10-13T08:00:00-03:00'),
-    (17, 59, '2026-10-13T17:59:00-03:00'),
-    (18, 0, '2026-10-14T08:00:00-03:00'),
-    (22, 0, '2026-10-14T08:00:00-03:00'),
+    (21, 59, '2026-10-13T22:00:00-03:00'),
+    (22, 0, '2026-10-13T22:00:00-03:00'),
+    (23, 59, '2026-10-13T23:59:00-03:00'),
+    (0, 0, '2026-10-13T00:00:00-03:00'),
+    (3, 59, '2026-10-13T03:59:00-03:00'),
+    (4, 0, '2026-10-13T22:00:00-03:00'),
+    (8, 0, '2026-10-13T22:00:00-03:00'),
+    (18, 0, '2026-10-13T22:00:00-03:00'),
 ])
 def test_limites_brasilia_e_utc(hora, minuto, esperada):
     instante = datetime(2026, 10, 13, hora, minuto, tzinfo=janela.BRASILIA)
@@ -22,7 +25,7 @@ def test_limites_brasilia_e_utc(hora, minuto, esperada):
     assert janela.proxima_abertura(instante.astimezone(timezone.utc)).isoformat() == esperada
 
 
-@pytest.mark.parametrize('hora', [0, 4, 7, 18, 22, 23])
+@pytest.mark.parametrize('hora', [4, 7, 8, 12, 18, 21])
 def test_transporte_bloqueia_antes_do_certificado_e_da_rede(monkeypatch, hora):
     from nfe_consulta import distribuicao
     monkeypatch.setattr(janela, 'agora_brasilia', lambda: datetime(2026, 10, 13, hora, tzinfo=janela.BRASILIA))
@@ -35,7 +38,7 @@ def test_transporte_bloqueia_antes_do_certificado_e_da_rede(monkeypatch, hora):
 
 def test_manual_bloqueia_antes_de_abrir_banco(monkeypatch):
     from nfe_consulta.web.sync_runtime import sincronizar_configurado
-    monkeypatch.setattr(janela, 'agora_brasilia', lambda: datetime(2026, 10, 13, 22, tzinfo=janela.BRASILIA))
+    monkeypatch.setattr(janela, 'agora_brasilia', lambda: datetime(2026, 10, 13, 18, tzinfo=janela.BRASILIA))
     with pytest.raises(janela.NfeJanelaConsultaErro):
         sincronizar_configurado(SimpleNamespace())
 
@@ -43,7 +46,7 @@ def test_manual_bloqueia_antes_de_abrir_banco(monkeypatch):
 def test_scheduler_nao_executa_recuperacao_fora_da_janela(monkeypatch):
     import asyncio
     from nfe_consulta.web import scheduler
-    monkeypatch.setattr(scheduler, 'agora_brasilia', lambda: datetime(2026, 10, 13, 22, tzinfo=janela.BRASILIA))
+    monkeypatch.setattr(scheduler, 'agora_brasilia', lambda: datetime(2026, 10, 13, 18, tzinfo=janela.BRASILIA))
     executar = Mock(side_effect=AssertionError('Não deve consultar'))
     monkeypatch.setattr(scheduler, 'executar_sincronizacao_automatica', executar)
     async def parar(_):
@@ -52,7 +55,7 @@ def test_scheduler_nao_executa_recuperacao_fora_da_janela(monkeypatch):
     app = SimpleNamespace(state=SimpleNamespace(settings=SimpleNamespace(auto_sync_once_date=None)))
     with pytest.raises(RuntimeError, match='fim'):
         asyncio.run(scheduler.loop_sincronizacao_automatica(app))
-    assert app.state.auto_sync_next_at == datetime(2026, 10, 14, 8, tzinfo=janela.BRASILIA)
+    assert app.state.auto_sync_next_at == datetime(2026, 10, 13, 22, tzinfo=janela.BRASILIA)
     executar.assert_not_called()
 
 
@@ -71,8 +74,8 @@ def test_fecha_entre_lotes_preservando_primeiro_lote(tmp_path, monkeypatch):
     from nfe_consulta.sincronizacao import sincronizar
     cnpj = '16840128000101'
     banco = BancoManifestacoes(str(tmp_path / 'lotes.db'))
-    aberto = datetime(2026, 10, 13, 17, 59, tzinfo=janela.BRASILIA)
-    fechado = aberto.replace(hour=18, minute=0)
+    aberto = datetime(2026, 10, 13, 3, 59, tzinfo=janela.BRASILIA)
+    fechado = aberto.replace(hour=4, minute=0)
     monkeypatch.setattr(janela, 'agora_brasilia', lambda: aberto)
     def responder(*args):
         monkeypatch.setattr(janela, 'agora_brasilia', lambda: fechado)
@@ -101,3 +104,13 @@ def test_recuperacao_fora_da_janela_nao_reserva_cota(tmp_path, monkeypatch):
         assert banco.conexao.execute('SELECT COUNT(*) FROM consultas_nsu').fetchone()[0] == 0
     finally:
         banco.fechar()
+
+
+def test_cooldown_apos_fechamento_aguarda_22h(monkeypatch):
+    from nfe_consulta.web.status_view import WebStatus
+    agora = datetime(2026, 10, 14, 3, 50, tzinfo=janela.BRASILIA)
+    monkeypatch.setattr(janela, 'agora_brasilia', lambda: agora)
+    status = WebStatus(True, None, '10', '20', None,
+                       agora.replace(hour=4, minute=30), None, None)
+    assert status.available_at == agora.replace(hour=22, minute=0)
+    assert not status.can_sync

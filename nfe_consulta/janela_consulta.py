@@ -19,19 +19,16 @@ def proxima_abertura(instante=None):
     if agora.tzinfo is None:
         raise ValueError("O instante deve ter fuso horário")
     agora = agora.astimezone(BRASILIA)
-    inicio = datetime.combine(agora.date(), time(8), tzinfo=BRASILIA)
-    fim = inicio.replace(hour=18)
-    if agora < inicio:
-        return inicio
-    if agora >= fim:
-        return inicio + timedelta(days=1)
-    return agora
+    # A janela atravessa a meia-noite: 22:00 inclusive até 04:00 exclusiva.
+    if agora.hour >= 22 or agora.hour < 4:
+        return agora
+    return datetime.combine(agora.date(), time(22), tzinfo=BRASILIA)
 
 
 def exigir_janela():
     agora = agora_brasilia()
     if proxima_abertura(agora) > agora:
         raise NfeJanelaConsultaErro(
-            "Consultas à SEFAZ permitidas das 08h às 18h (horário de Brasília). "
+            "Consultas à SEFAZ permitidas das 22h às 04h (horário de Brasília). "
             "A consulta ao banco local continua disponível."
         )

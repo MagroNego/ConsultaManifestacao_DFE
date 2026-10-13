@@ -301,7 +301,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         app.state.audit.write_system(
             "sefaz_scheduler",
             "iniciado",
-            horarios=["08:00", "15:00"],
+            horarios=["22:00", "01:00"],
             dias=list(settings.auto_sync_weekdays),
             data_unica=settings.auto_sync_once_date.isoformat() if settings.auto_sync_once_date else None,
             max_lotes=settings.auto_sync_max_lotes,

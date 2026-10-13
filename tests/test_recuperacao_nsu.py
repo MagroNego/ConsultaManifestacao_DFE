@@ -162,7 +162,7 @@ def test_loop_agenda_retoma_antes_da_proxima_janela(tmp_path, monkeypatch):
     settings = SimpleNamespace(database_path=path, database_path_file=tmp_path / "ausente",
                                current_database_password=lambda: None,
                                auto_sync_once_date=None, auto_sync_weekdays=tuple(range(7)))
-    agora = datetime.now(timezone.utc).astimezone(timezone(timedelta(hours=-3))).replace(hour=15)
+    agora = datetime.now(timezone.utc).astimezone(timezone(timedelta(hours=-3))).replace(hour=1)
     monkeypatch.setattr(scheduler, "agora_brasilia", lambda: agora)
     monkeypatch.setattr(scheduler, "ultima_janela_concluida", lambda _: None)
     monkeypatch.setattr(scheduler, "proxima_recuperacao_nsu", lambda _: agora + timedelta(hours=1))

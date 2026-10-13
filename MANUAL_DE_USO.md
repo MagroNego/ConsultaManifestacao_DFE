@@ -59,7 +59,7 @@ A área exige login administrativo e reúne:
 
 ## Sincronização automática
 
-A rotina executa às **08:00 e 15:00 (Brasília)**, todos os dias. Usa o mesmo banco, certificado, cursor e cooldown da rotina manual. O aplicativo precisa permanecer em execução.
+A rotina executa às **22:00 e 01:00 (Brasília)**, todos os dias. Usa o mesmo banco, certificado, cursor e cooldown da rotina manual. O aplicativo precisa permanecer em execução.
 
 Uma janela concluída não é repetida após reiniciar. Falhas e distribuições parciais são retomadas na próxima janela, respeitando o bloqueio vigente. A rejeição 656 registra uma pausa; não altere o NSU para tentar eliminar esse bloqueio.
 
@@ -114,15 +114,15 @@ O ícone **Manifestações** na Emissão abre uma tela da nota com os eventos ex
 
 ### Convivência com a captura do Qive
 
-As consultas externas deste aplicativo são permitidas diariamente das 08h às
-18h, no horário de Brasília (UTC-3). A sincronização automática mantém os
-horários de 08h e 15h nos dias configurados. Recuperações e retentativas também
+As consultas externas deste aplicativo são permitidas diariamente das 22h às
+04h, no horário de Brasília (UTC-3). A sincronização automática mantém os
+horários de 22h e 01h nos dias configurados. Recuperações e retentativas também
 respeitam a janela, inclusive entre lotes. Uma requisição já iniciada pode terminar
 após o fechamento; a próxima não é enviada. Consultas locais e exportações seguem
 disponíveis. O limite é verificado no servidor, independentemente do botão.
 
-A janela foi escolhida para separar o app da janela de 22h às 04h informada pelo
-suporte do Qive. Isso não garante, por si só, que a SEFAZ aceitará cursores
+Ative a rotina em produção após o Qive confirmar o ajuste. A janela foi
+escolhida para separar o app da janela de 08h às 18h solicitada ao suporte do Qive. Isso não garante, por si só, que a SEFAZ aceitará cursores
 independentes: acompanhe os retornos e confirme a configuração ativa com o Qive.
 
 O ultNSU de uma rejeição 656 fica registrado como divergência para conferência e
