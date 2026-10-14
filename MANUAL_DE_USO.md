@@ -25,21 +25,21 @@ Selecione um TXT com uma chave de 44 dígitos por linha e use **Gerar Excel por 
 ## Emissão — XMLs e cancelamentos
 
 1. Baixe o lote mensal de XMLs completos no Synchro.
-2. Abra **Admin → Importar XML**, selecione o ZIP ou vários XMLs e clique **Importar e arquivar**.
+2. Abra **Admin → Importar XML**, selecione o ZIP ou vários XMLs e clique **Importar dados**.
 3. Confira as quantidades importadas, duplicadas e recusadas. **Baixar registro do lote** lista o resultado por arquivo.
-4. Consulte **Notas e arquivos**, **Itens e impostos** ou **PIS/COFINS retidos**. Os meses anteriores permanecem no arquivo. Chaves repetidas preservam o primeiro XML, mesmo que o arquivo enviado tenha conteúdo diferente.
+4. Consulte **Notas emitidas**, **Itens e impostos** ou **PIS/COFINS retidos**. Os dados dos meses anteriores permanecem no banco. Chaves repetidas preservam os dados da primeira importação, mesmo que o XML reenviado tenha conteúdo diferente.
 
 O período do leitor filtra a **emissão da nota**. A consulta de manifestações continua filtrando a data do evento. A busca localiza número, chave e destinatário; nos itens também pesquisa o conteúdo fiscal e o produto. Os resultados têm 100 linhas por página. O Excel reúne Notas, Itens e Retencoes com os mesmos filtros e todas as páginas. O CSV exporta o relatório selecionado. Cada relatório tem limite de 100 mil linhas na exportação.
 
-Na tela **Consulta**, uma nota com XML importado mostra **Baixar XML** e **Ver itens**. Na aba Emissão, cada nota oferece XML, Itens e Manifestações. Notas sem evento de manifestação também podem ser arquivadas. O download entrega os bytes originais do documento.
+Na tela **Consulta**, uma nota importada permite **Ver itens**. Na aba Emissão, cada nota oferece Itens e Manifestações. Notas sem evento de manifestação também podem ser importadas. O app não oferece download do XML original; use o Synchro.
 
-Não há chamadas à SEFAZ na importação, leitura ou download; o certificado não é necessário. A importação não altera NSU, cooldown, agendamento ou manifestações.
+Não há chamadas à SEFAZ na importação, leitura ou exportação de relatórios; o certificado não é necessário. A importação não altera NSU, cooldown, agendamento ou manifestações.
 
 Limites: 100 MiB de arquivos por envio, 250 MiB descompactados no lote, 5.000 entradas por ZIP/documentos no lote e 8 MiB por XML. ZIPs podem ter subpastas, mas não devem ser protegidos por senha. Arquivos que não sejam XML, eventos sem cancelamento homologado, resumos e documentos de outro emitente são recusados com registro. Se houver ZIP estruturalmente inválido ou excesso de limite do lote, nenhuma nova nota daquele envio é gravada; divida ou corrija o lote. Erros em XMLs individuais permitem importar os demais arquivos válidos.
 
 São aceitas NF-e modelo 55 completas, com ou sem envelope nfeProc, emitidas pelo CNPJ configurado no aplicativo. O leitor verifica a estrutura mínima e a correspondência da chave/emitente/número/série; não valida assinatura digital, schema fiscal completo nem autorização atual. Use o XML original autorizado obtido no sistema emissor.
 
-Os XMLs e relatórios ficam no banco fiscal configurado; bancos SQLCipher protegem os novos dados com a mesma senha. O banco cresce conforme as importações: inclua-o nos backups e mantenha espaço livre. O arquivo recebido é usado temporariamente durante a importação e removido ao terminar.
+Os dados extraídos para consulta e relatórios ficam no banco fiscal configurado; bancos SQLCipher protegem os novos dados com a mesma senha. O banco cresce conforme as importações: inclua-o nos backups e mantenha espaço livre. O arquivo recebido é usado temporariamente durante a importação e removido ao terminar.
 
 ## Status
 
@@ -91,7 +91,7 @@ Nas abas Consulta e Emissão, abra o indicador **CT-e vinculado** para ver os co
 
 As informações chegam pela sincronização habitual. Depois de atualizar e reiniciar o aplicativo, aguarde a próxima sincronização permitida. Eventos ignorados por versões anteriores não são recuperados automaticamente. **Não localizado** indica ausência de vínculo no banco local, não ausência definitiva de CT-e na SEFAZ.
 
-O Admin aceita XMLs completos de NF-e e XMLs de cancelamento homologado, individualmente ou no ZIP. O evento pode chegar antes da nota. Cancelamentos são ligados pela chave de acesso, preservam o XML original e aparecem na coluna **Situação** da Consulta, Emissão, itens, retenções e novos relatórios Excel/CSV, inclusive na consulta por TXT. Reenviar a nota não remove o cancelamento. Um pedido sem retorno, rejeitado, não vinculado ou de homologação não altera a situação. Cancelamentos já recebidos via NSU usam a mesma informação.
+O Admin aceita XMLs completos de NF-e e XMLs de cancelamento homologado, individualmente ou no ZIP. O evento pode chegar antes da nota. Cancelamentos são ligados pela chave de acesso, preservam os dados do evento e aparecem na coluna **Situação** da Consulta, Emissão, itens, retenções e novos relatórios Excel/CSV, inclusive na consulta por TXT. Reenviar a nota não remove o cancelamento. Um pedido sem retorno, rejeitado, não vinculado ou de homologação não altera a situação. Cancelamentos já recebidos via NSU usam a mesma informação.
 
 A situação mostra **Autorizada** ou **Cancelada**, conforme os registros do banco local. Um cancelamento registrado tem prioridade. Se o arquivo contém apenas a nota autorizada e não traz o cancelamento, importe também o XML do evento. Em buscas por chave ou número, a Consulta mostra o cancelamento mesmo sem manifestações. A importação não altera o NSU nem faz chamadas à SEFAZ. A classificação não consulta a autorização atual na SEFAZ. Relatórios já gerados são cópias do momento da geração; gere outro para refletir novas importações.
 
@@ -101,7 +101,7 @@ Em **Consulta** e **Emissão**, o filtro **Situação** oferece **Todas**, **Aut
 
 Em **Admin → Alterar situação de notas**, informe números ou chaves de acesso, uma por linha, e o motivo. **Marcar como cancelada** atualiza a situação local na Consulta, Emissão e nos novos relatórios. São aceitas até 100 notas existentes no banco da empresa; números ambíguos exigem a chave. Se qualquer nota for inválida ou não encontrada, nenhuma nota do pedido é alterada.
 
-**Remover marcação manual** desfaz somente a correção interna. Um cancelamento recebido pelo NSU ou XML continua válido. Reimportações preservam a marcação manual. O histórico no banco registra usuário, motivo, ação e data; os XMLs originais e eventos da SEFAZ são preservados. Essa função não transmite um evento à SEFAZ. Arquivos já gerados permanecem com a situação existente na geração; gere um novo relatório após a alteração.
+**Remover marcação manual** desfaz somente a correção interna. Um cancelamento recebido pelo NSU ou XML continua válido. Reimportações preservam a marcação manual. O histórico no banco registra usuário, motivo, ação e data; os dados dos eventos da SEFAZ são preservados. Essa função não transmite um evento à SEFAZ. Arquivos já gerados permanecem com a situação existente na geração; gere um novo relatório após a alteração.
 
 ### Filtro e tela de itens
 
@@ -180,3 +180,30 @@ INICIAR_WEB.cmd
 Para manter a recuperação pausada, use `NFE_RECOVERY_ENABLED=0`. As pendências não
 são apagadas ao alternar essa configuração. Antes do teste noturno, confirme que
 o Qive aplicou a janela combinada; atualizar o código não confirma o ajuste deles.
+
+
+### Armazenamento de dados sem cópias permanentes dos XMLs
+
+Novas importações preservam cabeçalhos, itens, impostos, retenções, cancelamentos
+homologados e os demais dados extraídos usados pelas consultas e relatórios.
+Documentos distribuídos pela SEFAZ deixam registros de NSU, schema e classificação,
+as manifestações e os vínculos com CT-e. O XML original não fica guardado depois
+de o processamento terminar; consulte-o no Synchro.
+
+Uma resposta SEFAZ recebida permanece temporariamente no banco até os dados e o
+controle de processamento serem gravados na mesma transação. Se a gravação falhar,
+a resposta permanece pendente para nova tentativa. Respostas consNSU já tratadas
+são limpas ao confirmar o recebimento, a indisponibilidade ou a rejeição 656.
+
+A opção de baixar XML e sua rota foram retiradas. A aba Downloads continua com
+Excel, CSV e registros dos lotes; cópias antigas de XML não são disponibilizadas.
+
+Esta mudança não apaga retroativamente os XMLs existentes, não altera o cursor,
+não remove pendências e não compacta o banco. Os 161 MB atuais podem permanecer;
+o benefício imediato é evitar o crescimento por novas cópias de XML. Uma limpeza
+do histórico existente exige uma manutenção separada. Colunas legadas de XML
+continuam no schema por compatibilidade, sem conteúdo em novos documentos.
+
+Dados já extraídos podem gerar novos relatórios. Para extrair futuramente um campo
+que não foi armazenado, será necessário obter novamente o XML na origem; o app
+não terá uma cópia permanente para reprocessamento.

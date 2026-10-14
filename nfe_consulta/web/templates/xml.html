@@ -6,7 +6,7 @@
 <section class="page-heading">
   <div><h1>{{ 'ITENS | NF ' ~ (detail['Numero Nota']|int) if detail else 'Emissão' }}</h1></div>
   {% if detail %}<a class="button secondary" href="{{ back_url }}" data-items-back>← Voltar</a>{% endif %}
-  {% if not detail %}<span class="status-dot ok">{{ result.notas }} nota{{ '' if result.notas == 1 else 's' }} arquivada{{ '' if result.notas == 1 else 's' }}</span>{% endif %}
+  {% if not detail %}<span class="status-dot ok">{{ result.notas }} nota{{ '' if result.notas == 1 else 's' }} importada{{ '' if result.notas == 1 else 's' }}</span>{% endif %}
 </section>
 {% if detail %}<section class="card item-detail-card">
   <div class="meta-row"><span>Destinatário</span><strong>{{ detail['Destinatario Razao'] }}</strong></div>
@@ -20,7 +20,7 @@
     {% if detail %}<input type="hidden" name="voltar" value="{{ back_url }}">{% endif %}
     <div class="filters-grid{% if detail %} item-detail-filter{% endif %}">
       {% if not detail %}<label class="field"><span>Relatório</span><select name="tipo">
-        <option value="notas" {% if tipo == 'notas' %}selected{% endif %}>Notas e arquivos</option>
+        <option value="notas" {% if tipo == 'notas' %}selected{% endif %}>Notas emitidas</option>
         <option value="itens" {% if tipo == 'itens' %}selected{% endif %}>Itens e impostos</option>
         <option value="retencoes" {% if tipo == 'retencoes' %}selected{% endif %}>PIS/COFINS retidos</option>
       </select></label>
@@ -62,9 +62,6 @@
     {% for row in result.rows %}<tr>
       {% if tipo == 'notas' %}
       <td><div class="xml-row-actions">
-        {% if user.can_export %}<a class="xml-icon-action" data-download-link href="{{ url_for('xml_download', chave=row['Chave Acesso']) }}" title="Baixar XML" aria-label="Baixar XML da nota {{ row['Numero Nota'] }}">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9zM14 3v6h6M9 12l-2 3 2 3M15 12l2 3-2 3"/></svg>
-        </a>{% endif %}
         <a class="xml-icon-action" data-items-open href="{{ url_for('xml_items', chave=row['Chave Acesso']).include_query_params(voltar=request.url.path ~ ('?' ~ request.url.query if request.url.query else '')) }}" title="Itens" aria-label="Ver itens da nota {{ row['Numero Nota'] }}">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/></svg>
         </a>
@@ -86,6 +83,6 @@
     <span>Página {{ result.page }} de {{ result.pages }}</span>
     {% if result.page < result.pages %}<a href="{{ request.url.include_query_params(pagina=result.page + 1) }}">Próxima</a>{% endif %}
   </nav>{% endif %}
-  {% else %}<p class="muted">{{ 'Nenhum item corresponde ao filtro.' if detail else 'Nenhum XML corresponde aos filtros. Importe os arquivos em Admin ou ajuste a busca.' }}</p>{% endif %}
+  {% else %}<p class="muted">{{ 'Nenhum item corresponde ao filtro.' if detail else 'Nenhuma nota corresponde aos filtros. Importe os arquivos em Admin ou ajuste a busca.' }}</p>{% endif %}
 </section>
 {% endblock %}

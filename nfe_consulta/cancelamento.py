@@ -111,7 +111,7 @@ def read_cancellation(root, cnpj):
 
 def save_cancellation(conn, cnpj, item, data):
     cursor = conn.execute('INSERT OR IGNORE INTO xml_cancelamentos(cnpj,chave,protocolo,data_evento,codigo_status,xml) VALUES (?,?,?,?,?,?)',
-        (cnpj, item['chave'], item['protocolo'], item['data_evento'], item['codigo_status'], data))
+        (cnpj, item['chave'], item['protocolo'], item['data_evento'], item['codigo_status'], b''))
     conn.execute('''INSERT INTO informacoes_nfe(cnpj,chave,cancelada) VALUES (?,?,1)
         ON CONFLICT(cnpj,chave) DO UPDATE SET cancelada=1''', (cnpj, item['chave']))
     return cursor.rowcount > 0

@@ -56,9 +56,9 @@ As respostas de distribuição são preservadas na tabela `respostas_distribuica
 
 ## Lotes mensais de XML
 
-Abra **Admin → Importar XML** e envie o ZIP baixado do Synchro ou vários XMLs completos. Os documentos ficam arquivados no banco fiscal, preservando os meses anteriores e ignorando chaves repetidas. Consulte por emissão, número, chave ou destinatário; abra itens e retenções e exporte Excel/CSV. Na Consulta, **Baixar XML** aparece quando a chave tem arquivo importado.
+Abra **Admin → Importar XML** e envie o ZIP baixado do Synchro ou vários XMLs completos. O app guarda os dados extraídos para consultas e relatórios, preservando o histórico e ignorando chaves repetidas, sem armazenar novos XMLs permanentemente. Consulte por emissão, número, chave ou destinatário; abra itens e retenções e exporte Excel/CSV. Na Consulta, notas importadas permitem abrir os itens. Obtenha os XMLs originais no Synchro.
 
-O leitor foi integrado a partir de [Leitor_XML_Saida](https://github.com/MagroNego/Leitor_XML_Saida). Aceita NF-e modelo 55 emitidas pelo CNPJ do aplicativo. A importação é local, sem certificado e sem chamadas à SEFAZ. Faça backup do banco fiscal para preservar também os XMLs; SQLCipher protege os novos dados quando habilitado. Veja limites e detalhes no [manual de uso](MANUAL_DE_USO.md).
+O leitor foi integrado a partir de [Leitor_XML_Saida](https://github.com/MagroNego/Leitor_XML_Saida). Aceita NF-e modelo 55 emitidas pelo CNPJ do aplicativo. A importação é local, sem certificado e sem chamadas à SEFAZ. Faça backup do banco fiscal para preservar os dados extraídos; SQLCipher protege os novos dados quando habilitado. Veja limites e detalhes no [manual de uso](MANUAL_DE_USO.md).
 
 ## Administração e segurança
 
@@ -107,7 +107,7 @@ O empacotador inclui apenas código, recursos estáticos, lançadores e document
 
 ### Downloads recentes
 
-A aba **Downloads** guarda cópias dos relatórios Excel/CSV e dos XMLs baixados por **24 horas após a geração**. Cada arquivo mostra a quantidade de documentos processados, o período do relatório, a geração e a expiração em horário de Brasília. Baixar novamente não renova o prazo. As cópias ficam em `dados/downloads`, fora do banco fiscal, e são removidas automaticamente. A quantidade representa notas distintas nos relatórios; os registros de importação ficam disponíveis apenas no Admin. O período usa o filtro informado ou as datas de emissão dos XMLs / eventos das manifestações; sem datas, aparece “Não informado”.
+A aba **Downloads** guarda cópias dos relatórios Excel/CSV por **24 horas após a geração**. Cada arquivo mostra a quantidade de documentos processados, o período do relatório, a geração e a expiração em horário de Brasília. Baixar novamente não renova o prazo. As cópias ficam em `dados/downloads`, fora do banco fiscal, e são removidas automaticamente. A quantidade representa notas distintas nos relatórios; os registros de importação ficam disponíveis apenas no Admin. O período usa o filtro informado ou as datas de emissão dos XMLs / eventos das manifestações; sem datas, aparece “Não informado”.
 
 ### CT-e vinculado à NF-e
 

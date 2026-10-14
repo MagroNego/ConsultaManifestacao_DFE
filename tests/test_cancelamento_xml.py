@@ -52,7 +52,12 @@ def test_cancellation_order_idempotence_and_no_reactivation(tmp_path, event_firs
     assert batch(cfg, tmp_path, payloads)['duplicadas'] == 2
     report = xml_store.query_report(cfg.database_path, CNPJ_PADRAO)
     assert report['rows'][0]['Situação'] == 'Cancelada'
-    assert xml_store.download_xml(cfg.database_path, CNPJ_PADRAO, KEY) == helpers['xml']()
+    assert helpers['stored_xml'](cfg.database_path, KEY) == b''
+    conn = abrir_banco(cfg.database_path, somente_leitura=True)
+    try:
+        assert conn.execute('SELECT xml FROM xml_cancelamentos').fetchone()[0] == b''
+    finally:
+        conn.close()
     banco = BancoManifestacoes(str(cfg.database_path))
     banco.salvar_retorno(CNPJ_PADRAO, RetornoDistribuicao(138, 'ok', '2', '2', (),
         informacoes_notas=(InformacaoNota(KEY, 'Emitente', False),)))

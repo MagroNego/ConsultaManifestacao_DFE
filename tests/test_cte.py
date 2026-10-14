@@ -165,7 +165,7 @@ def test_xml_empty_installation_keeps_empty_state(tmp_path):
     with TestClient(create_app(cfg)) as client:
         response = client.get('/xml')
         assert response.status_code == 200
-        assert 'Nenhum XML corresponde aos filtros' in response.text
+        assert 'Nenhuma nota corresponde aos filtros' in response.text
         assert 'Não foi possível abrir' not in response.text
 
 

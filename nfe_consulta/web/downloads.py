@@ -18,6 +18,11 @@ RETENTION_SECONDS = 24 * 60 * 60
 BRASILIA = timezone(timedelta(hours=-3))
 
 
+def _is_xml(filename, media_type):
+    return (filename.lower().endswith('.xml')
+            or media_type.split(';', 1)[0].strip().lower() in {'application/xml', 'text/xml'})
+
+
 def period_label(dates=(), *, start=None, end=None) -> str:
     parsed = []
     for value in dates:
@@ -76,6 +81,8 @@ class DownloadArchive:
 
     def save(self, source: Path | bytes, *, filename: str, media_type: str,
              documents: int, period: str, admin_only=False):
+        if _is_xml(filename, media_type):
+            raise ValueError('XMLs originais não são arquivados pelo aplicativo.')
         self.directory.mkdir(parents=True, exist_ok=True)
         if os.name != 'nt':
             self.directory.chmod(0o700)
@@ -121,6 +128,8 @@ class DownloadArchive:
     def get(self, identifier, *, admin=False):
         item = self._read(identifier)
         if not item or item['expires_at'] <= time.time() or (item.get('admin_only') and not admin):
+            return None
+        if _is_xml(item['filename'], item['media_type']):
             return None
         if not (self.directory / f'{identifier}.bin').is_file():
             return None

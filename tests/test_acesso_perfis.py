@@ -70,7 +70,7 @@ def test_login_admin_importa_e_logout_revoga_sessao(tmp_path):
         assert client.post('/admin/logout', data={'csrf': token}, follow_redirects=False).status_code == 303
         client.cookies.set(cfg.admin_cookie_name, cookie)
         assert client.get('/atualizar', follow_redirects=False).status_code == 303
-        assert client.get('/xml/arquivo/' + helpers['CHAVE']).status_code == 200
+        assert client.get('/xml/arquivo/' + helpers['CHAVE']).status_code == 404
         assert client.post('/xml/importar', data={'csrf': token}, files={'files': ('a.xml', helpers['xml']())}).status_code == 401
 
 

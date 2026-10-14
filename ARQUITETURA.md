@@ -10,7 +10,7 @@
 | `relatorio_eventos.py` e `xlsx_writer.py` | Relatórios Excel |
 | `web/scheduler.py` | Janelas das 08:00 e 15:00, recuperação e estado persistente |
 | `web/sync_runtime.py`, `sincronizacao.py` e `distribuicao.py` | Configuração e distribuição por NSU |
-| `xml_reader.py`, `web/xml_store.py`, `web/xml_routes.py` e `web/xml_upload_limit.py` | Leitura fiscal, arquivo cumulativo, rotas e limite do corpo de upload |
+| `xml_reader.py`, `web/xml_store.py`, `web/xml_routes.py` e `web/xml_upload_limit.py` | Leitura fiscal, dados extraídos cumulativos, rotas e limite do corpo de upload |
 | `banco.py` e `seguranca_banco.py` | Persistência SQLite/SQLCipher e transações |
 | `web/email_alerts.py` | Destinatários, configuração SMTP e processamento da fila |
 | `web/audit.py` e `web/sync_history.py` | Auditoria e histórico operacional |
@@ -44,3 +44,13 @@ A fila SMTP persiste por evento/destinatário. A confirmação do servidor de e-
 A suíte automatizada cobre banco, consultas, filtros, exportações, sessões, CSRF, uploads, alertas, bloqueio SEFAZ e agendamento. Os testes não usam certificado de produção nem servidores externos. O fluxo de publicação executa a suíte em Windows e Linux antes de criar a release e anexar o ZIP e seu checksum SHA-256.
 
 `cancelamento.py` centraliza a leitura de retornos homologados e a consulta da situação. `xml_cancelamentos` conserva protocolo, data e XML do cancelamento; `informacoes_nfe.cancelada` é a fonte compartilhada por Emissão, Consulta e relatórios. A importação não altera cursores NSU nem cria manifestações. Bancos antigos sem essas tabelas continuam consultáveis; a criação é feita na importação. Importação idempotente e recebimento de uma nota original nunca reduzem uma situação cancelada para não cancelada.
+
+
+Os XMLs novos são usados como entrada de processamento e não como arquivo
+permanente. As tabelas de notas/itens, manifestações, cancelamentos e vínculos
+CT-e conservam os dados estruturados usados nos relatórios. `documentos_nsu`
+conserva o recebimento de cada NSU por schema/classificação. Colunas legadas
+`xml` recebem BLOB vazio nos novos documentos, sem reescrita dos XMLs antigos.
+Respostas `distNSU`/`consNSU` são preservadas temporariamente até concluir o
+processamento; a limpeza e a confirmação dos dados ocorrem na mesma transação.
+A recuperação continua usando os registros de NSU, independentemente do BLOB.
