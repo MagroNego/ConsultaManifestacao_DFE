@@ -269,7 +269,7 @@ def _certificado_web(settings: WebSettings) -> dict:
 def create_app(settings: WebSettings | None = None) -> FastAPI:
     settings = settings or get_settings()
     app = FastAPI(
-        title="NexusDFE",
+        title="AtlasDFE",
         version=__version__,
         root_path=settings.root_path,
         docs_url=None if settings.production else "/docs",

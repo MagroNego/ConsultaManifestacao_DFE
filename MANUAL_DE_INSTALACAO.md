@@ -1,4 +1,4 @@
-# Manual de instalação — v2.4.0
+# Manual de instalação — v2.5.0
 
 ## Requisitos
 
@@ -10,7 +10,7 @@
 
 ## Windows
 
-Extraia `ConsultaManifestacao_DFE-v2.4.0.zip`, por exemplo em `C:\ConsultaManifestacao`.
+Extraia `ConsultaManifestacao_DFE-v2.5.0.zip`, por exemplo em `C:\ConsultaManifestacao`.
 
 ```powershell
 .\INSTALAR.cmd
@@ -66,7 +66,7 @@ Configure o certificado por arquivo PFX/P12 em **Admin**. O Windows Certificate 
 4. Preserve `dados`, `secrets`, `logs`, arquivos de entrada/saída e o certificado. Preserve também `.venv`; as dependências serão atualizadas pelo instalador.
 5. Remova o antigo `TESTAR_SYNC_30-09_09H.cmd` e qualquer variável `NFE_AUTO_SYNC_ONCE_DATE` do processo de inicialização.
 6. Execute `INSTALAR.cmd` no Windows ou `.venv/bin/python -m pip install -e .` no Linux.
-7. Reinicie, confirme a versão **2.4.0** e compare `ultNSU`, `maxNSU` e última gravação em **Status** com os dados anteriores.
+7. Reinicie, confirme o nome **AtlasDFE** no cabeçalho e compare `ultNSU`, `maxNSU` e última gravação em **Status** com os dados anteriores.
 
 As tabelas adicionais são criadas pelo aplicativo sem apagar o histórico existente. Não avance nem zere o cursor NSU manualmente durante a atualização.
 

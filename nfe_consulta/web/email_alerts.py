@@ -95,7 +95,7 @@ def _enviar(settings, destinatario: str, chave: str, data: str, protocolo: str) 
     mensagem.set_content(
         "Foi recebido um novo evento de Operação não Realizada (210240).\n\n"
         f"Chave NF-e: {chave}\nData do evento: {data}\nProtocolo: {protocolo}\n\n"
-        "Confira o registro na NexusDFE."
+        "Confira o registro no AtlasDFE."
     )
     if settings.smtp_security == "ssl":
         conexao = smtplib.SMTP_SSL(

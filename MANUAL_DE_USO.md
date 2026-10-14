@@ -1,4 +1,4 @@
-# Manual de uso — v2.4.0
+# Manual de uso — v2.5.0
 
 ## Acesso
 

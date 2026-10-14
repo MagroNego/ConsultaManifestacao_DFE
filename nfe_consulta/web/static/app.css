@@ -1390,8 +1390,8 @@ html[data-theme="dark"] .brand-logo-dark {
   font-size: inherit;
 }
 
-/* Identidade NexusDFE: alterna com as mesmas regras do tema. */
-.nexus-logo {
+/* Identidade AtlasDFE: alterna com as mesmas regras do tema. */
+.atlas-logo {
   width: 190px;
   max-width: 100%;
   max-height: 56px;

@@ -1,4 +1,4 @@
-# Implantação Web — v2.4.0
+# Implantação Web — v2.5.0
 
 ## Processo e rede
 

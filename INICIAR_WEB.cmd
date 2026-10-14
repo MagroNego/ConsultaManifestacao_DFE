@@ -1,5 +1,6 @@
 @echo off
 setlocal EnableExtensions
+title AtlasDFE
 cd /d "%~dp0"
 
 if not defined NFE_AUTO_SYNC_ENABLED set "NFE_AUTO_SYNC_ENABLED=1"

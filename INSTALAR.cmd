@@ -3,7 +3,7 @@ setlocal EnableExtensions
 cd /d "%~dp0"
 
 echo ============================================
-echo Consulta de Manifestacao - Web
+echo AtlasDFE - Web
 echo ============================================
 echo.
 

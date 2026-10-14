@@ -1,8 +1,8 @@
-# NexusDFE
+# AtlasDFE
 
-**NexusDFE** é uma aplicação Web para consultar manifestações de NF-e, exportar relatórios Excel e sincronizar o histórico com o serviço **NFeDistribuicaoDFe** do Ambiente Nacional da NF-e.
+**AtlasDFE** é uma aplicação Web para consultar manifestações de NF-e, exportar relatórios Excel e sincronizar o histórico com o serviço **NFeDistribuicaoDFe** do Ambiente Nacional da NF-e.
 
-**Versão 2.4.0** · Python 3.11+ · Windows e Linux
+**Versão 2.5.0** · Python 3.11+ · Windows e Linux
 
 ## Funcionalidades
 
@@ -22,7 +22,7 @@ Consulta, Status e exportações usam o banco local e não fazem chamadas à SEF
 
 ## Instalação no Windows
 
-Baixe `ConsultaManifestacao_DFE-v2.4.0.zip` em [Releases](https://github.com/MagroNego/ConsultaManifestacao_DFE/releases), extraia em uma pasta definitiva e execute, nesta ordem:
+Baixe `ConsultaManifestacao_DFE-v2.5.0.zip` em [Releases](https://github.com/MagroNego/ConsultaManifestacao_DFE/releases), extraia em uma pasta definitiva e execute, nesta ordem:
 
 ```powershell
 .\INSTALAR.cmd
@@ -123,4 +123,4 @@ A aba **Emissão** reúne notas, itens e retenções. Importar um cancelamento h
 
 Quando existem NSUs pendentes, a execução prioriza somente a recuperação por `consNSU`, do mais antigo ao mais recente. A consulta de documentos novos por `distNSU` é adiada para outra execução, evitando que uma divergência nesse fluxo impeça a recuperação. São feitas até 20 consultas por execução, descontando `consNSU` e consultas por chave já reservadas na última hora neste banco. Este controle não conhece consultas de outras aplicações ou outros bancos. Uma rejeição 656 interrompe a execução e mantém a pausa de uma hora. O cooldown é prorrogado após o término da execução, para não contar apenas a partir do início. O histórico identifica execuções dedicadas à recuperação; elas não comprovam atualização de documentos novos.
 
-O log local registra `sefaz_sync_diagnostico` com um identificador da execução, PID, máquina, caminhos do banco/código, NSUs iniciais, cada lote gravado e resultado. Senhas e XMLs fiscais não entram nesse diagnóstico. O registro ajuda a comparar cópias e processos do NexusDFE; não identifica aplicações externas que consultem o mesmo CNPJ.
+O log local registra `sefaz_sync_diagnostico` com um identificador da execução, PID, máquina, caminhos do banco/código, NSUs iniciais, cada lote gravado e resultado. Senhas e XMLs fiscais não entram nesse diagnóstico. O registro ajuda a comparar cópias e processos do AtlasDFE; não identifica aplicações externas que consultem o mesmo CNPJ.

@@ -1,18 +1,15 @@
-# Consulta de Manifestação NF-e v2.4.0
+# AtlasDFE v2.5.0
 
-- Login obrigatório para consultas, Status, leitor XML, exportações e downloads, inclusive por URL direta.
-- Perfis Consulta (visualização), Fiscal (visualização, XML e exportações) e Administrador (acesso completo).
-- Gerenciamento de contas/perfis em Atualizar → Gerenciar acessos, com Consulta como padrão para novas contas.
-- Alterações de senha, perfil e estado da conta encerram suas sessões; último administrador ativo protegido.
-- Administradores e senhas existentes preservados na migração, sem recriar contas a partir de secrets. Sessões antigas são revogadas na primeira atualização.
-- Auditoria identifica usuários e perfis sem conteúdo fiscal dos XMLs ou senhas.
+- Nome AtlasDFE com logos próprios para os temas claro e escuro.
+- Novos XMLs são processados para extrair dados, sem cópia permanente; os relatórios, itens, impostos, manifestações, cancelamentos e vínculos CT-e continuam disponíveis.
+- Download de XML removido; Excel, CSV e registros de lote continuam disponíveis. Obtenha o XML original no Synchro.
+- Respostas da SEFAZ ficam temporariamente preservadas até o processamento confirmar; falhas de gravação mantêm a resposta para nova tentativa.
+- XMLs históricos não são apagados automaticamente, nem o banco é compactado nesta atualização.
+- Janela noturna das 22h às 04h de Brasília, disparos às 22h e 01h e recuperação consNSU pausada para o teste, com pendências preservadas.
+- Logs recolhidos, diagnóstico de erros e preservação do último NSU gravado com sucesso após 656.
 
 ## Atualização
 
-Pare o servidor. Faça backup do banco fiscal, dados/admin_accounts.db e secrets em local protegido. Substitua apenas código/lançadores, execute INSTALAR.cmd e reinicie com INICIAR_WEB.cmd. Preserve dados, secrets, banco, logs e certificado.
+Pare o aplicativo, faça backup do banco e preserve dados, secrets, logs e certificado. Atualize o código, execute INSTALAR.cmd se estiver usando o pacote e reinicie com INICIAR_WEB.cmd. As contas, senhas e caminhos configurados continuam válidos.
 
-Faça login novamente com o administrador existente. Cadastre as contas pessoais em Atualizar → Gerenciar acessos e escolha os perfis. Não substitua nem exclua o banco de contas existente.
-
-As permissões no app não configuram HTTPS, firewall ou proteção dos backups: mantenha o reverse proxy HTTPS e as permissões das pastas operacionais descritos em SERVIDOR_WEB.md.
-
-O pacote é publicado após os testes de Linux e Windows passarem.
+O teste noturno depende da confirmação da janela das 08h às 18h no Qive. Separar horários não garante aceitação de cursores independentes pela SEFAZ.

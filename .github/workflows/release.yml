@@ -57,5 +57,5 @@ jobs:
           gh release create "v$RELEASE_VERSION" \
             "dist/$PACKAGE" "dist/$PACKAGE.sha256" \
             --target "$GITHUB_SHA" \
-            --title "Consulta de Manifestação NF-e v$RELEASE_VERSION" \
+            --title "AtlasDFE v$RELEASE_VERSION" \
             --notes-file RELEASE_NOTES.md

@@ -1,1 +1,1 @@
-"""Interface web corporativa da NexusDFE."""
+"""Interface web corporativa da AtlasDFE."""
