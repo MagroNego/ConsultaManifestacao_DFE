@@ -1,7 +1,7 @@
 @echo off
 setlocal EnableExtensions
 cd /d "%~dp0"
-title Consulta de Manifestacao - Rede local
+title AtlasDFE - Rede local
 
 if not exist "%~dp0INICIAR_WEB.cmd" (
     echo Coloque este BAT na mesma pasta de INICIAR_WEB.cmd.

@@ -1,8 +1,8 @@
-# NexusDFE
+# AtlasDFE
 
-**NexusDFE** é uma aplicação Web para consultar manifestações de NF-e, exportar relatórios Excel e sincronizar o histórico com o serviço **NFeDistribuicaoDFe** do Ambiente Nacional da NF-e.
+**AtlasDFE** é uma aplicação Web para consultar manifestações de NF-e, exportar relatórios Excel e sincronizar o histórico com o serviço **NFeDistribuicaoDFe** do Ambiente Nacional da NF-e.
 
-**Versão 2.4.0** · Python 3.11+ · Windows e Linux
+**Versão 2.5.0** · Python 3.11+ · Windows e Linux
 
 ## Funcionalidades
 
@@ -22,7 +22,7 @@ Consulta, Status e exportações usam o banco local e não fazem chamadas à SEF
 
 ## Instalação no Windows
 
-Baixe `ConsultaManifestacao_DFE-v2.4.0.zip` em [Releases](https://github.com/MagroNego/ConsultaManifestacao_DFE/releases), extraia em uma pasta definitiva e execute, nesta ordem:
+Baixe `ConsultaManifestacao_DFE-v2.5.0.zip` em [Releases](https://github.com/MagroNego/ConsultaManifestacao_DFE/releases), extraia em uma pasta definitiva e execute, nesta ordem:
 
 ```powershell
 .\INSTALAR.cmd
@@ -56,9 +56,9 @@ As respostas de distribuição são preservadas na tabela `respostas_distribuica
 
 ## Lotes mensais de XML
 
-Abra **Admin → Importar XML** e envie o ZIP baixado do Synchro ou vários XMLs completos. Os documentos ficam arquivados no banco fiscal, preservando os meses anteriores e ignorando chaves repetidas. Consulte por emissão, número, chave ou destinatário; abra itens e retenções e exporte Excel/CSV. Na Consulta, **Baixar XML** aparece quando a chave tem arquivo importado.
+Abra **Admin → Importar XML** e envie o ZIP baixado do Synchro ou vários XMLs completos. O app guarda os dados extraídos para consultas e relatórios, preservando o histórico e ignorando chaves repetidas, sem armazenar novos XMLs permanentemente. Consulte por emissão, número, chave ou destinatário; abra itens e retenções e exporte Excel/CSV. Na Consulta, notas importadas permitem abrir os itens. Obtenha os XMLs originais no Synchro.
 
-O leitor foi integrado a partir de [Leitor_XML_Saida](https://github.com/MagroNego/Leitor_XML_Saida). Aceita NF-e modelo 55 emitidas pelo CNPJ do aplicativo. A importação é local, sem certificado e sem chamadas à SEFAZ. Faça backup do banco fiscal para preservar também os XMLs; SQLCipher protege os novos dados quando habilitado. Veja limites e detalhes no [manual de uso](MANUAL_DE_USO.md).
+O leitor foi integrado a partir de [Leitor_XML_Saida](https://github.com/MagroNego/Leitor_XML_Saida). Aceita NF-e modelo 55 emitidas pelo CNPJ do aplicativo. A importação é local, sem certificado e sem chamadas à SEFAZ. Faça backup do banco fiscal para preservar os dados extraídos; SQLCipher protege os novos dados quando habilitado. Veja limites e detalhes no [manual de uso](MANUAL_DE_USO.md).
 
 ## Administração e segurança
 
@@ -107,7 +107,7 @@ O empacotador inclui apenas código, recursos estáticos, lançadores e document
 
 ### Downloads recentes
 
-A aba **Downloads** guarda cópias dos relatórios Excel/CSV e dos XMLs baixados por **24 horas após a geração**. Cada arquivo mostra a quantidade de documentos processados, o período do relatório, a geração e a expiração em horário de Brasília. Baixar novamente não renova o prazo. As cópias ficam em `dados/downloads`, fora do banco fiscal, e são removidas automaticamente. A quantidade representa notas distintas nos relatórios; os registros de importação ficam disponíveis apenas no Admin. O período usa o filtro informado ou as datas de emissão dos XMLs / eventos das manifestações; sem datas, aparece “Não informado”.
+A aba **Downloads** guarda cópias dos relatórios Excel/CSV por **24 horas após a geração**. Cada arquivo mostra a quantidade de documentos processados, o período do relatório, a geração e a expiração em horário de Brasília. Baixar novamente não renova o prazo. As cópias ficam em `dados/downloads`, fora do banco fiscal, e são removidas automaticamente. A quantidade representa notas distintas nos relatórios; os registros de importação ficam disponíveis apenas no Admin. O período usa o filtro informado ou as datas de emissão dos XMLs / eventos das manifestações; sem datas, aparece “Não informado”.
 
 ### CT-e vinculado à NF-e
 
@@ -123,4 +123,4 @@ A aba **Emissão** reúne notas, itens e retenções. Importar um cancelamento h
 
 Quando existem NSUs pendentes, a execução prioriza somente a recuperação por `consNSU`, do mais antigo ao mais recente. A consulta de documentos novos por `distNSU` é adiada para outra execução, evitando que uma divergência nesse fluxo impeça a recuperação. São feitas até 20 consultas por execução, descontando `consNSU` e consultas por chave já reservadas na última hora neste banco. Este controle não conhece consultas de outras aplicações ou outros bancos. Uma rejeição 656 interrompe a execução e mantém a pausa de uma hora. O cooldown é prorrogado após o término da execução, para não contar apenas a partir do início. O histórico identifica execuções dedicadas à recuperação; elas não comprovam atualização de documentos novos.
 
-O log local registra `sefaz_sync_diagnostico` com um identificador da execução, PID, máquina, caminhos do banco/código, NSUs iniciais, cada lote gravado e resultado. Senhas e XMLs fiscais não entram nesse diagnóstico. O registro ajuda a comparar cópias e processos do NexusDFE; não identifica aplicações externas que consultem o mesmo CNPJ.
+O log local registra `sefaz_sync_diagnostico` com um identificador da execução, PID, máquina, caminhos do banco/código, NSUs iniciais, cada lote gravado e resultado. Senhas e XMLs fiscais não entram nesse diagnóstico. O registro ajuda a comparar cópias e processos do AtlasDFE; não identifica aplicações externas que consultem o mesmo CNPJ.

@@ -310,10 +310,11 @@ class BancoManifestacoes:
     def salvar_manifestacoes(self, cnpj: str, retorno: RetornoDistribuicao) -> int:
         inseridos = 0
         with self.conexao:
+            # Conserva o recebimento do NSU, sem uma cópia permanente do XML.
             for nsu, schema, xml, classificacao in retorno.documentos:
                 self.conexao.execute(
                     "INSERT OR IGNORE INTO documentos_nsu(cnpj,nsu,schema_xml,xml,classificacao) VALUES (?,?,?,?,?)",
-                    (cnpj, nsu, schema, xml, classificacao))
+                    (cnpj, nsu, schema, b"", classificacao))
             save_events(self.conexao, cnpj, retorno.eventos_cte)
             for info in retorno.informacoes_notas:
                 self.conexao.execute(
@@ -359,10 +360,11 @@ class BancoManifestacoes:
             raise NfeErroResposta("Cursor NSU invalido ou anterior ao ja salvo; lote nao gravado")
         inseridos = 0
         with self.conexao:
+            # A resposta bruta pendente só é limpa após esta transação confirmar.
             for nsu, schema, xml, classificacao in retorno.documentos:
                 self.conexao.execute(
                     "INSERT OR IGNORE INTO documentos_nsu(cnpj,nsu,schema_xml,xml,classificacao) VALUES (?,?,?,?,?)",
-                    (cnpj, nsu, schema, xml, classificacao))
+                    (cnpj, nsu, schema, b"", classificacao))
             save_events(self.conexao, cnpj, retorno.eventos_cte)
             for info in retorno.informacoes_notas:
                 self.conexao.execute(
@@ -407,7 +409,7 @@ class BancoManifestacoes:
                 (cnpj, int(retorno.ult_nsu)),
             )
             if consulta_nsu_id is not None:
-                self.conexao.execute("UPDATE consultas_nsu SET resultado='recebido' WHERE id=?", (consulta_nsu_id,))
+                self.conexao.execute("UPDATE consultas_nsu SET resultado='recebido',resposta_xml=NULL WHERE id=?", (consulta_nsu_id,))
             if resposta_id is not None:
                 self.finalizar_resposta(resposta_id, str(retorno.status_codigo),
                     f"ultNSU={retorno.ult_nsu}; maxNSU={retorno.max_nsu}; documentos={len(retorno.documentos)}")

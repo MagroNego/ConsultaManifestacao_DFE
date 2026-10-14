@@ -24,13 +24,13 @@ def recuperar_intervalos(banco, cnpj, uf, certificado, destinatarios=(), limite=
             exc = _erro_consumo_indevido(retorno)
             banco.pausar_distribuicao(cnpj, str(exc))
             with banco.conexao:
-                banco.conexao.execute("UPDATE consultas_nsu SET resultado='repetir' WHERE id=?", (identificador,))
+                banco.conexao.execute("UPDATE consultas_nsu SET resultado='repetir',resposta_xml=NULL WHERE id=?", (identificador,))
             raise exc
         if retorno.status_codigo == 137:
             if retorno.documentos:
                 raise NfeErroResposta('Resposta 137 com documentos; intervalo permanece pendente')
             with banco.conexao:
-                banco.conexao.execute("UPDATE consultas_nsu SET resultado='indisponivel' WHERE id=?", (identificador,))
+                banco.conexao.execute("UPDATE consultas_nsu SET resultado='indisponivel',resposta_xml=NULL WHERE id=?", (identificador,))
             return
         if retorno.status_codigo != 138 or len(retorno.documentos) != 1 or retorno.documentos[0][0] != nsu:
             raise NfeErroResposta('Resposta consNSU inesperada; intervalo permanece pendente')

@@ -737,3 +737,29 @@ def test_post_fora_do_horario_registra_janela_em_vez_de_cooldown(tmp_path, monke
     assert resposta.status_code == 429
     assert bloqueio['reason'] == 'fora_janela'
     assert bloqueio['proxima_tentativa'] == '2026-10-13T22:00:00-03:00'
+
+
+
+def test_atlasdfe_usa_logos_claro_escuro_e_nome_no_cabecalho(tmp_path):
+    import struct
+    cfg = settings_web(tmp_path)
+    criar_banco(cfg.database_path)
+    app = create_app(cfg)
+    with TestClient(app) as client:
+        entrar_admin(client, cfg)
+        resposta = client.get('/')
+        for tema in ('light', 'dark'):
+            url = '/static/img/atlasdfe-'+tema+'.png'
+            assert url in resposta.text
+            logo = client.get(url)
+            assert logo.status_code == 200
+            assert logo.headers['content-type'] == 'image/png'
+            assert logo.content[:8] == b'\x89PNG\r\n\x1a\n'
+            largura, altura = struct.unpack('>II', logo.content[16:24])
+            assert largura > altura > 0
+            assert logo.content[25] == 6  # PNG RGBA, com transparência.
+        assert '<title>' in resposta.text and 'AtlasDFE' in resposta.text
+        assert 'NexusDFE' not in resposta.text
+        assert 'atlas-logo brand-logo-light' in resposta.text
+        assert 'atlas-logo brand-logo-dark' in resposta.text
+    assert app.title == 'AtlasDFE'

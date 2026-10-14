@@ -1,4 +1,4 @@
-"""Arquivo cumulativo de XMLs emitidos e relatórios do leitor, no banco fiscal."""
+"""Dados extraídos de XMLs emitidos e relatórios cumulativos no banco fiscal."""
 from __future__ import annotations
 
 import csv
@@ -201,11 +201,11 @@ def import_batch(database_path, cnpj, paths, *, password=None, user="admin"):
                     ON CONFLICT(cnpj,chave) DO UPDATE SET emitente=CASE WHEN informacoes_nfe.emitente='' THEN excluded.emitente ELSE informacoes_nfe.emitente END''', (cnpj, chave, meta['emitente']))
                 if conn.execute("SELECT 1 FROM xml_documentos WHERE cnpj=? AND chave=?", (cnpj, chave)).fetchone():
                     summary["duplicadas"] += 1
-                    summary["registros"].append(dict(arquivo=name, status="Duplicada", mensagem="Chave já arquivada; original preservado."))
+                    summary["registros"].append(dict(arquivo=name, status="Duplicada", mensagem="Chave já importada; dados anteriores preservados."))
                     continue
                 conn.execute("""INSERT INTO xml_documentos
                     (cnpj,chave,numero,serie,emissao,emitente,destinatario,valor,itens,nome,sha256,xml)
-                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""", (cnpj, chave, meta["numero"], meta["serie"], meta["emissao"], meta["emitente"], meta["destinatario"], meta["valor"], len(rows), name, hashlib.sha256(data).hexdigest(), data))
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""", (cnpj, chave, meta["numero"], meta["serie"], meta["emissao"], meta["emitente"], meta["destinatario"], meta["valor"], len(rows), name, hashlib.sha256(data).hexdigest(), b""))
                 for kind, report in (("itens", rows), ("retencoes", [retained] if retained else [])):
                     for index, row in enumerate(report):
                         row["Chave Acesso"] = chave
@@ -230,17 +230,6 @@ def existing_keys(database_path, cnpj, keys, *, password=None):
             return set()
         marks = ",".join("?" for _ in keys)
         return {row[0] for row in conn.execute(f"SELECT chave FROM xml_documentos WHERE cnpj=? AND chave IN ({marks})", (cnpj, *keys))}
-    finally:
-        conn.close()
-
-
-def download_xml(database_path, cnpj, chave, *, password=None):
-    conn = abrir_banco(database_path, password, somente_leitura=True)
-    try:
-        if not _has_table(conn, "xml_documentos"):
-            return None
-        row = conn.execute("SELECT xml FROM xml_documentos WHERE cnpj=? AND chave=?", (cnpj, chave)).fetchone()
-        return bytes(row[0]) if row else None
     finally:
         conn.close()
 

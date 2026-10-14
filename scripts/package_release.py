@@ -29,7 +29,7 @@ def package(root: Path) -> Path:
     for source in sources:
         if not source.is_file() or source.is_symlink():
             raise ValueError(f"Arquivo inválido para o pacote: {source.name}")
-    for logo in ("yorozu-dark.png", "yorozu-light.png"):
+    for logo in ("yorozu-dark.png", "yorozu-light.png", "atlasdfe-dark.png", "atlasdfe-light.png"):
         if root / "nfe_consulta/web/static/img" / logo not in sources:
             raise ValueError(f"Recurso obrigatório ausente: {logo}")
     output = root / "dist" / f"{prefix}.zip"

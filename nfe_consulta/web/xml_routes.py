@@ -41,7 +41,7 @@ def register_xml_routes(app, settings, render, database_path):
             note = await run_in_threadpool(store.query_report, database_path(settings), CNPJ_PADRAO,
                 password=settings.current_database_password(), note_key=chave)
             if not note['rows']:
-                raise HTTPException(404, 'Nota não encontrada no arquivo local.')
+                raise HTTPException(404, 'Nota não encontrada no banco local.')
             selected = normalizar_filtros(chave=chave, data_inicial=data_inicial, data_final=data_final, codigo=codigo)
             if pagina < 1:
                 raise ValueError('Página inválida.')
@@ -74,7 +74,7 @@ def register_xml_routes(app, settings, render, database_path):
             note = await run_in_threadpool(store.query_report, database_path(settings), CNPJ_PADRAO,
                 password=settings.current_database_password(), note_key=chave)
             if not note['rows']:
-                raise HTTPException(404, 'Nota não encontrada no arquivo local.')
+                raise HTTPException(404, 'Nota não encontrada no banco local.')
             result = await run_in_threadpool(store.query_report, database_path(settings), CNPJ_PADRAO,
                 password=settings.current_database_password(), kind='itens', note_key=chave,
                 item_query=item, page=pagina)
@@ -177,25 +177,6 @@ def register_xml_routes(app, settings, render, database_path):
         app.state.audit.write(request, user, "xml_import", "ok", lote=summary["id"],
             importadas=summary["importadas"], cancelamentos=summary["cancelamentos"], duplicadas=summary["duplicadas"], erros=summary["erros"])
         return RedirectResponse(request.url_for("atualizar_page").include_query_params(lote=summary["id"]), status_code=303)
-
-    @app.get("/xml/arquivo/{chave}")
-    async def xml_download(request: Request, chave: str, user: Annotated[WebUser, Depends(require_export)]):
-        if len(chave) != 44 or not chave.isdigit():
-            raise HTTPException(400, "Chave de acesso inválida.")
-        try:
-            data = await run_in_threadpool(store.download_xml, database_path(settings), CNPJ_PADRAO,
-                chave, password=settings.current_database_password())
-        except Exception as exc:
-            raise HTTPException(503, "Arquivo de XMLs indisponível.") from exc
-        if data is None:
-            raise HTTPException(404, "XML ainda não importado. Envie o lote mensal no leitor.")
-        report = await run_in_threadpool(store.query_report, database_path(settings), CNPJ_PADRAO,
-            password=settings.current_database_password(), kind="notas", query=chave)
-        await archive_file(request, data, filename=f"{chave}.xml", media_type="application/xml",
-            documents=1, period=period_label(row.get("Data Emissao") for row in report["rows"]))
-        app.state.audit.write(request, user, "xml_download", "ok")
-        return Response(data, media_type="application/xml", headers={
-            "Content-Disposition": f'attachment; filename="{chave}.xml"', "Cache-Control": "no-store"})
 
     @app.get("/xml/exportar")
     async def xml_export(request: Request, user: Annotated[WebUser, Depends(require_export)],

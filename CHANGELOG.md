@@ -1,5 +1,12 @@
 # Histórico de versões
 
+## 2.5.0 — 2026-10-14
+
+- Identidade AtlasDFE com logos para fundo claro e escuro.
+- Armazenamento permanente dos dados extraídos, sem novos XMLs originais; download de XML removido.
+- Limpeza de respostas consNSU após processamento confirmado, preservando respostas pendentes e XMLs históricos.
+- Consulta noturna das 22h às 04h, diagnóstico de erros e recuperação consNSU pausada para teste.
+
 ## 2.4.0 — 2026-10-05
 
 - Login individual obrigatório para consultar qualquer dado fiscal, inclusive por links diretos.

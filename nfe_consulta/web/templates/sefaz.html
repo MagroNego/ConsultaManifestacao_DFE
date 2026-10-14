@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Admin · NexusDFE{% endblock %}
+{% block title %}Admin · AtlasDFE{% endblock %}
 
 {% block content %}
 <section class="page-heading">
@@ -27,12 +27,12 @@
 {% endif %}
 <details class="card xml-import" open>
   <summary>Importar XML</summary>
-  <p class="muted">Selecione XMLs de notas e cancelamentos homologados, ou um ZIP. Chaves repetidas preservam a nota original; o cancelamento atualiza sua situação.</p>
+  <p class="muted">Selecione XMLs de notas e cancelamentos homologados, ou um ZIP. O app guarda os dados para consulta e relatórios; obtenha o XML original no Synchro. Chaves repetidas preservam os dados já importados; o cancelamento atualiza sua situação.</p>
   <form action="{{ url_for('xml_import') }}" method="post" enctype="multipart/form-data" data-processing-form>
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <label class="field"><span>Arquivos XML ou ZIP</span><input type="file" name="files" accept=".xml,.zip" multiple required></label>
     <p class="muted">Até 100 MiB por envio, 250 MiB descompactados e 5.000 documentos. Somente NF-e emitidas pelo CNPJ configurado.</p>
-    <div class="actions"><button class="button primary" type="submit">Importar e arquivar</button></div>
+    <div class="actions"><button class="button primary" type="submit">Importar dados</button></div>
   </form>
 </details>
 

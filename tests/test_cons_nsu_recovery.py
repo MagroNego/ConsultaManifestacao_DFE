@@ -72,9 +72,12 @@ def test_gravacao_falha_reprocessa_sem_reconsultar(tmp_path,monkeypatch):
     b.conexao.commit()
     with pytest.raises(Exception,match='falha'):recuperar_intervalos(b,CNPJ,'33',None)
     assert b.conexao.execute('SELECT COUNT(*) FROM documentos_nsu').fetchone()[0]==0
+    assert b.conexao.execute('SELECT resposta_xml FROM consultas_nsu').fetchone()[0] is not None
     b.conexao.execute('DROP TRIGGER falha');b.conexao.commit()
     assert recuperar_intervalos(b,CNPJ,'33',None)==1
     assert len(calls)==1
+    assert b.conexao.execute('SELECT resposta_xml FROM consultas_nsu').fetchone()[0] is None
+    assert b.conexao.execute('SELECT xml FROM documentos_nsu').fetchone()[0] == b''
     b.fechar()
 
 def test_nsu_errado_nao_importa(tmp_path,monkeypatch):
@@ -92,14 +95,14 @@ def test_reinicio_reserva_sem_resposta_e_retentativa(tmp_path,monkeypatch):
     assert recuperar_intervalos(b,CNPJ,'33',None)==1
     b.fechar()
 
-def test_documento_ignorado_fica_preservado_e_conta_na_conferencia(tmp_path,monkeypatch):
+def test_metadados_do_documento_ignorado_contam_na_conferencia_sem_xml(tmp_path,monkeypatch):
     path,b=banco(tmp_path,11)
     xml=b'<outroDocumento>teste</outroDocumento>'
     doc=base64.b64encode(gzip.compress(xml)).decode()
     retorno=f'<retDistDFeInt><cStat>138</cStat><ultNSU>20</ultNSU><maxNSU>20</maxNSU><docZip NSU="11" schema="outro">{doc}</docZip></retDistDFeInt>'
     monkeypatch.setattr('nfe_consulta.distribuicao._enviar_soap_windows',lambda *a:retorno)
     assert recuperar_intervalos(b,CNPJ,'33',None)==0
-    assert b.conexao.execute('SELECT xml,classificacao FROM documentos_nsu').fetchone()==(xml,'ignorado')
+    assert b.conexao.execute('SELECT xml,classificacao FROM documentos_nsu').fetchone()==(b'','ignorado')
     assert read_web_status(path,CNPJ).complete
     b.fechar()
 

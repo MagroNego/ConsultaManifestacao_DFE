@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 from openpyxl import load_workbook
 
 from nfe_consulta.banco import BancoManifestacoes
+from nfe_consulta.seguranca_banco import abrir_banco
 from nfe_consulta.config import CNPJ_PADRAO
 from nfe_consulta.web.app import create_app
 from nfe_consulta.web.auth import PUBLIC_USER, WebUser, csrf_token
@@ -19,6 +20,14 @@ from nfe_consulta.modelos import Manifestacao, RetornoDistribuicao
 
 helpers = runpy.run_path(str(Path(__file__).with_name('test_web.py')))
 CHAVE = '332610' + CNPJ_PADRAO + '55001' + '000000123' + '1' + '00000001' + '0'
+
+
+def stored_xml(path, chave, *, password=None):
+    conn = abrir_banco(path, password, somente_leitura=True)
+    try:
+        return conn.execute('SELECT xml FROM xml_documentos WHERE chave=?', (chave,)).fetchone()[0]
+    finally:
+        conn.close()
 
 
 def xml(chave=CHAVE, dest='=1+1', emission='2026-10-01', namespace=True):
@@ -46,14 +55,14 @@ def login(client, cfg):
     return helpers["entrar_admin"](client, cfg)
 
 
-def test_arquivo_cumulativo_duplicatas_download_e_reabertura(tmp_path):
+def test_dados_cumulativos_duplicatas_sem_xml_e_reabertura(tmp_path):
     path, source = setup(tmp_path)
     first = store.import_batch(path, CNPJ_PADRAO, [(source, 'mensal.xml')])
     assert first['importadas'] == 1
     assert first['itens'] == 1 and first['retencoes'] == 1
     second = store.import_batch(path, CNPJ_PADRAO, [(source, 'outra.xml')])
     assert second['duplicadas'] == 1 and second['importadas'] == 0
-    assert store.download_xml(path, CNPJ_PADRAO, CHAVE) == xml()
+    assert stored_xml(path, CHAVE) == b""
     assert store.existing_keys(path, CNPJ_PADRAO, [CHAVE]) == {CHAVE}
     report = store.query_report(path, CNPJ_PADRAO, kind='itens', query='produto')
     assert report['total'] == 1
@@ -153,7 +162,7 @@ def test_excel_csv_precisao_formula_e_codigos(tmp_path):
         assert emission.number_format == 'dd/mm/yyyy'
 
 
-def test_web_lote_manifestacao_download_export_e_permissoes(tmp_path, monkeypatch):
+def test_web_lote_manifestacao_sem_download_xml_export_e_permissoes(tmp_path, monkeypatch):
     cfg = helpers['settings_web'](tmp_path)
     helpers['criar_banco'](cfg.database_path)
     def proibido(*args, **kwargs):
@@ -167,7 +176,7 @@ def test_web_lote_manifestacao_download_export_e_permissoes(tmp_path, monkeypatc
         response = client.post('/xml/importar', data={'csrf':token}, files={'files':('mensal.zip',zip_bytes([('a.xml',xml())]),'application/zip')})
         assert response.status_code == 200 and '1 importada(s)' in response.text
         assert '=1+1' in client.get('/xml').text
-        assert client.get('/xml/arquivo/'+CHAVE).content == xml()
+        assert client.get('/xml/arquivo/'+CHAVE).status_code == 404
         assert client.get('/xml/arquivo/'+'9'*44).status_code == 404
         assert client.get('/xml/exportar?formato=csv&tipo=itens&q=produto').status_code == 200
         data = client.get('/xml/exportar?formato=xlsx').content
@@ -177,13 +186,13 @@ def test_web_lote_manifestacao_download_export_e_permissoes(tmp_path, monkeypatc
         banco.salvar_retorno(CNPJ_PADRAO, RetornoDistribuicao(138,'ok','1'.zfill(15),'1'.zfill(15),((CHAVE,Manifestacao('210240','Operação não Realizada','2026-10-01T10:00:00-03:00','1')),),0))
         banco.fechar()
         consulta = client.get('/consulta',params={'chave':CHAVE})
-        assert 'Baixar XML' in consulta.text and '/xml/arquivo/'+CHAVE in consulta.text
+        assert 'Baixar XML' not in consulta.text and '/xml/arquivo/' not in consulta.text
         assert client.get('/xml?tipo=itens&q=produto').status_code == 200
     with TestClient(create_app(cfg)) as client:
-        assert client.get('/xml/arquivo/'+CHAVE).status_code == 200
+        assert client.get('/xml/arquivo/'+CHAVE).status_code == 404
         login(client,cfg)
-        assert '1 nota arquivada' in client.get('/xml').text
-        assert client.get('/xml/arquivo/'+CHAVE).content == xml()
+        assert '1 nota importada' in client.get('/xml').text
+        assert client.get('/xml/arquivo/'+CHAVE).status_code == 404
         assert client.get('/xml/lote/1/registro').status_code == 200
 
 
@@ -204,7 +213,7 @@ def test_xml_criptografado_nao_vaza_banco_plaintext(tmp_path):
     password = 'SenhaTeste-SQLCipher-123!'
     migrar_banco(path, secure, password)
     store.import_batch(secure,CNPJ_PADRAO,[(source,'a.xml')],password=password)
-    assert store.download_xml(secure,CNPJ_PADRAO,CHAVE,password=password) == xml()
+    assert stored_xml(secure,CHAVE,password=password) == b""
     assert b'Produto de teste' not in secure.read_bytes()
     assert store.query_report(path,CNPJ_PADRAO)['total'] == 0
 
@@ -249,7 +258,7 @@ def test_meses_cumulativos_paginacao_e_exportacao_integral(tmp_path):
     assert filtered['total'] == len(filtered['rows']) == 101
     source.write_bytes(xml(dest='Conteúdo alterado'))
     assert store.import_batch(path, CNPJ_PADRAO, [(source,'repetida.xml')])['duplicadas'] == 1
-    assert store.download_xml(path,CNPJ_PADRAO,CHAVE) == xml()
+    assert stored_xml(path,CHAVE) == b""
 
 
 def test_importacao_travada_e_texto_html_escapado(tmp_path):
@@ -291,3 +300,20 @@ def test_datas_xml_em_formato_brasileiro_sem_inverter_dia_mes(tmp_path, emission
             assert expected in response.text
             assert emission not in response.text
     assert store.query_report(cfg.database_path, CNPJ_PADRAO)['rows'][0]['Data Emissao'] == emission
+
+
+
+def test_novas_importacoes_nao_apagam_xml_legado_nem_dependem_dele(tmp_path):
+    path, source = setup(tmp_path)
+    store.import_batch(path, CNPJ_PADRAO, [(source, 'nota.xml')])
+    conn = abrir_banco(path)
+    with conn:
+        conn.execute('UPDATE xml_documentos SET xml=? WHERE chave=?', (xml(), CHAVE))
+    conn.close()
+    nova = CHAVE[:25]+'000000124'+CHAVE[34:]
+    source.write_bytes(xml(chave=nova))
+    store.import_batch(path, CNPJ_PADRAO, [(source, 'nova.xml')])
+    assert stored_xml(path, CHAVE) == xml()
+    assert stored_xml(path, nova) == b''
+    assert store.query_report(path, CNPJ_PADRAO)['total'] == 2
+    assert store.query_report(path, CNPJ_PADRAO, kind='itens')['total'] == 2

@@ -1,4 +1,4 @@
-# Consulta de Manifestação NF-e — v2.4.0
+# AtlasDFE — v2.5.0
 
 ## Primeira instalação
 
@@ -12,7 +12,7 @@ O lançador habilita a sincronização às **08:00 e 15:00 (Brasília)**. Manten
 
 ## Atualização
 
-Pare a instalação, faça backup e substitua o código e os lançadores pela nova versão. Preserve `dados`, `secrets`, logs, certificado e os caminhos configurados. Execute `INSTALAR.cmd` para atualizar as dependências e reinicie por `INICIAR_WEB.cmd`. Confirme **2.4.0** no cabeçalho e confira o cursor NSU em **Status**.
+Pare a instalação, faça backup e substitua o código e os lançadores pela nova versão. Preserve `dados`, `secrets`, logs, certificado e os caminhos configurados. Execute `INSTALAR.cmd` para atualizar as dependências e reinicie por `INICIAR_WEB.cmd`. Confirme **AtlasDFE** no cabeçalho e confira o cursor NSU em **Status**.
 
 Consulta e exportações não exigem login. Admin exige conta administrativa e senha. Contas antigas são preservadas; use `CONFIGURAR_ADMIN.cmd` para definir ou redefinir a senha da conta escolhida.
 
