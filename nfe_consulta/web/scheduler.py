@@ -309,7 +309,7 @@ async def loop_sincronizacao_automatica(app) -> None:
                     adiada = await executar_sincronizacao_automatica(app, janela_agendada=janela)
         agora = agora_brasilia()
         # Rejeições com cursor recuperável retomam após a pausa, sem esperar
-        # pela próxima janela de 22:00/01:00 e sem repetir durante o bloqueio.
+        # pelo próximo disparo horário e sem repetir durante o bloqueio.
         recuperacao = await asyncio.to_thread(proxima_recuperacao_nsu, settings)
         if recuperacao is not None:
             proxima = min(proxima, max(recuperacao, agora + timedelta(seconds=60)))
@@ -360,13 +360,13 @@ def proxima_recuperacao_nsu(settings) -> datetime | None:
 
 
 def janelas_diarias(agora: datetime) -> tuple[datetime, datetime]:
-    """Janelas fixas às 22:00 e 01:00 de Brasília, sem disparo à meia-noite."""
+    """Disparos horários de 22h até 03h de Brasília; às 04h a janela fecha."""
     if agora.tzinfo is None:
         raise ValueError("O instante deve ter fuso horário.")
     agora = agora.astimezone(timezone(timedelta(hours=-3)))
     candidatos = sorted(
         datetime.combine(agora.date() + timedelta(days=dia), time(hora), tzinfo=agora.tzinfo)
-        for dia in (-1, 0, 1) for hora in (1, 22)
+        for dia in (-1, 0, 1) for hora in (0, 1, 2, 3, 22, 23)
     )
     return (
         max(instante for instante in candidatos if instante <= agora),

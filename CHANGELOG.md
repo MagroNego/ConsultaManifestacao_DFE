@@ -1,5 +1,10 @@
 # Histórico de versões
 
+## 2.5.1 — 2026-10-14
+
+- Sincronização automática a cada hora: 22h, 23h, 00h, 01h, 02h e 03h de Brasília.
+- Mantém cooldown, pausas da SEFAZ, trava entre execuções e fechamento às 04h.
+
 ## 2.5.0 — 2026-10-14
 
 - Identidade AtlasDFE com logos para fundo claro e escuro.

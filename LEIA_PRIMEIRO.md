@@ -1,4 +1,4 @@
-# AtlasDFE — v2.5.0
+# AtlasDFE — v2.5.1
 
 ## Primeira instalação
 

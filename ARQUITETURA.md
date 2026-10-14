@@ -1,4 +1,4 @@
-# Arquitetura — v2.5.0
+# Arquitetura — v2.5.1
 
 ## Componentes
 

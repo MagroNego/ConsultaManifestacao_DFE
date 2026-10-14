@@ -1,4 +1,4 @@
-# Manual de instalação — v2.5.0
+# Manual de instalação — v2.5.1
 
 ## Requisitos
 
@@ -10,7 +10,7 @@
 
 ## Windows
 
-Extraia `ConsultaManifestacao_DFE-v2.5.0.zip`, por exemplo em `C:\ConsultaManifestacao`.
+Extraia `ConsultaManifestacao_DFE-v2.5.1.zip`, por exemplo em `C:\ConsultaManifestacao`.
 
 ```powershell
 .\INSTALAR.cmd

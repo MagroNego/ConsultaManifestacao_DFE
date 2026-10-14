@@ -85,7 +85,7 @@
           return;
         }
         if (form.hasAttribute("data-sync-confirm") && !window.confirm(
-          "Sincronizar com a SEFAZ agora? A atualização automática ocorre às 22:00 e 01:00. Novas tentativas ficarão bloqueadas por 60 minutos."
+          "Sincronizar com a SEFAZ agora? A atualização automática ocorre às 22:00, 23:00, 00:00, 01:00, 02:00 e 03:00. Novas tentativas ficarão bloqueadas por 60 minutos."
         )) {
           event.preventDefault();
           return;

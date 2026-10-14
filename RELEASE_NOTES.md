@@ -1,15 +1,9 @@
-# AtlasDFE v2.5.0
+# AtlasDFE 2.5.1
 
-- Nome AtlasDFE com logos próprios para os temas claro e escuro.
-- Novos XMLs são processados para extrair dados, sem cópia permanente; os relatórios, itens, impostos, manifestações, cancelamentos e vínculos CT-e continuam disponíveis.
-- Download de XML removido; Excel, CSV e registros de lote continuam disponíveis. Obtenha o XML original no Synchro.
-- Respostas da SEFAZ ficam temporariamente preservadas até o processamento confirmar; falhas de gravação mantêm a resposta para nova tentativa.
-- XMLs históricos não são apagados automaticamente, nem o banco é compactado nesta atualização.
-- Janela noturna das 22h às 04h de Brasília, disparos às 22h e 01h e recuperação consNSU pausada para o teste, com pendências preservadas.
-- Logs recolhidos, diagnóstico de erros e preservação do último NSU gravado com sucesso após 656.
+Sincronização automática a cada hora durante a janela noturna: **22h, 23h, 00h, 01h, 02h e 03h de Brasília**. Às 04h a janela fecha; não há novo disparo nesse horário.
 
-## Atualização
+Cooldowns e pausas da SEFAZ continuam prevalecendo sobre o agendamento. Uma tentativa bloqueada aguarda a liberação; não força uma consulta para gerar logs. A trava evita execuções simultâneas e reinícios recuperam apenas o disparo mais recente pendente.
 
-Pare o aplicativo, faça backup do banco e preserve dados, secrets, logs e certificado. Atualize o código, execute INSTALAR.cmd se estiver usando o pacote e reinicie com INICIAR_WEB.cmd. As contas, senhas e caminhos configurados continuam válidos.
+Mantém a identidade AtlasDFE, os dados dos relatórios sem novos XMLs permanentes e a recuperação consNSU pausada. Os dados e XMLs históricos existentes são preservados.
 
-O teste noturno depende da confirmação da janela das 08h às 18h no Qive. Separar horários não garante aceitação de cursores independentes pela SEFAZ.
+Para atualizar, pare o app, faça backup do banco e da configuração, atualize os arquivos e reinicie. Confirme a janela 08h–18h aplicada no Qive antes do teste. O computador e o processo do app precisam permanecer ativos.

@@ -190,9 +190,9 @@ def get_settings() -> WebSettings:
         "NFE_AUTO_SYNC_ENABLED",
         "0",
     ).strip() == "1"
-    # Variáveis legadas não substituem os dois horários da rotina definitiva.
+    # Variáveis legadas não substituem os horários da rotina recorrente.
     auto_sync_once_date = None
-    # Compatibilidade da configuração; a rotina recorrente usa 22:00 e 01:00.
+    # Compatibilidade da configuração; a rotina recorrente usa 22:00, 23:00, 00:00, 01:00, 02:00 e 03:00.
     auto_sync_interval_hours = 8
     auto_sync_hour = 22
     auto_sync_minute = 0
