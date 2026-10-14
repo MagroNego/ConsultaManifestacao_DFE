@@ -2,7 +2,7 @@
 
 **AtlasDFE** é uma aplicação Web para consultar manifestações de NF-e, exportar relatórios Excel e sincronizar o histórico com o serviço **NFeDistribuicaoDFe** do Ambiente Nacional da NF-e.
 
-**Versão 2.5.0** · Python 3.11+ · Windows e Linux
+**Versão 2.5.1** · Python 3.11+ · Windows e Linux
 
 ## Funcionalidades
 
@@ -11,7 +11,7 @@
 - Exportação por arquivo TXT com uma chave de 44 dígitos por linha.
 - Identificação do emitente pelo nome recebido ou pelo CNPJ da chave.
 - Status do banco, cursor NSU, bloqueio e últimas sincronizações.
-- Sincronização manual administrativa e automática às **22:00 e 01:00 (Brasília)**.
+- Sincronização manual administrativa e automática às **22:00, 23:00, 00:00, 01:00, 02:00 e 03:00 (Brasília)**.
 - Consulta e exportações sem login; Admin protegido por conta e senha.
 - Alertas de novos eventos **Operação não Realizada (210240)** por e-mail, com fila persistente.
 - Leitor XML integrado: importação cumulativa de XML/ZIP mensal, busca, itens, retenções, Excel e CSV.
@@ -22,7 +22,7 @@ Consulta, Status e exportações usam o banco local e não fazem chamadas à SEF
 
 ## Instalação no Windows
 
-Baixe `ConsultaManifestacao_DFE-v2.5.0.zip` em [Releases](https://github.com/MagroNego/ConsultaManifestacao_DFE/releases), extraia em uma pasta definitiva e execute, nesta ordem:
+Baixe `ConsultaManifestacao_DFE-v2.5.1.zip` em [Releases](https://github.com/MagroNego/ConsultaManifestacao_DFE/releases), extraia em uma pasta definitiva e execute, nesta ordem:
 
 ```powershell
 .\INSTALAR.cmd
@@ -34,13 +34,13 @@ Abra **http://127.0.0.1:8080**. Em **Admin**, configure o banco existente e o ce
 
 A versão de teste mantém a recuperação consNSU pausada (`NFE_RECOVERY_ENABLED=0`), preservando as pendências. Para retomá-la após o teste, defina `NFE_RECOVERY_ENABLED=1` e reinicie o app.
 
-O lançador Windows inicia em modo produção e habilita a sincronização nos horários fixos de 22:00 e 01:00. Para desligá-la, defina `NFE_AUTO_SYNC_ENABLED=0` antes de executar o lançador. Banco, certificado e credenciais são configurados na instalação e não acompanham o pacote.
+O lançador Windows inicia em modo produção e habilita a sincronização nos horários fixos de 22:00, 23:00, 00:00, 01:00, 02:00 e 03:00. Para desligá-la, defina `NFE_AUTO_SYNC_ENABLED=0` antes de executar o lançador. Banco, certificado e credenciais são configurados na instalação e não acompanham o pacote.
 
 Para Linux e atualização de uma instalação existente, consulte o [manual de instalação](MANUAL_DE_INSTALACAO.md).
 
 ## Sincronização automática
 
-A rotina executa às **22:00 e 01:00, horário de Brasília, todos os dias**. O processo Web precisa permanecer ativo. O agendamento independe do horário em que o aplicativo foi iniciado.
+A rotina executa às **22:00, 23:00, 00:00, 01:00, 02:00 e 03:00, horário de Brasília, todos os dias**. O processo Web precisa permanecer ativo. O agendamento independe do horário em que o aplicativo foi iniciado.
 
 ```text
 NFE_AUTO_SYNC_ENABLED=1
@@ -48,7 +48,7 @@ NFE_AUTO_SYNC_WEEKDAYS=0,1,2,3,4,5,6
 NFE_AUTO_SYNC_MAX_LOTES=50
 ```
 
-A conclusão de cada janela é registrada no banco para evitar repetição após reiniciar. Se o servidor voltar depois de um horário programado, recupera apenas a janela mais recente ainda não concluída. Quando a tentativa automática encontra cooldown ou rejeição 656, ela é reagendada para o término do bloqueio persistido, inclusive se a rejeição não informar um NSU de recuperação. Por exemplo, uma execução das 22:00 bloqueada até 22:39 retoma às 22:39; uma rejeição às 01:00 com pausa até 02:00 retoma às 02:00. Outras falhas e resultados parciais são retomados na próxima janela, respeitando o cooldown persistente. Após reiniciar, recupera apenas a janela mais recente dentro do período permitido, inclusive a das 22:00 do dia anterior quando retorna após a meia-noite. Das 04:00 até as 22:00, aguarda a abertura. Consultas manuais e retentativas também respeitam a janela das 22:00 às 04:00 de Brasília. Ative em produção após o Qive confirmar sua janela das 08:00 às 18:00. A rotina manual e a automática compartilham a mesma trava e o mesmo cursor NSU.
+A conclusão de cada janela é registrada no banco para evitar repetição após reiniciar. Se o servidor voltar depois de um horário programado, recupera apenas a janela mais recente ainda não concluída. Quando a tentativa automática encontra cooldown ou rejeição 656, ela é reagendada para o término do bloqueio persistido, inclusive se a rejeição não informar um NSU de recuperação. Por exemplo, uma execução das 22:00 bloqueada até 22:39 retoma às 22:39; uma rejeição às 01:00 com pausa até 02:00 retoma às 02:00. Outras falhas e resultados parciais são retomados na próxima janela, respeitando o cooldown persistente. Após reiniciar, recupera apenas a janela mais recente dentro do período permitido, inclusive após a virada da meia-noite. Das 04:00 até as 22:00, aguarda a abertura. Consultas manuais e retentativas também respeitam a janela das 22:00 às 04:00 de Brasília. Ative em produção após o Qive confirmar sua janela das 08:00 às 18:00. A rotina manual e a automática compartilham a mesma trava e o mesmo cursor NSU.
 
 O cooldown padrão é **60 minutos**. A configuração antiga de cooldown é ignorada: o servidor usa 60 minutos. Bloqueios já persistidos são preservados até expirar. A rejeição 656 mantém o cursor dos lotes gravados e registra separadamente um NSU de recuperação quando a SEFAZ informa um número válido maior. Com a rotina automática ativa, a consulta é retomada após a pausa/cooldown, sem esperar a próxima janela diária. A retomada usa esse NSU e mantém o intervalo como **histórico pendente de conferência** no Status: não afirma que os documentos desse intervalo foram importados. Rejeições sem NSU válido não provocam ajuste de cursor.
 

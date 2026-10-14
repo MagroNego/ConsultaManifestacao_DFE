@@ -1,4 +1,4 @@
-# Manual de uso — v2.5.0
+# Manual de uso — v2.5.1
 
 ## Acesso
 
@@ -59,7 +59,7 @@ A área exige login administrativo e reúne:
 
 ## Sincronização automática
 
-A rotina executa às **22:00 e 01:00 (Brasília)**, todos os dias. Usa o mesmo banco, certificado, cursor e cooldown da rotina manual. O aplicativo precisa permanecer em execução.
+A rotina executa às **22:00, 23:00, 00:00, 01:00, 02:00 e 03:00 (Brasília)**, todos os dias. Usa o mesmo banco, certificado, cursor e cooldown da rotina manual. O aplicativo precisa permanecer em execução.
 
 Uma janela concluída não é repetida após reiniciar. Falhas e distribuições parciais são retomadas na próxima janela, respeitando o bloqueio vigente. A rejeição 656 registra uma pausa; não altere o NSU para tentar eliminar esse bloqueio.
 
@@ -116,7 +116,7 @@ O ícone **Manifestações** na Emissão abre uma tela da nota com os eventos ex
 
 As consultas externas deste aplicativo são permitidas diariamente das 22h às
 04h, no horário de Brasília (UTC-3). A sincronização automática mantém os
-horários de 22h e 01h nos dias configurados. Recuperações e retentativas também
+horários de 22h, 23h, 00h, 01h, 02h e 03h nos dias configurados. Recuperações e retentativas também
 respeitam a janela, inclusive entre lotes. Uma requisição já iniciada pode terminar
 após o fechamento; a próxima não é enviada. Consultas locais e exportações seguem
 disponíveis. O limite é verificado no servidor, independentemente do botão.
@@ -138,7 +138,7 @@ antigos nem elimina pendências de bancos existentes.
 
 Antes de ativar a rotina, confirme com o Qive que as consultas e novas tentativas
 foram limitadas às 08h–18h de Brasília. Mantenha o computador e o aplicativo
-ligados durante a noite. O app dispara às 22h e 01h; fora das 22h–04h, consultas
+ligados durante a noite. O app dispara às 22h, 23h, 00h, 01h, 02h e 03h; fora das 22h–04h, consultas
 externas manuais, recuperação e retentativas ficam bloqueadas. A consulta ao
 banco local pode ser usada durante o dia.
 
