@@ -32,6 +32,8 @@ Baixe `ConsultaManifestacao_DFE-v2.4.0.zip` em [Releases](https://github.com/Mag
 
 Abra **http://127.0.0.1:8080**. Em **Admin**, configure o banco existente e o certificado A1. O certificado pode ser um PFX/P12 protegido ou estar instalado no repositório de certificados do Windows.
 
+A versão de teste mantém a recuperação consNSU pausada (`NFE_RECOVERY_ENABLED=0`), preservando as pendências. Para retomá-la após o teste, defina `NFE_RECOVERY_ENABLED=1` e reinicie o app.
+
 O lançador Windows inicia em modo produção e habilita a sincronização nos horários fixos de 22:00 e 01:00. Para desligá-la, defina `NFE_AUTO_SYNC_ENABLED=0` antes de executar o lançador. Banco, certificado e credenciais são configurados na instalação e não acompanham o pacote.
 
 Para Linux e atualização de uma instalação existente, consulte o [manual de instalação](MANUAL_DE_INSTALACAO.md).

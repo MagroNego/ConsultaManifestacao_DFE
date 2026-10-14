@@ -239,6 +239,7 @@ async def executar_sincronizacao_automatica(
             completo=resumo.completo,
             cache=resumo.cache,
             cooldown_minutos=settings.sync_cooldown_minutes,
+            recuperacao_cons_nsu=getattr(settings, "recovery_enabled", True),
         )
     finally:
         lock.release()
@@ -341,6 +342,8 @@ def proxima_tentativa_permitida(settings) -> datetime | None:
 
 
 def proxima_recuperacao_nsu(settings) -> datetime | None:
+    if not getattr(settings, "recovery_enabled", True):
+        return None
     from nfe_consulta.web.status_view import read_web_status
 
     try:

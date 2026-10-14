@@ -19,6 +19,8 @@ def detalhes_erro(exc, contexto=None):
     resultado = {}
     if not isinstance(dados, dict):
         dados = {}
+    if type(dados.get("recuperacao_cons_nsu")) is bool:
+        resultado["recuperacao_cons_nsu"] = dados["recuperacao_cons_nsu"]
     execucao = dados.get("execucao")
     if isinstance(execucao, str) and re.fullmatch(r"[a-f0-9]{32}", execucao):
         resultado["execucao"] = execucao

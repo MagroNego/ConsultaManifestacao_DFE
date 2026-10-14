@@ -146,6 +146,7 @@ class ParametrosSincronizacao:
     cert_senha_arquivo: str | None = None
     cooldown_minutos: int = 60
     destinatarios_alerta: tuple[str, ...] = ()
+    recuperar_lacunas: bool = True
 
 
 def sincronizar_banco(
@@ -185,7 +186,7 @@ def sincronizar_banco(
                 max_lotes=parametros.max_lotes,
                 progresso_fn=progresso_sincronizacao,
                 destinatarios_alerta=parametros.destinatarios_alerta,
-                recuperar_lacunas=True,
+                recuperar_lacunas=parametros.recuperar_lacunas,
             )
         finally:
             banco.prorrogar_cooldown(cnpj, parametros.cooldown_minutos)

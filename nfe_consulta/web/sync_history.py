@@ -139,6 +139,8 @@ def read_sync_history(path: Path, limit: int = 10) -> tuple[SyncHistoryItem, ...
                 detail = "Recuperação de pendências; consulta de novos documentos adiada"
             if outcome == "ignorado":
                 detail = _REASONS.get(reason, "Tentativa não executada")
+            if payload.get("recuperacao_cons_nsu") is False:
+                detail = (detail + ". " if detail else "") + "Recuperação consNSU pausada; fila preservada"
             interrupted = reason in {"fora_janela", "NfeJanelaConsultaErro"} and any(
                 type(payload.get(key)) is int and payload[key] > 0
                 for key in ("lotes_gravados", "recuperados_na_tentativa")

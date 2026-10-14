@@ -34,7 +34,8 @@ def sincronizar_configurado(settings: WebSettings, *, max_lotes: int = 50, audit
     """Correlaciona erros, consultas e gravações da mesma tentativa."""
     inicio = monotonic()
     contexto = {"execucao": uuid4().hex, "etapa": "janela",
-                "quando": datetime.now(BRASILIA).isoformat(), "lotes_gravados": 0}
+                "quando": datetime.now(BRASILIA).isoformat(), "lotes_gravados": 0,
+                "recuperacao_cons_nsu": getattr(settings, "recovery_enabled", True)}
     try:
         exigir_janela()
         return _sincronizar_configurado(settings, max_lotes=max_lotes, audit=audit, contexto=contexto)
@@ -77,6 +78,7 @@ def _sincronizar_configurado(settings, *, max_lotes, audit, contexto):
         contexto["diagnosticar"] = diagnosticar
         if diagnosticar:
             audit.write_system("sefaz_sync_diagnostico", "iniciado", execucao=execucao,
+                recuperacao_cons_nsu=getattr(settings, "recovery_enabled", True),
                 pid=os.getpid(), host=socket.gethostname(), banco=str(banco.resolve()),
                 codigo=__file__, ult_nsu=status.ult_nsu, max_nsu=status.max_nsu)
 
@@ -111,6 +113,7 @@ def _sincronizar_configurado(settings, *, max_lotes, audit, contexto):
                     ),
                     cooldown_minutos=settings.sync_cooldown_minutes,
                     destinatarios_alerta=destinatarios,
+                    recuperar_lacunas=getattr(settings, "recovery_enabled", True),
                 ),
                 progresso_sincronizacao=progresso,
             )

@@ -48,6 +48,9 @@
     </div>
   </div>
 
+  {% if not request.app.state.settings.recovery_enabled %}
+  <p class="muted">Teste do distNSU: recuperação via consNSU pausada. As pendências continuam salvas.</p>
+  {% endif %}
   <div class="status-footer">
     <span>Próxima sincronização permitida · janela das 22h às 04h (Brasília)</span>
     <strong>
@@ -69,7 +72,9 @@
     Divergência de NSU: banco {{ local }} · SEFAZ {{ remoto }}.
     {% if retomado %}A consulta foi retomada.{% else %}O NSU informado na rejeição foi registrado para conferência; a distribuição mantém o último NSU gravado com sucesso.{% endif %}
     {% if status_web.recovery_pending %}
+    {% if request.app.state.settings.recovery_enabled %}
     Há NSUs na fila de recuperação. Consultas das 22h às 04h: até 20 NSUs por execução, descontando as consultas pontuais da última hora, respeitando o bloqueio e os limites de consulta.
+    {% else %}A fila de recuperação está preservada e pausada para o teste do distNSU.{% endif %}
     {% else %}
     Há documentos que não puderam ser recuperados. O intervalo continua pendente de conferência.
     {% endif %}
@@ -95,7 +100,7 @@
   {% for inicio, fim, recebidos, total in status_web.recovery_intervals %}
   <div class="alert compact">
     <strong>NSU {{ inicio }} a {{ fim }}</strong> · {{ recebidos }} de {{ total }} documentos recebidos
-    · {% if recebidos == total %}Intervalo recuperado{% elif status_web.recovery_pending %}Em recuperação{% else %}Pendências não resolvidas{% endif %}
+    · {% if recebidos == total %}Intervalo recuperado{% elif status_web.recovery_pending and not request.app.state.settings.recovery_enabled %}Recuperação pausada{% elif status_web.recovery_pending %}Em recuperação{% else %}Pendências não resolvidas{% endif %}
     <progress value="{{ recebidos }}" max="{{ total }}" style="display:block;width:100%;margin-top:8px" aria-label="Progresso do intervalo NSU {{ inicio }} a {{ fim }}">{{ recebidos }} de {{ total }}</progress>
   </div>
   {% endfor %}

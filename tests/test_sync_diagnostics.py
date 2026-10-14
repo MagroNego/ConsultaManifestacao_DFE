@@ -174,3 +174,36 @@ def test_fechamento_apos_lote_gravado_nao_aparece_como_nao_executada(tmp_path):
     item = read_sync_history(path)[0]
     assert item.result == 'Interrompida pelo horário'
     assert 'já foi gravado foi mantido' in item.detail
+
+
+@pytest.mark.parametrize('habilitada', [False, True])
+def test_pausa_cons_nsu_preserva_fila_e_separa_consulta_de_distribuicao(tmp_path, monkeypatch, habilitada):
+    caminho, settings, audit, registros = preparar(tmp_path, monkeypatch)
+    settings.recovery_enabled = habilitada
+    banco = BancoManifestacoes(str(caminho))
+    with banco.conexao:
+        banco.registrar_recuperacao_nsu(CNPJ_PADRAO, '10', '15')
+    fila = banco.conexao.execute('SELECT cnpj,nsu_local,nsu_sefaz FROM recuperacoes_nsu').fetchall()
+    banco.fechar()
+    chamadas = []
+    def soap(xml, *args):
+        chamadas.append(xml)
+        if '<consNSU>' in xml:
+            return '<retDistDFeInt><cStat>137</cStat><ultNSU>30</ultNSU><maxNSU>30</maxNSU></retDistDFeInt>'
+        return '<retDistDFeInt><cStat>138</cStat><ultNSU>30</ultNSU><maxNSU>30</maxNSU></retDistDFeInt>'
+    monkeypatch.setattr('nfe_consulta.distribuicao._enviar_soap_windows', soap)
+    resumo = sync_runtime.sincronizar_configurado(settings, audit=audit)
+    banco = BancoManifestacoes(str(caminho))
+    assert banco.conexao.execute('SELECT cnpj,nsu_local,nsu_sefaz FROM recuperacoes_nsu').fetchall() == fila
+    if habilitada:
+        assert all('<consNSU>' in xml for xml in chamadas)
+        assert resumo.somente_recuperacao
+        assert int(banco.obter_estado(CNPJ_PADRAO)[0]) == 10
+    else:
+        assert len(chamadas) == 1 and '<distNSU>' in chamadas[0]
+        assert '<ultNSU>000000000000010</ultNSU>' in chamadas[0]
+        assert not resumo.somente_recuperacao
+        assert banco.conexao.execute('SELECT COUNT(*) FROM consultas_nsu').fetchone()[0] == 0
+        assert int(banco.obter_estado(CNPJ_PADRAO)[0]) == 30
+        assert banco.proximo_nsu_faltante(CNPJ_PADRAO) == '000000000000011'
+    banco.fechar()

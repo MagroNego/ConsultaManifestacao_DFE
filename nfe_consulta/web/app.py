@@ -304,6 +304,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             "sefaz_scheduler",
             "iniciado",
             horarios=["22:00", "01:00"],
+            recuperacao_cons_nsu=settings.recovery_enabled,
             dias=list(settings.auto_sync_weekdays),
             data_unica=settings.auto_sync_once_date.isoformat() if settings.auto_sync_once_date else None,
             max_lotes=settings.auto_sync_max_lotes,
@@ -1388,6 +1389,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                 completo=resumo.completo,
                 cache=resumo.cache,
                 cooldown_minutos=settings.sync_cooldown_minutes,
+                recuperacao_cons_nsu=settings.recovery_enabled,
             )
             return RedirectResponse(
                 url=request.url_for("atualizar_page").include_query_params(ok="1"),

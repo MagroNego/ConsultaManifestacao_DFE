@@ -1,5 +1,6 @@
 from pathlib import Path
 from datetime import date
+import pytest
 
 from nfe_consulta import certificado_config
 from nfe_consulta.web import settings
@@ -105,3 +106,18 @@ def test_configuracao_antiga_nao_substitui_rotina_fixa_nem_cooldown(monkeypatch)
     assert cfg.auto_sync_enabled
     assert cfg.auto_sync_once_date is None
     assert cfg.sync_cooldown_minutes == 60
+
+
+@pytest.mark.parametrize('valor,esperado', [(None, False), ('0', False), ('1', True)])
+def test_recuperacao_cons_nsu_pausada_por_padrao_e_retomada_por_configuracao(monkeypatch, valor, esperado):
+    monkeypatch.setenv('NFE_WEB_ENV', 'development')
+    if valor is None:
+        monkeypatch.delenv('NFE_RECOVERY_ENABLED', raising=False)
+    else:
+        monkeypatch.setenv('NFE_RECOVERY_ENABLED', valor)
+    settings.get_settings.cache_clear()
+    try:
+        cfg = settings.get_settings()
+        assert cfg.recovery_enabled is esperado
+    finally:
+        settings.get_settings.cache_clear()

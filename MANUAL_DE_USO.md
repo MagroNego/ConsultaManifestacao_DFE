@@ -159,3 +159,24 @@ próxima janela de disparo, evitando repetir o mesmo erro a cada minuto.
 Depois da primeira noite, confira o NSU salvo, os documentos recuperados e os
 retornos da SEFAZ. Se a 656 persistir mesmo com os horários separados, use a
 referência e os NSUs do log para retomar a análise com o Qive.
+
+
+### Versão de teste: recuperação consNSU pausada
+
+Esta versão inicia com `NFE_RECOVERY_ENABLED=0`. Consultas manuais e automáticas
+via aplicativo web usam distNSU, mantendo a fila e as respostas de recuperação
+consNSU salvas no banco. O agendador não usa essa fila pausada para antecipar uma
+consulta. A janela das 22h–04h, os disparos às 22h/01h e a pausa após 656 permanecem.
+O Status indica que a recuperação está pausada.
+
+Após avaliar o teste, para retomar a recuperação, feche o app e execute no Prompt
+de Comando, dentro da pasta da instalação:
+
+```bat
+set NFE_RECOVERY_ENABLED=1
+INICIAR_WEB.cmd
+```
+
+Para manter a recuperação pausada, use `NFE_RECOVERY_ENABLED=0`. As pendências não
+são apagadas ao alternar essa configuração. Antes do teste noturno, confirme que
+o Qive aplicou a janela combinada; atualizar o código não confirma o ajuste deles.

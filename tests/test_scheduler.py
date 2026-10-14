@@ -489,3 +489,10 @@ def test_erro_configuracao_aguarda_disparo_mesmo_com_recuperacao_pendente(monkey
     assert esperas[0] > 60
     assert registros[0][1]['etapa'] == 'certificado'
     assert 'sensível' not in repr(registros)
+
+
+def test_recuperacao_pausada_nao_antecipa_proximo_disparo(monkeypatch):
+    def proibido(*args, **kwargs):
+        pytest.fail('A fila pausada não deve reagendar consultas')
+    monkeypatch.setattr('nfe_consulta.web.status_view.read_web_status', proibido)
+    assert scheduler.proxima_recuperacao_nsu(SimpleNamespace(recovery_enabled=False)) is None

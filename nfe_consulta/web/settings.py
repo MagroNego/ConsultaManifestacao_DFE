@@ -106,6 +106,7 @@ class WebSettings:
     database_path_file: Path | None = None
     database_password_file: Path | None = None
     auto_sync_enabled: bool = False
+    recovery_enabled: bool = False
     auto_sync_interval_hours: int = 8
     auto_sync_hour: int = 22
     auto_sync_minute: int = 0
@@ -256,6 +257,7 @@ def get_settings() -> WebSettings:
         database_path_file=DATABASE_PATH_FILE,
         database_password_file=DATABASE_PASSWORD_FILE,
         auto_sync_enabled=auto_sync_enabled,
+        recovery_enabled=os.getenv("NFE_RECOVERY_ENABLED", "0").strip() == "1",
         auto_sync_interval_hours=auto_sync_interval_hours,
         auto_sync_hour=auto_sync_hour,
         auto_sync_minute=auto_sync_minute,
