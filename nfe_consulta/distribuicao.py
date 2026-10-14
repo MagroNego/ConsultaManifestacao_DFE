@@ -1,3 +1,5 @@
+from nfe_consulta.janela_consulta import exigir_janela
+
 import json
 import os
 import subprocess
@@ -38,6 +40,28 @@ def preservar_resposta(sink):
         _response_sink.reset(token)
 
 
+_consulta_observer = ContextVar("distribuicao_consulta_observer", default=None)
+
+
+@contextmanager
+def acompanhar_consultas(observer):
+    """Contexto de diagnóstico com metadados; nunca recebe XML ou certificado."""
+    token = _consulta_observer.set(observer)
+    try:
+        yield
+    finally:
+        _consulta_observer.reset(token)
+
+
+def _registrar_consulta(operacao, nsu, retorno=None):
+    observer = _consulta_observer.get()
+    if observer is not None:
+        observer(operacao=operacao, nsu_solicitado=nsu,
+                 cstat=retorno.status_codigo if retorno is not None else None,
+                 nsu_sefaz=(retorno.ult_nsu if retorno is not None
+                            and retorno.ult_nsu_informado else None))
+
+
 def _motivo_exibivel(motivo: str) -> str:
     """Limita texto remoto e remove controles de terminal antes de exibir e salvar."""
     return " ".join("".join(
@@ -61,6 +85,7 @@ def _erro_consumo_indevido(
         f"SEFAZ retornou 656 | xMotivo: {motivo}{diagnostico} "
         "| Aguarde uma hora antes de tentar novamente.",
         ult_nsu=(retorno.ult_nsu if retorno.ult_nsu_informado else None),
+        ult_nsu_enviado=ult_nsu_enviado,
     )
 
 
@@ -84,11 +109,14 @@ def montar_cons_nsu(cnpj: str, c_uf_autor: str, nsu: str) -> str:
 
 
 def consultar_nsu(cnpj, c_uf_autor, nsu, certificado):
+    _registrar_consulta("consNSU", nsu)
     resposta = _enviar_soap_windows(montar_soap(montar_cons_nsu(cnpj, c_uf_autor, nsu)), certificado)
     sink = _response_sink.get()
     if sink is not None:
         sink(resposta)
-    return parse_retorno_distribuicao(resposta)
+    retorno = parse_retorno_distribuicao(resposta)
+    _registrar_consulta("consNSU", nsu, retorno)
+    return retorno
 
 
 def montar_cons_chave(cnpj: str, c_uf_autor: str, chave: str) -> str:
@@ -118,6 +146,7 @@ def _enviar_soap_windows(
     certificado: CertificadoWindows,
     endpoint: str = ENDPOINT_PRODUCAO,
 ) -> str:
+    exigir_janela()
     payload = json.dumps(
         {
             "url": endpoint,
@@ -211,12 +240,14 @@ def consultar_distribuicao(
     ult_nsu: str,
     certificado: CertificadoWindows,
 ) -> RetornoDistribuicao:
+    _registrar_consulta("distNSU", ult_nsu)
     dist_dfe = montar_dist_nsu(cnpj, c_uf_autor, ult_nsu)
     resposta = _enviar_soap_windows(montar_soap(dist_dfe), certificado)
     sink = _response_sink.get()
     if sink is not None:
         sink(resposta)
     retorno = parse_retorno_distribuicao(resposta)
+    _registrar_consulta("distNSU", ult_nsu, retorno)
     if retorno.status_codigo == 656:
         raise _erro_consumo_indevido(retorno, ult_nsu_enviado=ult_nsu)
     if retorno.status_codigo not in (137, 138):

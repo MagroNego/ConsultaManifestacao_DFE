@@ -59,7 +59,7 @@ A área exige login administrativo e reúne:
 
 ## Sincronização automática
 
-A rotina executa às **08:00 e 15:00 (Brasília)**, todos os dias. Usa o mesmo banco, certificado, cursor e cooldown da rotina manual. O aplicativo precisa permanecer em execução.
+A rotina executa às **22:00 e 01:00 (Brasília)**, todos os dias. Usa o mesmo banco, certificado, cursor e cooldown da rotina manual. O aplicativo precisa permanecer em execução.
 
 Uma janela concluída não é repetida após reiniciar. Falhas e distribuições parciais são retomadas na próxima janela, respeitando o bloqueio vigente. A rejeição 656 registra uma pausa; não altere o NSU para tentar eliminar esse bloqueio.
 
@@ -110,3 +110,73 @@ Na Emissão, **Item** pesquisa descrição, código ou NCM dos produtos. Em nota
 O ícone **Itens** de uma nota abre uma tela própria, com os dados da nota, filtro de produtos e exportação dos seus itens. **Voltar** retorna à Emissão com os filtros e a página anteriores, restaurando a posição de rolagem quando o navegador permite armazenamento de sessão.
 
 O ícone **Manifestações** na Emissão abre uma tela da nota com os eventos existentes no banco local, filtros por data e manifestação e exportação para Excel. **Voltar** mantém os filtros, a página e a posição da lista. Se não houver eventos, a tela informa que nenhum registro foi encontrado.
+
+
+### Convivência com a captura do Qive
+
+As consultas externas deste aplicativo são permitidas diariamente das 22h às
+04h, no horário de Brasília (UTC-3). A sincronização automática mantém os
+horários de 22h e 01h nos dias configurados. Recuperações e retentativas também
+respeitam a janela, inclusive entre lotes. Uma requisição já iniciada pode terminar
+após o fechamento; a próxima não é enviada. Consultas locais e exportações seguem
+disponíveis. O limite é verificado no servidor, independentemente do botão.
+
+Ative a rotina em produção após o Qive confirmar o ajuste. A janela foi
+escolhida para separar o app da janela de 08h às 18h solicitada ao suporte do Qive. Isso não garante, por si só, que a SEFAZ aceitará cursores
+independentes: acompanhe os retornos e confirme a configuração ativa com o Qive.
+
+O ultNSU de uma rejeição 656 fica registrado como divergência para conferência e
+recuperação. Ele não substitui o cursor de distribuição. A próxima distribuição
+parte do último cursor gravado com sucesso; os documentos de lacunas continuam
+sendo recuperados via consNSU, respeitando o limite horário e o bloqueio.
+As respostas recebidas são preservadas antes do processamento e os documentos e
+cursor são gravados na mesma transação. Esta atualização não restaura cursores
+antigos nem elimina pendências de bancos existentes.
+
+
+### Primeiro teste com as janelas separadas
+
+Antes de ativar a rotina, confirme com o Qive que as consultas e novas tentativas
+foram limitadas às 08h–18h de Brasília. Mantenha o computador e o aplicativo
+ligados durante a noite. O app dispara às 22h e 01h; fora das 22h–04h, consultas
+externas manuais, recuperação e retentativas ficam bloqueadas. A consulta ao
+banco local pode ser usada durante o dia.
+
+No Status, abra **Abrir logs** para acompanhar a execução. Erros novos mostram a
+etapa (distribuição ou recuperação), o código da SEFAZ quando recebido, o NSU
+inicial, o solicitado, o informado pela SEFAZ e o efetivamente salvo. Também
+mostram os lotes gravados, respostas pendentes, duração, próxima tentativa
+permitida e uma referência que reúne os registros da mesma execução no arquivo
+`logs/web_audit.log`. Horários novos de erro são identificados como Brasília;
+registros antigos conservam o horário do servidor.
+
+Se ocorrer 656, respeite a pausa e acompanhe as lacunas; não altere o cursor nem
+apague pendências para forçar o teste. Se houver falha de gravação, a resposta
+preservada permanece para processamento posterior. Falhas de certificado,
+configuração ou comunicação são registradas e a rotina automática aguarda a
+próxima janela de disparo, evitando repetir o mesmo erro a cada minuto.
+
+Depois da primeira noite, confira o NSU salvo, os documentos recuperados e os
+retornos da SEFAZ. Se a 656 persistir mesmo com os horários separados, use a
+referência e os NSUs do log para retomar a análise com o Qive.
+
+
+### Versão de teste: recuperação consNSU pausada
+
+Esta versão inicia com `NFE_RECOVERY_ENABLED=0`. Consultas manuais e automáticas
+via aplicativo web usam distNSU, mantendo a fila e as respostas de recuperação
+consNSU salvas no banco. O agendador não usa essa fila pausada para antecipar uma
+consulta. A janela das 22h–04h, os disparos às 22h/01h e a pausa após 656 permanecem.
+O Status indica que a recuperação está pausada.
+
+Após avaliar o teste, para retomar a recuperação, feche o app e execute no Prompt
+de Comando, dentro da pasta da instalação:
+
+```bat
+set NFE_RECOVERY_ENABLED=1
+INICIAR_WEB.cmd
+```
+
+Para manter a recuperação pausada, use `NFE_RECOVERY_ENABLED=0`. As pendências não
+são apagadas ao alternar essa configuração. Antes do teste noturno, confirme que
+o Qive aplicou a janela combinada; atualizar o código não confirma o ajuste deles.

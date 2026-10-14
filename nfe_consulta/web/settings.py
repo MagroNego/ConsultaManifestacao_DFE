@@ -106,8 +106,9 @@ class WebSettings:
     database_path_file: Path | None = None
     database_password_file: Path | None = None
     auto_sync_enabled: bool = False
+    recovery_enabled: bool = False
     auto_sync_interval_hours: int = 8
-    auto_sync_hour: int = 8
+    auto_sync_hour: int = 22
     auto_sync_minute: int = 0
     auto_sync_weekdays: tuple[int, ...] = (0, 1, 2, 3, 4, 5, 6)
     auto_sync_max_lotes: int = 50
@@ -191,9 +192,9 @@ def get_settings() -> WebSettings:
     ).strip() == "1"
     # Variáveis legadas não substituem os dois horários da rotina definitiva.
     auto_sync_once_date = None
-    # Compatibilidade da configuração; a rotina recorrente usa 08:00 e 15:00.
+    # Compatibilidade da configuração; a rotina recorrente usa 22:00 e 01:00.
     auto_sync_interval_hours = 8
-    auto_sync_hour = 8
+    auto_sync_hour = 22
     auto_sync_minute = 0
     auto_sync_max_lotes = int(os.getenv("NFE_AUTO_SYNC_MAX_LOTES", "50"))
     auto_sync_weekdays = _dias_semana(
@@ -256,6 +257,7 @@ def get_settings() -> WebSettings:
         database_path_file=DATABASE_PATH_FILE,
         database_password_file=DATABASE_PASSWORD_FILE,
         auto_sync_enabled=auto_sync_enabled,
+        recovery_enabled=os.getenv("NFE_RECOVERY_ENABLED", "0").strip() == "1",
         auto_sync_interval_hours=auto_sync_interval_hours,
         auto_sync_hour=auto_sync_hour,
         auto_sync_minute=auto_sync_minute,

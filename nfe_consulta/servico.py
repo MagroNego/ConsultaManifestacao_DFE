@@ -4,6 +4,8 @@ Toda a regra de orquestração fica aqui para manter HTTP, agendamento e
 persistência desacoplados das integrações fiscais.
 """
 
+from nfe_consulta.janela_consulta import exigir_janela
+
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
@@ -144,6 +146,7 @@ class ParametrosSincronizacao:
     cert_senha_arquivo: str | None = None
     cooldown_minutos: int = 60
     destinatarios_alerta: tuple[str, ...] = ()
+    recuperar_lacunas: bool = True
 
 
 def sincronizar_banco(
@@ -152,6 +155,7 @@ def sincronizar_banco(
     progresso_sincronizacao: ProgressoSincronizacao | None = None,
 ) -> ResumoSincronizacao:
     """Sincroniza somente o banco, sem depender de TXT ou gerar planilha."""
+    exigir_janela()
     banco_path = Path(parametros.banco).expanduser()
     if parametros.max_lotes < 1 or parametros.max_lotes > 500:
         raise ValueError("max_lotes deve estar entre 1 e 500.")
@@ -182,7 +186,7 @@ def sincronizar_banco(
                 max_lotes=parametros.max_lotes,
                 progresso_fn=progresso_sincronizacao,
                 destinatarios_alerta=parametros.destinatarios_alerta,
-                recuperar_lacunas=True,
+                recuperar_lacunas=parametros.recuperar_lacunas,
             )
         finally:
             banco.prorrogar_cooldown(cnpj, parametros.cooldown_minutos)

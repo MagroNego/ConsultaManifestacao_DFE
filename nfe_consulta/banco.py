@@ -187,12 +187,8 @@ class BancoManifestacoes:
         )
 
     def nsu_para_consulta(self, cnpj: str) -> str:
-        local, _ = self.obter_estado(cnpj)
-        row = self.conexao.execute(
-            "SELECT nsu_sefaz FROM recuperacoes_nsu WHERE cnpj=? AND retomado_em IS NULL "
-            "ORDER BY CAST(nsu_sefaz AS INTEGER) DESC LIMIT 1", (cnpj,),
-        ).fetchone()
-        return row[0] if row and int(row[0]) > int(local) else local
+        # O NSU retornado numa rejeição é diagnóstico, não confirmação de leitura.
+        return self.obter_estado(cnpj)[0]
 
     def proximo_nsu_faltante(self, cnpj: str) -> str | None:
         linha = self.conexao.execute("""
@@ -354,6 +350,8 @@ class BancoManifestacoes:
         destinatarios_alerta: tuple[str, ...] = (),
         *, resposta_id: int | None = None, atualizar_estado: bool = True, consulta_nsu_id: int | None = None,
     ) -> int:
+        if retorno.status_codigo not in (137, 138):
+            raise NfeErroResposta("Resposta rejeitada não pode atualizar documentos ou cursor")
         anterior, _ = self.obter_estado(cnpj)
         if (not retorno.ult_nsu.isdigit() or not retorno.max_nsu.isdigit()
                 or int(retorno.ult_nsu) < int(anterior)

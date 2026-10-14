@@ -64,7 +64,8 @@
       <span class="muted">NFeDistribuicaoDFe</span>
     </div>
 
-    <p class="muted">A atualização automática ocorre às 08:00 e 15:00 (Brasília). Use a sincronização manual quando precisar atualizar fora desses horários.</p>
+    <p class="muted">A atualização automática ocorre às 22:00 e 01:00 (Brasília). A sincronização manual também respeita a janela das 22h às 04h.</p>
+    {% if not request.app.state.settings.recovery_enabled %}<p class="muted">Teste do distNSU: consultas de recuperação consNSU pausadas; pendências preservadas.</p>{% endif %}
     <form action="{{ url_for('atualizar_sincronizar') }}" method="post" data-processing-form data-sync-confirm>
       <input type="hidden" name="csrf" value="{{ csrf }}">
 
@@ -130,7 +131,7 @@
                 Tentativa única encerrada · confira o Status
               {% endif %}
             {% else %}
-              Ativa · 08:00 e 15:00 (Brasília)
+              Ativa · 22:00 e 01:00 (Brasília)
             {% endif %}
           {% else %}
             Desativada

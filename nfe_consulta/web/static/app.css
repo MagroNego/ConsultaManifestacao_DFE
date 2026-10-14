@@ -1403,3 +1403,21 @@ html[data-theme="dark"] .brand-logo-dark {
   flex: 0 0 1px;
   background: var(--border);
 }
+
+/* Logs recolhidos por padrão na página de status. */
+.sync-logs { margin-top: 18px; }
+.sync-logs-toggle { width: fit-content; min-height: 44px; gap: 10px; list-style: none; }
+.sync-logs-toggle::-webkit-details-marker { display: none; }
+.sync-logs-toggle:focus-visible { outline: 2px solid var(--primary); outline-offset: 4px; }
+.sync-logs-toggle svg { flex-shrink: 0; }
+.sync-logs-close-label, .sync-logs[open] .sync-logs-open-label { display: none; }
+.sync-logs[open] .sync-logs-close-label { display: inline; }
+.sync-logs[open] .sync-logs-chevron { transform: rotate(180deg); }
+.sync-logs-content { margin-top: 24px; min-width: 0; }
+.sync-logs-recovery { padding-bottom: 24px; margin-bottom: 24px; border-bottom: 1px solid var(--border); }
+.sync-logs-recovery .alert { overflow-wrap: anywhere; }
+.sync-logs-recovery progress { accent-color: var(--success); }
+@media (max-width: 620px) {
+  .sync-logs { padding: 16px; }
+  .sync-logs-toggle { width: 100%; }
+}

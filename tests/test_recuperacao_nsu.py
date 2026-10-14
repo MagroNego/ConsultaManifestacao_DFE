@@ -34,7 +34,7 @@ def release_pause(banco):
         banco.conexao.execute("DELETE FROM pausa_distribuicao")
 
 
-def test_656_preserva_cursor_pausa_e_retoma_com_nsu_da_sefaz(tmp_path, monkeypatch):
+def test_656_preserva_cursor_pausa_e_retoma_com_nsu_local(tmp_path, monkeypatch):
     path, banco = setup_bank(tmp_path)
     respostas = [response(656, "15"), response(138, "20")]
     enviados = []
@@ -47,7 +47,7 @@ def test_656_preserva_cursor_pausa_e_retoma_com_nsu_da_sefaz(tmp_path, monkeypat
     with pytest.raises(NfeConsumoIndevidoErro):
         sincronizar(banco, CNPJ, "33", CERT)
     assert banco.obter_estado(CNPJ)[0] == "10".zfill(15)
-    assert banco.nsu_para_consulta(CNPJ) == "15".zfill(15)
+    assert banco.nsu_para_consulta(CNPJ) == "10".zfill(15)
     assert read_web_status(path, CNPJ).complete is False
     with pytest.raises(Exception, match="nova tentativa"):
         sincronizar(banco, CNPJ, "33", CERT)
@@ -56,7 +56,7 @@ def test_656_preserva_cursor_pausa_e_retoma_com_nsu_da_sefaz(tmp_path, monkeypat
     banco.fechar()
     banco = BancoManifestacoes(str(path))
     resumo = sincronizar(banco, CNPJ, "33", CERT)
-    assert "<ultNSU>000000000000015</ultNSU>" in enviados[-1]
+    assert "<ultNSU>000000000000010</ultNSU>" in enviados[-1]
     assert resumo.completo
     status = read_web_status(path, CNPJ)
     assert not status.complete  # Retomada não comprova os documentos do intervalo.
@@ -162,9 +162,10 @@ def test_loop_agenda_retoma_antes_da_proxima_janela(tmp_path, monkeypatch):
     settings = SimpleNamespace(database_path=path, database_path_file=tmp_path / "ausente",
                                current_database_password=lambda: None,
                                auto_sync_once_date=None, auto_sync_weekdays=tuple(range(7)))
-    agora = datetime.now(timezone.utc).astimezone(timezone(timedelta(hours=-3))).replace(hour=15)
+    agora = datetime.now(timezone.utc).astimezone(timezone(timedelta(hours=-3))).replace(hour=1)
     monkeypatch.setattr(scheduler, "agora_brasilia", lambda: agora)
     monkeypatch.setattr(scheduler, "ultima_janela_concluida", lambda _: None)
+    monkeypatch.setattr(scheduler, "proxima_recuperacao_nsu", lambda _: agora + timedelta(hours=1))
     chamados, esperas = [], []
 
     async def executar(*args, **kwargs):

@@ -66,6 +66,8 @@ from nfe_consulta.web.email_alerts import (
     contar_pendentes, enviar_pendentes, cancelar_pendentes_removidos,
 )
 from nfe_consulta.web.sync_runtime import sincronizar_configurado
+from nfe_consulta.web.sync_diagnostics import detalhes_erro, mensagem_erro
+from nfe_consulta import janela_consulta
 from nfe_consulta.web.uploads import consolidar_txts
 from nfe_consulta.web.xml_routes import register_xml_routes
 from nfe_consulta.web.xml_store import existing_keys, MAX_UPLOAD, import_history
@@ -301,7 +303,8 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         app.state.audit.write_system(
             "sefaz_scheduler",
             "iniciado",
-            horarios=["08:00", "15:00"],
+            horarios=["22:00", "01:00"],
+            recuperacao_cons_nsu=settings.recovery_enabled,
             dias=list(settings.auto_sync_weekdays),
             data_unica=settings.auto_sync_once_date.isoformat() if settings.auto_sync_once_date else None,
             max_lotes=settings.auto_sync_max_lotes,
@@ -1307,6 +1310,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
 
         status_web = await run_in_threadpool(_status_web, settings)
         if not status_web.database_ready:
+            app.state.audit.write(request, user, "sefaz_sync", "ignorado", reason="database_unavailable")
             return _render(
                 request,
                 "sefaz.html",
@@ -1322,7 +1326,11 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             )
 
         if not status_web.can_sync:
-            app.state.audit.write(request, user, "sefaz_sync", "ignorado", reason="cooldown")
+            agora = janela_consulta.agora_brasilia()
+            app.state.audit.write(request, user, "sefaz_sync", "ignorado",
+                reason="fora_janela" if janela_consulta.proxima_abertura(agora) > agora else "cooldown",
+                nsu_salvo=status_web.ult_nsu,
+                proxima_tentativa=status_web.available_at.isoformat() if status_web.available_at else None)
             return _render(
                 request,
                 "sefaz.html",
@@ -1342,6 +1350,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
 
         lock: threading.Lock = app.state.sync_lock
         if not lock.acquire(blocking=False):
+            app.state.audit.write(request, user, "sefaz_sync", "ignorado", reason="sync_in_progress")
             return _render(
                 request,
                 "sefaz.html",
@@ -1380,6 +1389,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                 completo=resumo.completo,
                 cache=resumo.cache,
                 cooldown_minutos=settings.sync_cooldown_minutes,
+                recuperacao_cons_nsu=settings.recovery_enabled,
             )
             return RedirectResponse(
                 url=request.url_for("atualizar_page").include_query_params(ok="1"),
@@ -1392,6 +1402,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                 "sefaz_sync",
                 "erro",
                 reason=type(exc).__name__,
+                **detalhes_erro(exc),
             )
             try:
                 status_web = await run_in_threadpool(_status_web, settings)
@@ -1408,7 +1419,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                 user,
                 status_code=http_status,
                 status_web=status_web,
-                error=str(exc),
+                error=mensagem_erro(exc),
                 certificate_store=settings.certificate_store,
                 certificate_fixed=bool(settings.certificate_thumbprint),
                 certificate_web=_certificado_web(settings),

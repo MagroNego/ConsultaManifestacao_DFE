@@ -692,3 +692,48 @@ def test_consulta_publica_nao_expoe_erro_de_senha_do_banco(tmp_path, monkeypatch
     assert "Banco não sincronizado" in resposta.text
     assert "informe a senha" not in resposta.text.casefold()
     assert "criptografado" not in resposta.text.casefold()
+
+
+def test_erro_manual_exibe_diagnostico_no_status_sem_mensagem_bruta(tmp_path, monkeypatch):
+    from nfe_consulta.modelos import NfeConsumoIndevidoErro
+    cfg = settings_web(tmp_path)
+    criar_banco(cfg.database_path)
+    exc = NfeConsumoIndevidoErro('senha=segredo mensagem interna', ult_nsu='25', ult_nsu_enviado='20')
+    exc.sync_diagnostics = dict(execucao='b'*32, etapa='distNSU', nsu_antes='10', nsu_salvo='20',
+        lotes_gravados=1, respostas_pendentes=0, proxima_tentativa='2026-10-14T22:00:00-03:00')
+    def falhar(*args, **kwargs):
+        raise exc
+    monkeypatch.setattr('nfe_consulta.web.app.sincronizar_configurado', falhar)
+    with TestClient(create_app(cfg)) as client:
+        token = entrar_admin(client, cfg)
+        resposta = client.post('/atualizar/sincronizar', data={
+            'csrf': token, 'max_lotes': '50', 'confirmacao': 'sincronizar'})
+        history = client.get('/status')
+    assert resposta.status_code == 429
+    assert 'segredo' not in resposta.text and 'segredo' not in history.text
+    assert 'b'*32 in resposta.text and 'b'*32 in history.text
+    assert 'NSU salvo: 000000000000020' in history.text
+    assert 'Lotes gravados: 1' in history.text
+    assert '14/10/2026 22:00 (Brasília)' in history.text
+    assert '<details class="card status-summary sync-logs">' in history.text
+
+
+def test_post_fora_do_horario_registra_janela_em_vez_de_cooldown(tmp_path, monkeypatch):
+    from datetime import datetime
+    from nfe_consulta.janela_consulta import BRASILIA
+    cfg = settings_web(tmp_path)
+    criar_banco(cfg.database_path)
+    monkeypatch.setattr('nfe_consulta.janela_consulta.agora_brasilia',
+                        lambda: datetime(2026, 10, 13, 18, tzinfo=BRASILIA))
+    def proibido(*args, **kwargs):
+        pytest.fail('Consulta fora da janela')
+    monkeypatch.setattr('nfe_consulta.web.app.sincronizar_configurado', proibido)
+    with TestClient(create_app(cfg)) as client:
+        token = entrar_admin(client, cfg)
+        resposta = client.post('/atualizar/sincronizar', data={
+            'csrf': token, 'max_lotes': '50', 'confirmacao': 'sincronizar'})
+    registros = [json.loads(line.split(' ', 2)[2]) for line in cfg.audit_log.read_text().splitlines()]
+    bloqueio = next(r for r in registros if r['action'] == 'sefaz_sync')
+    assert resposta.status_code == 429
+    assert bloqueio['reason'] == 'fora_janela'
+    assert bloqueio['proxima_tentativa'] == '2026-10-13T22:00:00-03:00'

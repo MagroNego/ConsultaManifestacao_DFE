@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from nfe_consulta.janela_consulta import NfeJanelaConsultaErro, proxima_abertura
+
 import asyncio
 from datetime import date, datetime, time, timedelta, timezone
 from typing import Iterable
@@ -9,6 +11,7 @@ from typing import Iterable
 from nfe_consulta.config import CNPJ_PADRAO
 from nfe_consulta.modelos import NfeConsumoIndevidoErro, NfeLimiteConsultaErro
 from nfe_consulta.seguranca_banco import abrir_banco
+from nfe_consulta.web.sync_diagnostics import detalhes_erro
 from nfe_consulta.web.sync_runtime import (
     caminho_banco_configurado,
     sincronizar_configurado,
@@ -180,18 +183,23 @@ async def executar_sincronizacao_automatica(
                 max_lotes=settings.auto_sync_max_lotes,
                 audit=app.state.audit,
             )
-        except NfeLimiteConsultaErro:
+        except NfeJanelaConsultaErro as exc:
+            app.state.audit.write_system("sefaz_sync_auto", "ignorado", reason="fora_janela", **detalhes_erro(exc))
+            return proxima_abertura(agora_brasilia())
+        except NfeLimiteConsultaErro as exc:
             app.state.audit.write_system(
                 "sefaz_sync_auto",
                 "ignorado",
                 reason="cooldown",
+                **detalhes_erro(exc),
             )
             return await asyncio.to_thread(proxima_tentativa_permitida, settings)
-        except NfeConsumoIndevidoErro:
+        except NfeConsumoIndevidoErro as exc:
             app.state.audit.write_system(
                 "sefaz_sync_auto",
                 "erro",
                 reason="consumo_indevido_656",
+                **detalhes_erro(exc),
             )
             return await asyncio.to_thread(proxima_tentativa_permitida, settings)
         except Exception as exc:
@@ -199,8 +207,9 @@ async def executar_sincronizacao_automatica(
                 "sefaz_sync_auto",
                 "erro",
                 reason=type(exc).__name__,
+                **detalhes_erro(exc),
             )
-            return
+            return proxima_abertura(janelas_diarias(agora_brasilia())[1])
 
         try:
             if resumo.completo:
@@ -213,7 +222,7 @@ async def executar_sincronizacao_automatica(
                 "sefaz_sync_auto", "erro",
                 reason=f"schedule_state_{type(exc).__name__}",
             )
-            return
+            return proxima_abertura(janelas_diarias(agora_brasilia())[1])
 
         app.state.audit.write_system(
             "sefaz_sync_auto",
@@ -230,6 +239,7 @@ async def executar_sincronizacao_automatica(
             completo=resumo.completo,
             cache=resumo.cache,
             cooldown_minutos=settings.sync_cooldown_minutes,
+            recuperacao_cons_nsu=getattr(settings, "recovery_enabled", True),
         )
     finally:
         lock.release()
@@ -274,11 +284,16 @@ async def loop_sincronizacao_automatica(app) -> None:
 
     while True:
         agora = agora_brasilia()
+        abertura = proxima_abertura(agora)
+        if abertura > agora:
+            app.state.auto_sync_next_at = abertura
+            await asyncio.sleep(min(60.0, (abertura - agora).total_seconds()))
+            continue
         janela, proxima = janelas_diarias(agora)
         recuperacao = await asyncio.to_thread(proxima_recuperacao_nsu, settings)
         adiada = None
         app.state.auto_sync_next_at = proxima
-        if janela.date() == agora.date() and janela.weekday() in settings.auto_sync_weekdays:
+        if janela.weekday() in settings.auto_sync_weekdays:
             try:
                 ultima = await asyncio.to_thread(ultima_janela_concluida, settings)
             except Exception as exc:
@@ -287,18 +302,22 @@ async def loop_sincronizacao_automatica(app) -> None:
                     "sefaz_scheduler", "erro",
                     reason=f"schedule_state_{type(exc).__name__}",
                 )
+                adiada = proxima_abertura(proxima)
             else:
                 if (ultima is None or ultima < janela
                         or (recuperacao is not None and recuperacao <= agora)):
                     adiada = await executar_sincronizacao_automatica(app, janela_agendada=janela)
         agora = agora_brasilia()
         # Rejeições com cursor recuperável retomam após a pausa, sem esperar
-        # pela próxima janela de 08:00/15:00 e sem repetir durante o bloqueio.
+        # pela próxima janela de 22:00/01:00 e sem repetir durante o bloqueio.
         recuperacao = await asyncio.to_thread(proxima_recuperacao_nsu, settings)
         if recuperacao is not None:
             proxima = min(proxima, max(recuperacao, agora + timedelta(seconds=60)))
         if adiada is not None:
-            proxima = min(proxima, max(adiada, agora + timedelta(seconds=1)))
+            # Uma tentativa bloqueada/erro de configuração também limita a
+            # recuperação pendente; não repita a falha a cada minuto.
+            proxima = max(adiada, agora + timedelta(seconds=1))
+        proxima = proxima_abertura(proxima)
         app.state.auto_sync_next_at = proxima
         espera = max(1.0, (proxima - agora).total_seconds())
         # Uma tentativa manual pode registrar recuperação enquanto o agendador
@@ -323,6 +342,8 @@ def proxima_tentativa_permitida(settings) -> datetime | None:
 
 
 def proxima_recuperacao_nsu(settings) -> datetime | None:
+    if not getattr(settings, "recovery_enabled", True):
+        return None
     from nfe_consulta.web.status_view import read_web_status
 
     try:
@@ -339,13 +360,13 @@ def proxima_recuperacao_nsu(settings) -> datetime | None:
 
 
 def janelas_diarias(agora: datetime) -> tuple[datetime, datetime]:
-    """Janelas fixas às 08:00 e 15:00 de Brasília, sem disparo à meia-noite."""
+    """Janelas fixas às 22:00 e 01:00 de Brasília, sem disparo à meia-noite."""
     if agora.tzinfo is None:
         raise ValueError("O instante deve ter fuso horário.")
     agora = agora.astimezone(timezone(timedelta(hours=-3)))
     candidatos = sorted(
         datetime.combine(agora.date() + timedelta(days=dia), time(hora), tzinfo=agora.tzinfo)
-        for dia in (-1, 0, 1) for hora in (8, 15)
+        for dia in (-1, 0, 1) for hora in (1, 22)
     )
     return (
         max(instante for instante in candidatos if instante <= agora),

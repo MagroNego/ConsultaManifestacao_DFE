@@ -240,21 +240,21 @@ def test_janelas_oito_horas_usam_brasilia_em_fins_de_semana():
 
 
 @pytest.mark.parametrize("hora,minuto,atual_dia,atual_hora,proximo_dia,proxima_hora", [
-    (0, 0, 2, 15, 3, 8),
-    (7, 59, 2, 15, 3, 8),
-    (8, 0, 3, 8, 3, 15),
-    (14, 59, 3, 8, 3, 15),
-    (15, 0, 3, 15, 4, 8),
-    (23, 59, 3, 15, 4, 8),
+    (0, 0, 2, 22, 3, 1),
+    (0, 59, 2, 22, 3, 1),
+    (1, 0, 3, 1, 3, 22),
+    (21, 59, 3, 1, 3, 22),
+    (22, 0, 3, 22, 4, 1),
+    (23, 59, 3, 22, 4, 1),
 ])
-def test_janelas_fixas_08_e_15(hora, minuto, atual_dia, atual_hora, proximo_dia, proxima_hora):
+def test_janelas_fixas_22_e_01(hora, minuto, atual_dia, atual_hora, proximo_dia, proxima_hora):
     agora = scheduler.horario_unico(date(2026, 10, 3), hora, minuto)
     atual, proxima = scheduler.janelas_diarias(agora.astimezone(timezone.utc))
     assert (atual.day, atual.hour, atual.minute) == (atual_dia, atual_hora, 0)
     assert (proxima.day, proxima.hour, proxima.minute) == (proximo_dia, proxima_hora, 0)
 
 
-def test_loop_antes_das_08_nao_recupera_janela_de_ontem(monkeypatch):
+def test_loop_diurno_aguarda_22h(monkeypatch):
     agora = scheduler.horario_unico(date(2026, 10, 5), 7, 59)
     monkeypatch.setattr(scheduler, "agora_brasilia", lambda: agora)
     chamadas = []
@@ -270,7 +270,7 @@ def test_loop_antes_das_08_nao_recupera_janela_de_ontem(monkeypatch):
     with pytest.raises(asyncio.CancelledError):
         asyncio.run(scheduler.loop_sincronizacao_automatica(app))
     assert chamadas == []
-    assert app.state.auto_sync_next_at == agora.replace(hour=8, minute=0)
+    assert app.state.auto_sync_next_at == agora.replace(hour=22, minute=0)
 
 
 def test_persistencia_distingue_duas_janelas_e_sobrevive_a_reinicio(tmp_path):
@@ -280,7 +280,7 @@ def test_persistencia_distingue_duas_janelas_e_sobrevive_a_reinicio(tmp_path):
     cfg = SimpleNamespace(database_path=caminho, database_path_file=None,
                           current_database_password=lambda: None)
     assert scheduler.ultima_janela_concluida(cfg) is None
-    for hora in (8, 15):
+    for hora in (22, 1):
         janela = scheduler.horario_unico(date(2026, 9, 30), hora, 0)
         scheduler.registrar_janela_concluida(cfg, janela)
         # A leitura reabre o arquivo; não depende de estado em memória.
@@ -288,8 +288,8 @@ def test_persistencia_distingue_duas_janelas_e_sobrevive_a_reinicio(tmp_path):
 
 
 def test_loop_nao_repete_janela_concluida_apos_reinicio(monkeypatch):
-    atual = scheduler.horario_unico(date(2026, 9, 30), 8, 0)
-    monkeypatch.setattr(scheduler, "agora_brasilia", lambda: atual.replace(hour=9))
+    atual = scheduler.horario_unico(date(2026, 9, 30), 22, 0)
+    monkeypatch.setattr(scheduler, "agora_brasilia", lambda: atual.replace(hour=23))
     monkeypatch.setattr(scheduler, "ultima_janela_concluida", lambda _: atual)
     chamadas = []
     async def executar(*args, **kwargs):
@@ -307,12 +307,12 @@ def test_loop_nao_repete_janela_concluida_apos_reinicio(monkeypatch):
     except asyncio.CancelledError:
         pass
     assert chamadas == []
-    assert app.state.auto_sync_next_at.hour == 15
+    assert app.state.auto_sync_next_at.hour == 1
 
 
 def test_loop_recupera_so_a_janela_mais_recente(monkeypatch):
-    atual = scheduler.horario_unico(date(2026, 10, 4), 15, 0)
-    monkeypatch.setattr(scheduler, "agora_brasilia", lambda: atual.replace(hour=17))
+    atual = scheduler.horario_unico(date(2026, 10, 4), 1, 0)
+    monkeypatch.setattr(scheduler, "agora_brasilia", lambda: atual.replace(hour=3))
     monkeypatch.setattr(scheduler, "ultima_janela_concluida", lambda _: atual.replace(day=1))
     chamadas = []
     async def executar(*args, **kwargs):
@@ -343,13 +343,13 @@ def test_distribuicao_parcial_nao_conclui_janela(monkeypatch):
     monkeypatch.setattr(scheduler, "sincronizar_configurado", lambda *args, **kwargs: SimpleNamespace(
         lotes=50, eventos_novos=1, ult_nsu="1", max_nsu="2", completo=False, cache=False))
     asyncio.run(scheduler.executar_sincronizacao_automatica(
-        app, janela_agendada=scheduler.horario_unico(date(2026, 9, 30), 8, 0)))
+        app, janela_agendada=scheduler.horario_unico(date(2026, 9, 30), 22, 0)))
     assert registros == []
 
 
 @pytest.mark.parametrize("hora,minuto,erro", [
-    (8, 39, "cooldown"),
-    (15, 60, "656"),
+    (22, 39, "cooldown"),
+    (1, 60, "656"),
 ])
 def test_loop_retoma_janela_bloqueada_ao_liberar(tmp_path, monkeypatch, hora, minuto, erro):
     from datetime import timedelta
@@ -378,6 +378,7 @@ def test_loop_retoma_janela_bloqueada_ao_liberar(tmp_path, monkeypatch, hora, mi
     audit = SimpleNamespace(write_system=lambda *args, **kwargs: None)
     app = SimpleNamespace(state=SimpleNamespace(settings=cfg, sync_lock=threading.Lock(), audit=audit))
     monkeypatch.setattr(scheduler, "agora_brasilia", lambda: agora[0])
+    monkeypatch.setattr("nfe_consulta.janela_consulta.agora_brasilia", lambda: agora[0])
     monkeypatch.setattr(scheduler, "ultima_janela_concluida", lambda _: concluidas[-1] if concluidas else None)
     monkeypatch.setattr(scheduler, "registrar_janela_concluida", lambda _, janela: concluidas.append(janela))
 
@@ -410,13 +411,14 @@ def test_loop_retoma_janela_bloqueada_ao_liberar(tmp_path, monkeypatch, hora, mi
 def test_recuperacao_manual_acorda_agendador_apos_janela_concluida(monkeypatch):
     from datetime import timedelta
 
-    inicio = datetime(2026, 10, 9, 10, 40, tzinfo=timezone(timedelta(hours=-3)))
+    inicio = datetime(2026, 10, 9, 2, 40, tzinfo=timezone(timedelta(hours=-3)))
     liberacao = inicio + timedelta(minutes=2)
     agora, esperas, chamadas = [inicio], [], []
     cfg = SimpleNamespace(auto_sync_once_date=None, auto_sync_weekdays=tuple(range(7)))
     app = SimpleNamespace(state=SimpleNamespace(settings=cfg))
     monkeypatch.setattr(scheduler, "agora_brasilia", lambda: agora[0])
-    monkeypatch.setattr(scheduler, "ultima_janela_concluida", lambda _: inicio.replace(hour=8, minute=0))
+    monkeypatch.setattr("nfe_consulta.janela_consulta.agora_brasilia", lambda: agora[0])
+    monkeypatch.setattr(scheduler, "ultima_janela_concluida", lambda _: inicio.replace(hour=1, minute=0))
     monkeypatch.setattr(scheduler, "proxima_recuperacao_nsu",
                         lambda _: liberacao if esperas and not chamadas else None)
 
@@ -436,3 +438,61 @@ def test_recuperacao_manual_acorda_agendador_apos_janela_concluida(monkeypatch):
         asyncio.run(scheduler.loop_sincronizacao_automatica(app))
     assert chamadas == [liberacao]
     assert esperas == [60, 60]
+
+
+@pytest.mark.parametrize("hora,esperada", [(0, 22), (2, 1)])
+def test_reinicio_na_madrugada_recupera_janela_mais_recente(monkeypatch, hora, esperada):
+    agora = scheduler.horario_unico(date(2026, 10, 14), hora, 30)
+    monkeypatch.setattr(scheduler, "agora_brasilia", lambda: agora)
+    monkeypatch.setattr(scheduler, "ultima_janela_concluida", lambda _: None)
+    monkeypatch.setattr(scheduler, "proxima_recuperacao_nsu", lambda _: None)
+    chamadas = []
+    async def executar(*args, **kwargs):
+        chamadas.append(kwargs["janela_agendada"])
+    async def parar(_):
+        raise asyncio.CancelledError
+    monkeypatch.setattr(scheduler, "executar_sincronizacao_automatica", executar)
+    monkeypatch.setattr(scheduler.asyncio, "sleep", parar)
+    app = SimpleNamespace(state=SimpleNamespace(settings=SimpleNamespace(
+        auto_sync_once_date=None, auto_sync_weekdays=tuple(range(7)),
+    )))
+    with pytest.raises(asyncio.CancelledError):
+        asyncio.run(scheduler.loop_sincronizacao_automatica(app))
+    assert len(chamadas) == 1
+    assert chamadas[0].hour == esperada
+    assert chamadas[0].day == (13 if hora == 0 else 14)
+
+
+@pytest.mark.parametrize("hora,proxima_hora", [(22, 1), (2, 22)])
+def test_erro_configuracao_aguarda_disparo_mesmo_com_recuperacao_pendente(monkeypatch, hora, proxima_hora):
+    from nfe_consulta.modelos import NfeErroCertificado
+    agora = scheduler.horario_unico(date(2026, 10, 14), hora, 10)
+    monkeypatch.setattr(scheduler, "agora_brasilia", lambda: agora)
+    monkeypatch.setattr(scheduler, "ultima_janela_concluida", lambda _: None)
+    monkeypatch.setattr(scheduler, "proxima_recuperacao_nsu", lambda _: agora)
+    chamadas, esperas, registros = [], [], []
+    def falhar(*args, **kwargs):
+        chamadas.append(1)
+        raise NfeErroCertificado("falha sensível")
+    async def parar(segundos):
+        esperas.append(segundos)
+        raise asyncio.CancelledError
+    monkeypatch.setattr(scheduler, "sincronizar_configurado", falhar)
+    monkeypatch.setattr(scheduler.asyncio, "sleep", parar)
+    cfg = SimpleNamespace(auto_sync_once_date=None, auto_sync_weekdays=tuple(range(7)), auto_sync_max_lotes=50)
+    app = SimpleNamespace(state=SimpleNamespace(settings=cfg, sync_lock=threading.Lock(),
+        audit=SimpleNamespace(write_system=lambda *args, **kwargs: registros.append((args, kwargs)))))
+    with pytest.raises(asyncio.CancelledError):
+        asyncio.run(scheduler.loop_sincronizacao_automatica(app))
+    assert chamadas == [1]
+    assert app.state.auto_sync_next_at.hour == proxima_hora
+    assert esperas[0] > 60
+    assert registros[0][1]['etapa'] == 'certificado'
+    assert 'sensível' not in repr(registros)
+
+
+def test_recuperacao_pausada_nao_antecipa_proximo_disparo(monkeypatch):
+    def proibido(*args, **kwargs):
+        pytest.fail('A fila pausada não deve reagendar consultas')
+    monkeypatch.setattr('nfe_consulta.web.status_view.read_web_status', proibido)
+    assert scheduler.proxima_recuperacao_nsu(SimpleNamespace(recovery_enabled=False)) is None
