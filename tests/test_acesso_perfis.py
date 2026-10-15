@@ -43,7 +43,7 @@ def test_admin_redireciona_para_login(tmp_path, path):
         response = client.get(path, follow_redirects=False)
         assert response.status_code == 303
         assert response.headers['location'].endswith('/admin/login')
-        assert 'Entrar no Admin' in client.get(path).text
+        assert 'Entrar no AtlasDFE' in client.get(path).text
 
 
 def test_todas_mutacoes_admin_bloqueadas_sem_sessao(tmp_path):
@@ -74,11 +74,11 @@ def test_login_admin_importa_e_logout_revoga_sessao(tmp_path):
         assert client.post('/xml/importar', data={'csrf': token}, files={'files': ('a.xml', helpers['xml']())}).status_code == 401
 
 
-def test_login_recusa_senha_invalida_e_conta_fiscal(tmp_path):
+def test_login_recusa_senha_invalida(tmp_path):
     cfg, app = setup(tmp_path)
     app.state.admin_accounts.create('fiscal', PASSWORD, 'fiscal')
     with TestClient(app) as client:
-        for username, password in [('admin', 'errada'), ('fiscal', PASSWORD)]:
+        for username, password in [('admin', 'errada'), ('fiscal', 'errada')]:
             response = client.post('/admin/login', data={'csrf': csrf_token(PUBLIC_USER, cfg), 'username': username, 'password': password})
             assert response.status_code == 401
         assert client.get('/atualizar', follow_redirects=False).status_code == 303
@@ -128,3 +128,50 @@ def test_migracao_preserva_senha_e_admin_e_revoga_sessoes_antigas(tmp_path):
         assert db.execute('SELECT password_hash FROM admins').fetchone()[0]==encoded
     accounts.create('novo',PASSWORD)
     assert accounts.role('novo')=='consulta'
+
+
+@pytest.mark.parametrize('role', ['consulta', 'fiscal'])
+def test_usuario_comum_entra_consulta_exporta_e_sai_sem_acessar_admin(tmp_path, role):
+    cfg, app = setup(tmp_path)
+    app.state.admin_accounts.create('comum', PASSWORD, role)
+    with TestClient(app) as client:
+        response = client.post('/admin/login', data={
+            'csrf': csrf_token(PUBLIC_USER, cfg), 'username': 'comum', 'password': PASSWORD,
+        }, follow_redirects=False)
+        assert response.status_code == 303
+        assert response.headers['location'].endswith('/consulta')
+        page = client.get('/consulta')
+        assert 'comum' in page.text
+        assert '>Sair</button>' in page.text
+        assert client.get('/consulta/exportar').status_code == 200
+        assert client.get('/admin/contas', follow_redirects=False).status_code == 303
+        for path in ['/admin/contas', '/atualizar', '/xml/importar', '/admin/notas/situacao']:
+            assert client.post(path, data={'action': 'create', 'username': 'intruso',
+                'password': PASSWORD, 'role': 'admin'}).status_code == 401
+        import re
+        token = re.search(r'name="csrf" value="([^"]+)"', page.text).group(1)
+        cookie = client.cookies[cfg.admin_cookie_name]
+        assert client.post('/admin/logout', data={'csrf': token}, follow_redirects=False).status_code == 303
+        client.cookies.set(cfg.admin_cookie_name, cookie)
+        assert '>Sair</button>' not in client.get('/consulta').text
+
+
+def test_admin_cadastra_comum_e_gerencia_acesso_com_csrf(tmp_path):
+    cfg, app = setup(tmp_path)
+    with TestClient(app) as client:
+        token = helpers['login'](client, cfg)
+        assert 'Gerenciar usuários' in client.get('/atualizar').text
+        assert 'Usuário comum' in client.get('/admin/contas').text
+        data = {'csrf': token, 'action': 'create', 'username': 'novo', 'password': PASSWORD}
+        assert client.post('/admin/contas', data={**data, 'csrf': 'invalido'}).status_code == 403
+        assert app.state.admin_accounts.role('novo') is None
+        assert client.post('/admin/contas', data=data, follow_redirects=False).status_code == 303
+        assert app.state.admin_accounts.role('novo') == 'fiscal'
+        assert client.post('/admin/contas', data=data).status_code == 400
+        for role in ['inexistente']:
+            assert client.post('/admin/contas', data={**data, 'username': 'outro', 'role': role}).status_code == 400
+        assert client.post('/admin/contas', data={'csrf': token, 'action': 'deactivate',
+            'username': cfg.admin_username}).status_code == 400
+        assert client.post('/admin/contas', data={'csrf': token, 'action': 'deactivate',
+            'username': 'novo'}, follow_redirects=False).status_code == 303
+        assert app.state.admin_accounts.authenticate('novo', PASSWORD) is None

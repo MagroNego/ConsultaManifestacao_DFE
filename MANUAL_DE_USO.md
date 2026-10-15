@@ -207,3 +207,7 @@ continuam no schema por compatibilidade, sem conteúdo em novos documentos.
 Dados já extraídos podem gerar novos relatórios. Para extrair futuramente um campo
 que não foi armazenado, será necessário obter novamente o XML na origem; o app
 não terá uma cópia permanente para reprocessamento.
+
+### Cadastrar usuário comum
+
+Entre como administrador e abra **Admin → Gerenciar usuários**. Informe usuário, senha inicial de pelo menos 12 caracteres e mantenha **Usuário comum** no perfil. Clique em **Cadastrar usuário**. A pessoa pode entrar pelo botão **Entrar**, consultar e exportar relatórios; não acessa a administração. Nessa mesma tela o administrador pode alterar perfil, redefinir senha, ativar ou desativar contas. Mudanças de perfil, senha e ativação revogam as sessões da conta. O último administrador ativo não pode ser removido nem perder o perfil.
