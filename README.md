@@ -70,7 +70,7 @@ A senha fica como hash em `dados/admin_accounts.db` (ou `NFE_ADMIN_ACCOUNTS_PATH
 
 - Proteção CSRF nos formulários.
 - SQL parametrizado, processamento XML com `defusedxml` e limites de upload/exportação.
-- Auditoria com rotação em `logs/web_audit.log`.
+- Auditoria com rotação em `logs/web_audit.log`. O histórico de sincronização retém 30 dias; a limpeza automática preserva os demais registros administrativos e todos os dados fiscais.
 - SQLCipher opcional para proteger o banco fiscal; a administração mostra o modo de armazenamento.
 
 Senhas do banco, certificado e SMTP ficam em `secrets`. Contas administrativas antigas continuam disponíveis; contas sem perfil Admin não entram nessa área. As credenciais não são incluídas nas releases.

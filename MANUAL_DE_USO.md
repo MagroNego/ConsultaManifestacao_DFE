@@ -211,3 +211,7 @@ não terá uma cópia permanente para reprocessamento.
 ### Cadastrar usuário comum
 
 Entre como administrador e abra **Admin → Gerenciar usuários**. Informe usuário, senha inicial de pelo menos 12 caracteres e mantenha **Usuário comum** no perfil. Clique em **Cadastrar usuário**. A pessoa pode entrar pelo botão **Entrar**, consultar e exportar relatórios; não acessa a administração. Nessa mesma tela o administrador pode alterar perfil, redefinir senha, ativar ou desativar contas. Mudanças de perfil, senha e ativação revogam as sessões da conta. O último administrador ativo não pode ser removido nem perder o perfil.
+
+### Retenção do histórico de sincronização
+
+O histórico de sincronização mostra somente os últimos 30 dias. Registros SEFAZ mais antigos são removidos do log ao iniciar o servidor e diariamente na primeira gravação de auditoria. A limpeza também alcança os cinco arquivos de rotação. Registros administrativos seguem a rotação por tamanho existente. Notas, manifestações, cursores NSU, respostas pendentes e intervalos de recuperação não são apagados. A retenção não altera nem compacta o banco fiscal.

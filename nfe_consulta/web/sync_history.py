@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from nfe_consulta.web.sync_diagnostics import detalhes_erro
+from nfe_consulta.web.log_retention import SYNC_RETENTION_DAYS, log_instant
 
 
 _REASONS = {
@@ -105,8 +106,9 @@ def _tail_lines(path: Path, max_bytes: int = 6 * 1024 * 1024) -> list[str]:
     return data.decode("utf-8", errors="replace").splitlines()
 
 
-def read_sync_history(path: Path, limit: int = 10) -> tuple[SyncHistoryItem, ...]:
+def read_sync_history(path: Path, limit: int = 10, *, now: datetime | None = None) -> tuple[SyncHistoryItem, ...]:
     """Lê apenas ações SEFAZ; nunca expõe usuário, IP ou mensagem bruta do log."""
+    cutoff = (now or datetime.now(timezone.utc)) - timedelta(days=SYNC_RETENTION_DAYS)
     items: list[SyncHistoryItem] = []
     for candidate in (path, *(path.with_name(f"{path.name}.{i}") for i in range(1, 6))):
         if not candidate.is_file():
@@ -124,6 +126,9 @@ def read_sync_history(path: Path, limit: int = 10) -> tuple[SyncHistoryItem, ...
             if not isinstance(payload, dict):
                 continue
             if payload.get("action") not in {"sefaz_sync", "sefaz_sync_auto"}:
+                continue
+            instant = log_instant(line, payload)
+            if instant is None or instant < cutoff:
                 continue
             outcome = payload.get("result")
             if outcome not in {"ok", "erro", "ignorado"}:
