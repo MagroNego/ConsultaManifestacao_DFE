@@ -116,6 +116,18 @@ class AdminAccounts:
             except sqlite3.IntegrityError as exc:
                 raise ValueError("Este usuário já existe.") from exc
 
+    def delete(self, username: str) -> None:
+        with closing(self._connect()) as db, db:
+            db.execute("BEGIN IMMEDIATE")
+            row = db.execute("SELECT active,role FROM admins WHERE username=?", (username,)).fetchone()
+            if row is None:
+                raise ValueError("Usuário não encontrado.")
+            if row[0] and row[1] == "admin" and db.execute(
+                    "SELECT count(*) FROM admins WHERE active=1 AND role='admin'").fetchone()[0] <= 1:
+                raise ValueError("O último administrador ativo não pode ser excluído.")
+            db.execute("DELETE FROM admin_sessions WHERE username=? COLLATE NOCASE", (username,))
+            db.execute("DELETE FROM admins WHERE username=?", (username,))
+
     def reset_password(self, username: str, password: str) -> None:
         if len(password) < 12 or len(password) > 1024:
             raise ValueError("A senha deve ter entre 12 e 1024 caracteres.")

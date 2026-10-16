@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Criar conta · AtlasDFE{% endblock %}
+{% block content %}
+<section class="login-shell">
+  <div class="card login-card">
+    <div class="login-heading">
+      <h1>Criar minha conta</h1>
+      <p>Escolha seu usuário e sua senha para consultar e exportar relatórios. A conta terá acesso de usuário comum.</p>
+    </div>
+    {% if error %}<div class="alert error" role="alert">{{ error }}</div>{% endif %}
+    <form action="{{ url_for('register_submit') }}" method="post" class="login-form">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label class="field"><span>Usuário</span><input name="username" value="{{ username|default('') }}" required minlength="3" maxlength="64" pattern="[A-Za-z0-9._@\-]{3,64}" autocomplete="username" autofocus></label>
+      <p class="muted">Use de 3 a 64 caracteres: letras sem acentos, números, ponto, traço, sublinhado ou @.</p>
+      <label class="field"><span>Senha (mínimo 12 caracteres)</span><input type="password" name="password" required minlength="12" maxlength="1024" autocomplete="new-password"></label>
+      <label class="field"><span>Confirmar senha</span><input type="password" name="password_confirmation" required minlength="12" maxlength="1024" autocomplete="new-password"></label>
+      <button class="button primary login-submit" type="submit">Criar conta</button>
+    </form>
+    <p class="login-note">Após o cadastro, você já pode entrar. Somente administradores acessam as configurações e gerenciam contas.</p>
+    <a href="{{ url_for('login_page') }}">Já tenho conta · Entrar</a>
+  </div>
+</section>
+{% endblock %}

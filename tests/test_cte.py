@@ -1,3 +1,4 @@
+from conftest import authenticated_user
 import base64
 import gzip
 from io import BytesIO
@@ -115,6 +116,7 @@ def test_links_in_public_ui_excel_csv_and_txt_lookup(tmp_path):
     xml_store.import_batch(cfg.database_path, CNPJ_PADRAO, [(source, 'nota.xml')])
     app = create_app(cfg)
     with TestClient(app) as client:
+        token_usuario = authenticated_user(client)
         for url in ['/consulta?chave=' + NFE, '/xml']:
             response = client.get(url)
             assert response.status_code == 200
@@ -163,6 +165,7 @@ def test_txt_workbook_includes_cte_preserves_manifestation(tmp_path):
 def test_xml_empty_installation_keeps_empty_state(tmp_path):
     cfg = web['settings_web'](tmp_path)
     with TestClient(create_app(cfg)) as client:
+        token_usuario = authenticated_user(client)
         response = client.get('/xml')
         assert response.status_code == 200
         assert 'Nenhuma nota corresponde aos filtros' in response.text

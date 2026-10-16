@@ -8,6 +8,7 @@
       <p>Use sua conta de usuário ou administrador. As permissões seguem o perfil cadastrado.</p>
     </div>
 
+    {% if success %}<div class="alert success">{{ success }}</div>{% endif %}
     {% if error %}
     <div class="alert error">{{ error }}</div>
     {% endif %}
@@ -18,7 +19,7 @@
     </div>
     {% endif %}
 
-    <form action="{{ url_for('admin_login') }}" method="post" class="login-form">
+    <form action="{{ url_for('login_submit') }}" method="post" class="login-form">
       <input type="hidden" name="csrf" value="{{ csrf }}">
 
       <label class="field">
@@ -50,6 +51,7 @@
       </button>
     </form>
 
+    <p><a href="{{ url_for('register_page') }}">Criar minha conta</a></p>
     <p class="login-note">
       A sessão expira após {{ request.app.state.settings.admin_session_minutes }} minutos de inatividade.
     </p>

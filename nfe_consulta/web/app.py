@@ -62,8 +62,8 @@ from nfe_consulta.web.admin_accounts import AdminAccounts
 from nfe_consulta.web.scheduler import loop_sincronizacao_automatica
 from nfe_consulta.web.settings import WebSettings, get_settings
 from nfe_consulta.web.email_alerts import (
-    carregar_destinatarios, salvar_destinatarios, smtp_pronto,
-    contar_pendentes, enviar_pendentes, cancelar_pendentes_removidos,
+    carregar_destinatarios, salvar_destinatarios, smtp_pronto, normalizar_destinatarios,
+    contar_pendentes, enviar_pendentes, cancelar_pendentes_removidos, enviar_teste, remetente_atual, salvar_remetente,
 )
 from nfe_consulta.web.sync_runtime import sincronizar_configurado
 from nfe_consulta.web.sync_diagnostics import detalhes_erro, mensagem_erro
@@ -285,6 +285,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
     )
     app.state.login_attempts = {}
     app.state.login_lock = threading.Lock()
+    app.state.email_test_next_at = 0.0
     app.state.export_queue = ExportQueue()
     app.state.export_jobs = ExportJobs()
     app.state.sync_lock = threading.Lock()
@@ -341,7 +342,14 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                     headers={"Cache-Control": "no-store"})
             return JSONResponse({"detail": "Entre para acessar a área Admin."}, status_code=401,
                 headers={"Cache-Control": "no-store"})
-        if path in {"/excel", "/xml/importar", "/admin/login", "/admin/contas", "/admin/notas/situacao"} and request.method == "POST":
+        public_path = path in {"/login", "/cadastro", "/admin/login", "/healthz"} or path.startswith("/static/")
+        if not public_path and not current_user(request).authenticated:
+            if request.method in {"GET", "HEAD"}:
+                return RedirectResponse(request.url_for("login_page"), status_code=303,
+                    headers={"Cache-Control": "no-store"})
+            return JSONResponse({"detail": "Entre para acessar o AtlasDFE."}, status_code=401,
+                headers={"Cache-Control": "no-store"})
+        if path in {"/excel", "/xml/importar", "/admin/login", "/login", "/cadastro", "/admin/contas", "/admin/notas/situacao"} and request.method == "POST":
             try:
                 size = int(request.headers.get("content-length", "0"))
             except ValueError:
@@ -482,6 +490,49 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             filename=item['filename'], media_type=item['media_type'],
             headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"})
 
+    @app.get("/cadastro", response_class=HTMLResponse, name="register_page")
+    async def register_page(request: Request, user: Annotated[WebUser, Depends(current_user)]):
+        if user.authenticated:
+            return RedirectResponse(request.url_for("consulta_page"), status_code=303)
+        return _render(request, "register.html", user)
+
+    @app.post("/cadastro", name="register_submit")
+    async def register_submit(
+        request: Request, user: Annotated[WebUser, Depends(current_user)],
+        csrf: str = Form(...), username: str = Form(...), password: str = Form(...),
+        password_confirmation: str = Form(...),
+    ):
+        validate_csrf(csrf, user, settings)
+        if user.authenticated:
+            raise HTTPException(403, "Saia da conta atual para criar outro acesso.")
+        address = request.client.host if request.client else "unknown"
+        now = time.monotonic()
+        with app.state.login_lock:
+            attempts = app.state.login_attempts
+            # Usa o mesmo limite de memória do login, com contagem separada.
+            for key in list(attempts):
+                attempts[key] = [t for t in attempts[key] if now - t < 300]
+                if not attempts[key]:
+                    del attempts[key]
+            key = ("register", address)
+            recent = attempts.get(key, [])
+            if len(recent) >= 5 or (len(attempts) >= 5000 and key not in attempts):
+                raise HTTPException(429, "Muitos cadastros. Aguarde alguns minutos e tente novamente.")
+            attempts[key] = recent + [now]
+        try:
+            if password != password_confirmation:
+                raise ValueError("As senhas não coincidem. Digite novamente.")
+            # O perfil é fixo no servidor, independentemente do formulário.
+            await run_in_threadpool(app.state.admin_accounts.create, username, password, "fiscal")
+        except ValueError as exc:
+            return _render(request, "register.html", user, status_code=400, error=str(exc),
+                           username=username[:64])
+        app.state.audit.write(request, user, "user_register", "ok")
+        return _render(request, "login.html", user,
+            admin_configured=app.state.admin_accounts.configured(),
+            success="Conta criada. Entre com seu usuário e senha.")
+
+    @app.get("/login", response_class=HTMLResponse, name="login_page")
     @app.get("/admin/login", response_class=HTMLResponse)
     async def admin_login_page(
         request: Request,
@@ -500,6 +551,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             admin_configured=app.state.admin_accounts.configured(),
         )
 
+    @app.post("/login", name="login_submit")
     @app.post("/admin/login")
     async def admin_login(
         request: Request,
@@ -622,6 +674,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         request: Request, user: Annotated[WebUser, Depends(require_admin)],
         csrf: str = Form(...), action: str = Form(...), username: str = Form(...),
         password: str = Form(""), role: str = Form("fiscal"),
+        confirm_delete: bool = Form(False),
     ):
         validate_csrf(csrf, user, settings)
         accounts = app.state.admin_accounts
@@ -632,6 +685,10 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                 await run_in_threadpool(accounts.set_role, username, role)
             elif action in {"activate", "deactivate"}:
                 await run_in_threadpool(accounts.set_active, username, action == "activate")
+            elif action == "delete":
+                if not confirm_delete:
+                    raise ValueError("Confirme a exclusão da conta.")
+                await run_in_threadpool(accounts.delete, username)
             elif action == "reset":
                 await run_in_threadpool(accounts.reset_password, username, password)
             else:
@@ -640,7 +697,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             return _render(request, "admin_accounts.html", user, status_code=400,
                 accounts=await run_in_threadpool(accounts.list_accounts), error=str(exc))
         app.state.audit.write(request, user, "admin_accounts", "ok",
-                              operation=action, account=username.strip())
+                              operation=action, target=username.strip())
         return RedirectResponse(str(request.url_for("admin_accounts_page")) + "?saved=1", status_code=303)
 
     @app.get("/admin/historico", response_class=HTMLResponse)
@@ -1058,6 +1115,8 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         db_ok: str | None = None,
         email_ok: str | None = None,
         email_sent: str | None = None,
+        email_test_sent: str | None = None,
+        email_test_failed: str | None = None,
         lote: int | None = None,
         situacao_ok: int | None = None,
         situacao_acao: str | None = None,
@@ -1074,6 +1133,12 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         except (ValueError, OSError):
             email_recipients = ""
             erro = "Lista de destinatários inválida. Salve novamente os endereços para corrigir."
+
+        try:
+            email_sender, email_smtp_user = remetente_atual(settings)
+        except (ValueError, OSError):
+            email_sender, email_smtp_user = settings.smtp_from, settings.smtp_user
+            erro = "Configuração do remetente inválida. Salve novamente os dados dos alertas."
 
         batch = None
         if lote is not None:
@@ -1096,6 +1161,8 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                 else "Certificado validado e configurado." if cert_ok == "1"
                 else "Banco validado e configurado." if db_ok == "1"
                 else "Destinatários dos alertas salvos." if email_ok == "1"
+                else f"Teste: {email_test_sent} envio(s) aceito(s) pelo SMTP; {email_test_failed} falha(s). Confira a caixa de entrada e o spam."
+                if email_test_sent and email_test_sent.isdigit() and email_test_failed and email_test_failed.isdigit()
                 else f"{email_sent} aviso(s) enviado(s)." if email_sent and email_sent.isdigit()
                 else None
             ),
@@ -1106,6 +1173,8 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             database_web=_database_web(settings),
             cooldown_minutes=settings.sync_cooldown_minutes,
             email_recipients=email_recipients,
+            email_sender=email_sender,
+            email_smtp_user=email_smtp_user,
             smtp_ready=smtp_pronto(settings),
             email_pending=await run_in_threadpool(contar_pendentes, settings) if status_web.database_ready else None,
         )
@@ -1145,9 +1214,15 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         user: Annotated[WebUser, Depends(require_admin)],
         csrf: str = Form(...),
         recipients: str = Form(""),
+        sender: str | None = Form(None),
+        smtp_user: str = Form(""),
     ):
         validate_csrf(csrf, user, settings)
         try:
+            # Valida todo o formulário antes de gravar a configuração.
+            normalizar_destinatarios(recipients)
+            if sender is not None:
+                salvar_remetente(settings, sender, smtp_user)
             emails = salvar_destinatarios(settings.email_recipients_file, recipients)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -1160,6 +1235,29 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             url=request.url_for("atualizar_page").include_query_params(email_ok="1"),
             status_code=303,
         )
+
+    @app.post("/atualizar/alertas-email/testar")
+    async def atualizar_testar_email(
+        request: Request, user: Annotated[WebUser, Depends(require_admin)],
+        csrf: str = Form(...),
+    ):
+        validate_csrf(csrf, user, settings)
+        with app.state.login_lock:
+            now = time.monotonic()
+            if now < app.state.email_test_next_at:
+                raise HTTPException(429, "Aguarde um minuto antes de enviar outro teste.")
+            app.state.email_test_next_at = now + 60
+        try:
+            enviados, falhas = await run_in_threadpool(enviar_teste, settings, app.state.audit)
+        except (ValueError, RuntimeError) as exc:
+            raise HTTPException(400, str(exc)) from exc
+        except Exception as exc:
+            app.state.audit.write(request, user, "email_test", "erro", reason=type(exc).__name__)
+            raise HTTPException(503, "Não foi possível preparar o teste. Confira a configuração dos alertas.") from exc
+        app.state.audit.write(request, user, "email_test", "ok" if not falhas else "erro",
+                              sent=enviados, failed=falhas)
+        return RedirectResponse(request.url_for("atualizar_page").include_query_params(
+            email_test_sent=str(enviados), email_test_failed=str(falhas)), status_code=303)
 
     @app.post("/atualizar/alertas-email/enviar-pendentes")
     async def atualizar_enviar_pendentes(

@@ -1,3 +1,4 @@
+from conftest import authenticated_user
 from pathlib import Path
 from html import unescape
 from io import BytesIO
@@ -14,6 +15,7 @@ def test_manifestations_detail_is_scoped_and_back_keeps_emission_filters(tmp_pat
     cfg = h['setup'](tmp_path)
     key, other = h['KEY'], h['KEY2']
     with TestClient(create_app(cfg)) as client:
+        token_usuario = authenticated_user(client)
         original = '/xml?q=123&pagina=2&situacao=cancelada'
         page = client.get(original).text
         href = unescape(re.search(r'data-items-open href="([^"]+)" title="Manifestações"', page).group(1))
@@ -42,6 +44,7 @@ def test_imported_note_without_manifestations_has_dedicated_empty_screen(tmp_pat
     items = runpy.run_path(str(Path(__file__).with_name('test_xml_items.py')))
     cfg = items['setup'](tmp_path)
     with TestClient(create_app(cfg)) as client:
+        token_usuario = authenticated_user(client)
         response = client.get('/xml/manifestacoes/' + items['KEY'])
         assert response.status_code == 200
         assert 'MANIFESTAÇÕES | NF 123' in response.text

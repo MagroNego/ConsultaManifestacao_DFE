@@ -80,11 +80,14 @@ def require_admin(request: Request) -> WebUser:
 
 
 def require_user(request: Request) -> WebUser:
-    return current_user(request)
+    user = current_user(request)
+    if not user.authenticated:
+        raise HTTPException(401, "Entre para acessar o AtlasDFE.")
+    return user
 
 
 def require_export(request: Request) -> WebUser:
-    return current_user(request)
+    return require_user(request)
 
 
 def set_admin_cookie(response: Response, settings: WebSettings, token: str, *, secure: bool = True) -> None:
@@ -110,8 +113,8 @@ def clear_admin_cookie(response: Response, settings: WebSettings, *, secure: boo
 
 
 def csrf_token(user: WebUser, settings: WebSettings) -> str:
-    # A área pública usa um token de origem; a área administrativa vincula
-    # cada formulário à sessão concreta, revogada no logout.
+    # Login e cadastro usam o token público; formulários autenticados
+    # são vinculados à sessão concreta, revogada no logout.
     identidade = user.session_token if user.authenticated else "publico"
     mensagem = f"{user.username.casefold()}|{identidade}|nfe-web-v3".encode("utf-8")
     return hmac.new(

@@ -1,3 +1,4 @@
+from conftest import authenticated_async_user
 import asyncio
 from pathlib import Path
 import runpy
@@ -102,6 +103,7 @@ def test_http_third_export_waits_and_archived_download_bypasses_queue(tmp_path):
                 break
         item = app.state.downloads.save(b'archived', filename='ready.csv', media_type='text/csv', documents=1, period='Não informado')
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url='http://test') as client:
+            token_usuario = await authenticated_async_user(client, app)
             tasks = [asyncio.create_task(client.get('/xml/exportar')) for _ in range(3)]
             # Await signals via loop until two requests entered generation.
             for _ in range(200):

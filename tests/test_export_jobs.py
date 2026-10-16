@@ -1,3 +1,4 @@
+from conftest import authenticated_async_user
 import asyncio
 from pathlib import Path
 import runpy
@@ -34,6 +35,7 @@ def test_background_jobs_survive_navigation_show_queue_and_publish_archive(tmp_p
             if getattr(route, 'path', '') == '/xml/exportar':
                 route.app = APIRoute('/xml/exportar', generate, methods=['GET']).app
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url='http://test') as client:
+            token_usuario = await authenticated_async_user(client, app)
             first = await client.get('/xml/exportar?data_inicial=01/10/2026', headers={'X-NFE-Background': '1'})
             assert first.status_code == 202
             first_id = first.json()['job_id']
@@ -69,6 +71,7 @@ def test_real_csv_background_export_and_error(tmp_path):
         xml_store.import_batch(cfg.database_path, CNPJ_PADRAO, [(source, 'nota.xml')])
         app = create_app(cfg)
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url='http://test') as client:
+            token_usuario = await authenticated_async_user(client, app)
             success = await client.get('/xml/exportar?formato=csv&tipo=itens', headers={'X-NFE-Background': '1'})
             failure = await client.get('/xml/exportar?formato=invalid', headers={'X-NFE-Background': '1'})
             await asyncio.wait_for(asyncio.gather(*list(app.state.export_jobs.tasks)), 5)
@@ -94,6 +97,7 @@ def test_background_post_preserves_body_and_shutdown_marks_error(tmp_path):
             if getattr(route, 'path', '') == '/excel':
                 route.app = APIRoute('/excel', generate, methods=['POST']).app
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url='http://test') as client:
+            token_usuario = await authenticated_async_user(client, app)
             response = await client.post('/excel', content=b'original multipart body', headers={'X-NFE-Background': '1'})
             assert response.status_code == 202
             await asyncio.wait_for(entered.wait(), 2)
@@ -109,8 +113,9 @@ def test_real_txt_background_export_still_validates_csrf(tmp_path):
         web['criar_banco'](cfg.database_path)
         app = create_app(cfg)
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url='http://test') as client:
+            token_usuario = await authenticated_async_user(client, app)
             ids = []
-            for token in (csrf_token(PUBLIC_USER, cfg), 'invalid'):
+            for token in (token_usuario, 'invalid'):
                 response = await client.post('/excel', data={'csrf': token},
                     files={'files': ('chaves.txt', helpers['CHAVE'].encode(), 'text/plain')},
                     headers={'X-NFE-Background': '1'})

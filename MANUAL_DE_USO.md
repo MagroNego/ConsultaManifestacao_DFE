@@ -2,7 +2,7 @@
 
 ## Acesso
 
-Abra o endereço do aplicativo. Consulta, Status, Emissão e exportações são públicos na rede. Ao abrir **Admin**, informe uma conta administrativa. A importação e as configurações exigem sessão válida, mesmo por endereço direto. Use **Sair do Admin** para encerrar a sessão. Operações públicas usam a identidade `usuario-interno`; operações administrativas registram a conta autenticada.
+Abra o endereço do aplicativo e entre com sua conta. Se ainda não tiver acesso, use **Criar minha conta**, escolha usuário e senha de pelo menos 12 caracteres e confirme a senha. O acesso é imediato, como usuário comum para consulta e exportação. Consulta, Status, Emissão, Downloads e exportações exigem sessão válida, inclusive por endereço direto. A área **Admin**, importação, configurações e gerenciamento de contas são exclusivos de administradores. Use **Sair** para encerrar a sessão. As operações registram a identidade autenticada.
 
 ## Consulta
 
@@ -65,7 +65,7 @@ Uma janela concluída não é repetida após reiniciar. Falhas e distribuições
 
 ## Alertas de Operação não Realizada
 
-Em **Admin → Alertas por e-mail**, cadastre até 20 endereços, separados por linha ou vírgula. Novos eventos **210240** geram avisos para os destinatários cadastrados. Reprocessar um evento já gravado não cria uma nova mensagem.
+Em **Admin → Alertas por e-mail**, cadastre até 20 endereços, separados por linha ou vírgula. Novos eventos de **Operação não Realizada (210240)** geram avisos para os destinatários cadastrados. Reprocessar um evento já gravado não cria uma nova mensagem.
 
 Os envios dependem da configuração SMTP do servidor. Falhas temporárias mantêm os avisos na fila. Após corrigir o SMTP, use **Tentar enviar pendentes**; isso não refaz a sincronização da SEFAZ. Remover um destinatário cancela seus avisos ainda pendentes.
 
@@ -215,3 +215,11 @@ Entre como administrador e abra **Admin → Gerenciar usuários**. Informe usuá
 ### Retenção do histórico de sincronização
 
 O histórico de sincronização mostra somente os últimos 30 dias. Registros SEFAZ mais antigos são removidos do log ao iniciar o servidor e diariamente na primeira gravação de auditoria. A limpeza também alcança os cinco arquivos de rotação. Registros administrativos seguem a rotação por tamanho existente. Notas, manifestações, cursores NSU, respostas pendentes e intervalos de recuperação não são apagados. A retenção não altera nem compacta o banco fiscal.
+
+Em **Admin → Alertas por e-mail**, use **Enviar e-mail de teste** após configurar o SMTP e salvar os destinatários. O teste envia uma mensagem sintética para todos os destinatários salvos, sem consultar a SEFAZ ou criar manifestações. Aguarde um minuto entre testes. Aceitação pelo SMTP não confirma a entrega; confira caixa de entrada e spam.
+
+O campo **E-mail remetente** pode ser alterado em Alertas por e-mail, junto com **Usuário SMTP**. No Gmail, os dois devem corresponder à conta da senha de app salva em `secrets/smtp-password.txt`. A configuração local persiste em `secrets/smtp-sender.json` e vale para os próximos envios sem reiniciar. Servidor, porta e segurança continuam definidos no ambiente; trocar de provedor pode exigir ajustá-los.
+
+### Cadastro próprio e exclusão de contas
+
+Qualquer pessoa que alcance a tela do app pode criar uma conta comum e entrar imediatamente, conforme a política escolhida para esta instalação. O cadastro nunca permite escolher perfil administrativo. No **Admin → Gerenciar usuários**, o administrador pode redefinir senhas e excluir usuários mediante confirmação. Senhas atuais não são exibidas nem recuperáveis; são armazenadas como hash. A exclusão encerra as sessões e preserva notas, manifestações e auditoria. O último administrador ativo não pode ser excluído.

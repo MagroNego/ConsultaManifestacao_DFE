@@ -23,6 +23,7 @@ LABELS = {
 }
 OPERATIONS = {
     "create": "Conta cadastrada",
+    "delete": "Conta excluída",
     "reset": "Senha alterada",
     "activate": "Conta ativada",
     "deactivate": "Conta desativada",

@@ -1,3 +1,4 @@
+from conftest import authenticated_user
 from pathlib import Path
 import runpy
 import json
@@ -41,6 +42,7 @@ def test_exports_archive_document_count_period_and_download_without_renewal(tmp_
     xml_store.import_batch(cfg.database_path, CNPJ_PADRAO, [(source, 'nota.xml')])
     app = create_app(cfg)
     with TestClient(app) as client:
+        token_usuario = authenticated_user(client)
         assert client.get('/downloads').status_code == 200
         for url in ['/xml/exportar?formato=csv&tipo=itens&data_inicial=01/10/2026&data_final=31/10/2026', '/xml/exportar?formato=xlsx']:
             response = client.get(url)
@@ -63,6 +65,7 @@ def test_private_archive_not_visible_or_downloadable_publicly(tmp_path):
     app = create_app(cfg)
     item = app.state.downloads.save(b'private', filename='segredo.csv', media_type='text/csv', documents=1, period='Não informado', admin_only=True)
     with TestClient(app) as client:
+        authenticated_user(client)
         assert 'segredo.csv' not in client.get('/downloads').text
         assert client.get('/downloads/' + item['id']).status_code == 404
         web['entrar_admin'](client, cfg)
@@ -85,6 +88,7 @@ def test_excel_product_filter_counts_documents_from_all_sheets(tmp_path):
     xml_store.import_batch(cfg.database_path, CNPJ_PADRAO, [(source, 'nota.xml')])
     app = create_app(cfg)
     with TestClient(app) as client:
+        token_usuario = authenticated_user(client)
         for formato in ('csv', 'xlsx'):
             response = client.get('/xml/exportar', params={'formato': formato, 'tipo': 'itens', 'q': 'produto'})
             assert response.status_code == 200
@@ -115,6 +119,7 @@ def test_download_xml_legado_nao_e_oferecido_nem_servido(tmp_path):
     path.write_text(json.dumps(meta))
     relatorio = archive.save(b'relatorio', filename='notas.csv', media_type='text/csv', documents=1, period='Não informado')
     with TestClient(app) as client:
+        authenticated_user(client)
         assert 'nota.xml' not in client.get('/downloads').text
         assert client.get('/downloads/'+antigo['id']).status_code == 404
         assert client.get('/downloads/'+relatorio['id']).content == b'relatorio'

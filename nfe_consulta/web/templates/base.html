@@ -23,6 +23,7 @@
       </a>
     </div>
 
+    {% if user.authenticated %}
     <nav class="tabs" aria-label="Navegação principal">
       <a href="{{ url_for('consulta_page') }}" class="{% if request.url.path == '/' or request.url.path.startswith('/consulta') %}active{% endif %}">Consulta</a>
       <a href="{{ url_for('status_page') }}" class="{% if request.url.path.startswith('/status') %}active{% endif %}">Status</a>
@@ -32,8 +33,10 @@
       <a href="{{ url_for('atualizar_page') }}" class="{% if request.url.path.startswith('/atualizar') or request.url.path.startswith('/admin/login') %}active{% endif %}">Admin</a>
       {% endif %}
     </nav>
+    {% endif %}
 
     <div class="account">
+      {% if user.authenticated %}
       <div class="notifications">
         <button class="theme-toggle notification-bell" type="button" data-notification-bell aria-label="Notificações" aria-expanded="false" aria-controls="notification-panel">
           <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg>
@@ -44,6 +47,7 @@
           <ul data-notification-list><li class="notification-empty">Nenhuma notificação recente.</li></ul>
         </section>
       </div>
+      {% endif %}
       <button class="theme-toggle" type="button" data-theme-toggle aria-label="Alternar tema">
         <span data-theme-icon>◐</span>
       </button>
@@ -54,7 +58,7 @@
         <button type="submit" class="logout-button">{{ "Sair do Admin" if user.is_admin else "Sair" }}</button>
       </form>
       {% else %}
-      <a href="{{ url_for('admin_login_page') }}">Entrar</a>
+      <a class="button secondary" href="{{ url_for('login_page') }}">Entrar</a>
       {% endif %}
     </div>
   </header>

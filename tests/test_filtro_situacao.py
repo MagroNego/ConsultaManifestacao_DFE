@@ -1,3 +1,4 @@
+from conftest import authenticated_user
 import csv
 from io import BytesIO, StringIO
 from pathlib import Path
@@ -43,6 +44,7 @@ def test_filters_apply_to_all_reports_and_exports(tmp_path, state, key):
     events = consultar_eventos(cfg.database_path, CNPJ_PADRAO, normalizar_filtros(situacao=state))
     assert events.total == 1 and events.eventos[0].chave == key
     with TestClient(create_app(cfg)) as client:
+        token_usuario = authenticated_user(client)
         for url in ('/xml', '/consulta'):
             page = client.get(url, params={'situacao': state}).text
             assert f'<option value="{state}" selected>' in page
@@ -76,6 +78,7 @@ def test_state_filter_before_count_and_pagination(tmp_path):
     report = xml_store.query_report(cfg.database_path, CNPJ_PADRAO, situacao='cancelada', page=2)
     assert report['total'] == 1 and report['page'] == report['pages'] == 1
     with TestClient(create_app(cfg)) as client:
+        token_usuario = authenticated_user(client)
         page = client.get('/xml?pagina=1&situacao=autorizada').text
         assert 'situacao=autorizada' in page and 'pagina=2' in page
 
@@ -87,6 +90,7 @@ def test_invalid_filter_and_legacy_database_without_status_table(tmp_path):
     with pytest.raises(ValueError):
         xml_store.query_report(cfg.database_path, CNPJ_PADRAO, situacao='invalid')
     with TestClient(create_app(cfg)) as client:
+        token_usuario = authenticated_user(client)
         assert client.get('/xml/exportar?formato=csv&situacao=invalid').status_code == 400
         assert 'Situação inválida' in client.get('/consulta?situacao=invalid').text
     conn = abrir_banco(cfg.database_path, None)
