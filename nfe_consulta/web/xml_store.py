@@ -1,6 +1,7 @@
 """Dados extraídos de XMLs emitidos e relatórios cumulativos no banco fiscal."""
 from __future__ import annotations
 
+from nfe_consulta.export_control import cancellable_rows, check_export_cancelled
 import csv
 import hashlib
 import json
@@ -292,10 +293,10 @@ def query_report(database_path, cnpj, *, password=None, kind="notas", query="", 
         if not export:
             suffix += " LIMIT 100 OFFSET ?"
         lines = conn.execute(f"SELECT {select} FROM {source} WHERE {where}" + suffix, params if export else [*params, (page - 1) * 100]).fetchall()
-        rows = [dict(zip(FIELDS_NOTAS, row)) for row in lines] if kind == "notas" else [json.loads(row[0]) for row in lines]
+        rows = [dict(zip(FIELDS_NOTAS, row)) for row in cancellable_rows(lines)] if kind == "notas" else [json.loads(row[0]) for row in cancellable_rows(lines)]
         ctes = linked_ctes(conn, cnpj, [row.get("Chave Acesso", "") for row in rows])
         cancelled = cancelled_keys(conn, cnpj, [row.get('Chave Acesso', '') for row in rows])
-        for row in rows:
+        for row in cancellable_rows(rows):
             row['Situação'] = status_label(row.get('Chave Acesso', '') in cancelled)
             row["CT-e vinculado"] = export_label(ctes.get(row.get("Chave Acesso", ""), ()))
         return dict(rows=rows, columns=columns, total=total, page=page, pages=pages, notas=conn.execute("SELECT COUNT(*) FROM xml_documentos WHERE cnpj=?", (cnpj,)).fetchone()[0])
@@ -321,7 +322,7 @@ def export_csv(report):
     out = StringIO(newline="")
     writer = csv.DictWriter(out, fieldnames=report["columns"], delimiter=";", quoting=csv.QUOTE_ALL)
     writer.writeheader()
-    for row in report["rows"]:
+    for row in cancellable_rows(report["rows"]):
         writer.writerow({key: ("'" + str(row.get(key, "")) if str(row.get(key, "")).lstrip().startswith(("=", "+", "-", "@")) else row.get(key, "")) for key in report["columns"]})
     return out.getvalue().encode("utf-8-sig")
 
@@ -333,7 +334,7 @@ def export_excel(reports):
         sheet = workbook.create_sheet(title)
         columns = [key for key in report["columns"] if key not in EXCEL_EXCLUDED_COLUMNS]
         sheet.append(columns)
-        for row in report["rows"]:
+        for row_index, row in enumerate(cancellable_rows(report["rows"]), 2):
             values = []
             for key in columns:
                 value = row.get(key, "")
@@ -354,7 +355,8 @@ def export_excel(reports):
                         pass
                 values.append(value)
             sheet.append(values)
-            for cell in sheet[sheet.max_row]:
+            for column_index in range(1, len(columns) + 1):
+                cell = sheet.cell(row_index, column_index)
                 if isinstance(cell.value, date):
                     cell.number_format = "dd/mm/yyyy"
                 elif isinstance(cell.value, str):
@@ -370,5 +372,7 @@ def export_excel(reports):
         for index, key in enumerate(columns, 1):
             sheet.column_dimensions[get_column_letter(index)].width = 48 if "Chave" in key else 36 if "Razao" in key or key == "Descricao" else 18
     out = BytesIO()
+    check_export_cancelled()
     workbook.save(out)
+    check_export_cancelled()
     return out.getvalue()

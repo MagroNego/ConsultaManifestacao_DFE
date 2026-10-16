@@ -292,14 +292,20 @@
           const button = form.querySelector("button");
           if (button.disabled) return;
           button.disabled = true;
+          const originalLabel = button.innerHTML;
+          button.textContent = "Cancelando…";
+          form.querySelector(".download-error")?.remove();
           try {
             const response = await fetch(form.action, { method: "POST", credentials: "same-origin",
               headers: { "Accept": "application/json" }, body: new FormData(form) });
-            if (!response.ok) throw new Error("Não foi possível cancelar. Atualize a página e confira se a geração já terminou.");
+            if (!response.ok) throw new Error(response.status === 403
+              ? "Sua sessão ou token pode ter mudado. Atualize a página e tente novamente."
+              : "Não foi possível cancelar. Atualize a página e confira se a geração já terminou.");
             button.textContent = "Cancelando…";
             pollJobs();
           } catch (error) {
             button.disabled = false;
+            button.innerHTML = originalLabel;
             const notice = document.createElement("span");
             notice.className = "download-error";
             notice.setAttribute("role", "alert");

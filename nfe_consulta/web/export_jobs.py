@@ -3,10 +3,12 @@ from __future__ import annotations
 
 import asyncio
 import time
+from threading import Event
 from contextvars import ContextVar
 from datetime import datetime
 from uuid import uuid4
 
+from nfe_consulta.export_control import cancel_event
 from nfe_consulta.web.downloads import BRASILIA, RETENTION_SECONDS
 from nfe_consulta.web.export_queue import ExportQueueBusy
 
@@ -33,7 +35,7 @@ class ExportJobs:
         now = time.time()
         item = dict(id=uuid4().hex, status='queued', created_at=now, period=period,
                     created_label=datetime.fromtimestamp(now, BRASILIA).strftime('%d/%m/%Y %H:%M'),
-                    archive_id=None, owner=owner, cancel_requested=False)
+                    archive_id=None, owner=owner, cancel_requested=False, cancel_event=Event())
         self.records[item['id']] = item
         scope = dict(scope)
         scope['headers'] = [(key, value) for key, value in scope['headers'] if key.lower() != b'x-nfe-background']
@@ -46,6 +48,7 @@ class ExportJobs:
 
     async def _run(self, app, scope, body, item):
         token = current_export_job.set(item)
+        cancel_token = cancel_event.set(item["cancel_event"])
         first = True
         status = 500
         is_html = False
@@ -74,19 +77,21 @@ class ExportJobs:
         except Exception:
             item['status'] = 'cancelled' if item['cancel_requested'] else 'error'
         finally:
+            cancel_event.reset(cancel_token)
             current_export_job.reset(token)
 
     def cancel(self, identifier):
         item = self.records.get(identifier)
-        if item is None or item['status'] not in {'queued', 'generating', 'cancelling', 'cancelled'}:
+        if item is None or item.get('archive_id') or item['status'] not in {'queued', 'generating', 'cancelling', 'cancelled'}:
             return False
         if item['status'] in {'cancelling', 'cancelled'}:
             return True
         queued = item['status'] == 'queued'
         item['cancel_requested'] = True
+        item['cancel_event'].set()
         item['status'] = 'cancelled' if queued else 'cancelling'
-        # Não abandona uma thread de geração em andamento: ela conclui o bloco
-        # atual com a vaga reservada, e o resultado não é publicado.
+        # A thread interrompe o trabalho nos pontos de verificação; mantém
+        # a vaga reservada até encerrar e limpar os arquivos temporários.
         if queued:
             task = self.tasks_by_id.get(identifier)
             if task is not None:

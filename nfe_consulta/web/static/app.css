@@ -1366,13 +1366,21 @@ html[data-theme="dark"] .brand-logo-dark {
 .manifestations-detail .filters-form { max-width: none; }
 
 .cte-links .cte-link-detail {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: baseline;
+  gap: 16px;
+  min-width: max-content;
   white-space: nowrap;
   font-size: 12px;
   line-height: 1.5;
 }
+.cte-links .cte-link-detail > * {
+  flex: 0 0 auto;
+}
 .cte-links .cte-link-label {
   white-space: nowrap;
-  display: block;
+  display: inline;
   font-weight: 500;
 }
 
