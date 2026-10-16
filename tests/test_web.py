@@ -763,3 +763,29 @@ def test_atlasdfe_usa_logos_claro_escuro_e_nome_no_cabecalho(tmp_path):
         assert 'atlas-logo brand-logo-light' in resposta.text
         assert 'atlas-logo brand-logo-dark' in resposta.text
     assert app.title == 'AtlasDFE'
+
+
+
+def test_admin_troca_remetente_e_testa_email_sem_sefaz(tmp_path, monkeypatch):
+    from dataclasses import replace
+    from nfe_consulta.web import email_alerts
+    cfg = replace(settings_web(tmp_path), smtp_host='smtp.test', smtp_from='antes@gmail.com')
+    criar_banco(cfg.database_path)
+    app = create_app(cfg)
+    enviados = []
+    monkeypatch.setattr(email_alerts, '_enviar_mensagem', lambda _, mensagem: enviados.append(mensagem))
+    with TestClient(app) as client:
+        assert client.post('/atualizar/alertas-email/testar', data={'csrf':'x'}).status_code == 401
+        token = entrar_admin(client, cfg)
+        assert client.post('/atualizar/alertas-email/testar', data={'csrf':'x'}).status_code == 403
+        response = client.post('/atualizar/alertas-email', data={'csrf':token,
+            'recipients':'teste@empresa.com.br', 'sender':'novo@gmail.com', 'smtp_user':''}, follow_redirects=False)
+        assert response.status_code == 303
+        assert email_alerts.remetente_atual(cfg)[0] == 'novo@gmail.com'
+        page = client.get('/atualizar').text
+        assert 'Enviar e-mail de teste' in page and 'novo@gmail.com' in page
+        response = client.post('/atualizar/alertas-email/testar', data={'csrf':token}, follow_redirects=False)
+        assert response.status_code == 303
+        assert 'email_test_sent=1' in response.headers['location']
+        assert str(enviados[0]['From']) == 'novo@gmail.com'
+        assert client.post('/atualizar/alertas-email/testar', data={'csrf':token}).status_code == 429

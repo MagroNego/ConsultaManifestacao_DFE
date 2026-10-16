@@ -204,3 +204,62 @@ def test_diagnostico_correlaciona_processo_banco_e_lote_sem_senhas(tmp_path, mon
     assert diagnosticos[0][2]['pid'] > 0
     assert diagnosticos[1][2]['ult_nsu'] == '000000000000010'
     assert all('senha' not in chave and 'password' not in chave for r in diagnosticos for chave in r[2])
+
+
+@pytest.mark.parametrize('codigo', ['210210', '210240'])
+def test_alertas_ciencia_e_operacao_com_evento_correto_e_sem_duplicar(tmp_path, monkeypatch, codigo):
+    caminho = tmp_path / 'eventos.db'
+    recipients = tmp_path / 'secrets' / 'recipients.json'
+    email_alerts.salvar_destinatarios(recipients, 'teste@empresa.com.br')
+    banco = BancoManifestacoes(str(caminho))
+    banco.salvar_retorno('123', retorno(codigo), ('teste@empresa.com.br',))
+    banco.salvar_retorno('123', retorno(codigo), ('teste@empresa.com.br',))
+    assert len(banco.notificacoes_pendentes()) == 1
+    banco.fechar()
+    settings = SimpleNamespace(smtp_host='smtp.test', smtp_from='origem@gmail.com', smtp_user='',
+        smtp_password_file=tmp_path/'senha.txt', email_recipients_file=recipients,
+        current_database_password=lambda: None)
+    monkeypatch.setattr(sync_runtime, 'caminho_banco_configurado', lambda _: caminho)
+    enviados = []
+    monkeypatch.setattr(email_alerts, '_enviar_mensagem', lambda _, mensagem: enviados.append(mensagem))
+    audit = SimpleNamespace(write_system=lambda *a, **kw: None)
+    assert email_alerts.enviar_pendentes(settings, audit) == 1
+    assert email_alerts.enviar_pendentes(settings, audit) == 0
+    assert codigo in enviados[0].get_content()
+    assert ('Ciência da Emissão' if codigo == '210210' else 'Operação não Realizada') in str(enviados[0]['Subject'])
+
+
+def test_remetente_salvo_persiste_valida_e_atualiza_autenticacao(tmp_path, monkeypatch):
+    settings = SimpleNamespace(email_recipients_file=tmp_path/'recipients.json',
+        smtp_from='antigo@gmail.com', smtp_user='antigo@gmail.com', smtp_host='smtp.test',
+        smtp_port=587, smtp_security='starttls', smtp_password_file=tmp_path/'senha.txt')
+    settings.smtp_password_file.write_text('senha-de-app')
+    email_alerts.salvar_remetente(settings, 'novo@gmail.com', 'novo@gmail.com')
+    assert email_alerts.remetente_atual(settings) == ('novo@gmail.com', 'novo@gmail.com')
+    with pytest.raises(ValueError):
+        email_alerts.salvar_remetente(settings, 'novo@gmail.com\r\nBcc:outro@gmail.com', '')
+    assert email_alerts.remetente_atual(settings)[0] == 'novo@gmail.com'
+    from unittest.mock import MagicMock
+    smtp = MagicMock()
+    monkeypatch.setattr(email_alerts.smtplib, 'SMTP', lambda *a, **kw: smtp)
+    email_alerts._enviar(settings, 'teste@empresa.com.br', '3'*44, '2026-10-16', '123', '210210')
+    smtp.__enter__().login.assert_called_once_with('novo@gmail.com', 'senha-de-app')
+    message = smtp.__enter__().send_message.call_args.args[0]
+    assert str(message['From']) == 'novo@gmail.com'
+
+
+def test_email_de_teste_nao_abre_banco_e_nao_consulta_sefaz(tmp_path, monkeypatch):
+    recipients = tmp_path/'recipients.json'
+    email_alerts.salvar_destinatarios(recipients, 'teste@empresa.com.br')
+    settings = SimpleNamespace(smtp_host='smtp.test', smtp_from='app@gmail.com', smtp_user='',
+        smtp_password_file=tmp_path/'senha.txt', email_recipients_file=recipients)
+    def proibido(*args, **kwargs):
+        pytest.fail('Teste de e-mail não pode abrir banco nem consultar SEFAZ')
+    monkeypatch.setattr(email_alerts, 'BancoManifestacoes', proibido)
+    monkeypatch.setattr(sync_runtime, 'sincronizar_configurado', proibido)
+    enviados = []
+    monkeypatch.setattr(email_alerts, '_enviar_mensagem', lambda _, mensagem: enviados.append(mensagem))
+    audit = SimpleNamespace(write_system=lambda *a, **kw: None)
+    assert email_alerts.enviar_teste(settings, audit) == (1, 0)
+    assert 'teste' in str(enviados[0]['Subject'])
+    assert enviados[0]['To'] == 'teste@empresa.com.br'

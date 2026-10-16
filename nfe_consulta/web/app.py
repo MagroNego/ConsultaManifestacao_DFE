@@ -62,8 +62,8 @@ from nfe_consulta.web.admin_accounts import AdminAccounts
 from nfe_consulta.web.scheduler import loop_sincronizacao_automatica
 from nfe_consulta.web.settings import WebSettings, get_settings
 from nfe_consulta.web.email_alerts import (
-    carregar_destinatarios, salvar_destinatarios, smtp_pronto,
-    contar_pendentes, enviar_pendentes, cancelar_pendentes_removidos,
+    carregar_destinatarios, salvar_destinatarios, smtp_pronto, normalizar_destinatarios,
+    contar_pendentes, enviar_pendentes, cancelar_pendentes_removidos, enviar_teste, remetente_atual, salvar_remetente,
 )
 from nfe_consulta.web.sync_runtime import sincronizar_configurado
 from nfe_consulta.web.sync_diagnostics import detalhes_erro, mensagem_erro
@@ -285,6 +285,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
     )
     app.state.login_attempts = {}
     app.state.login_lock = threading.Lock()
+    app.state.email_test_next_at = 0.0
     app.state.export_queue = ExportQueue()
     app.state.export_jobs = ExportJobs()
     app.state.sync_lock = threading.Lock()
@@ -1058,6 +1059,8 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         db_ok: str | None = None,
         email_ok: str | None = None,
         email_sent: str | None = None,
+        email_test_sent: str | None = None,
+        email_test_failed: str | None = None,
         lote: int | None = None,
         situacao_ok: int | None = None,
         situacao_acao: str | None = None,
@@ -1074,6 +1077,12 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         except (ValueError, OSError):
             email_recipients = ""
             erro = "Lista de destinatários inválida. Salve novamente os endereços para corrigir."
+
+        try:
+            email_sender, email_smtp_user = remetente_atual(settings)
+        except (ValueError, OSError):
+            email_sender, email_smtp_user = settings.smtp_from, settings.smtp_user
+            erro = "Configuração do remetente inválida. Salve novamente os dados dos alertas."
 
         batch = None
         if lote is not None:
@@ -1096,6 +1105,8 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                 else "Certificado validado e configurado." if cert_ok == "1"
                 else "Banco validado e configurado." if db_ok == "1"
                 else "Destinatários dos alertas salvos." if email_ok == "1"
+                else f"Teste: {email_test_sent} envio(s) aceito(s) pelo SMTP; {email_test_failed} falha(s). Confira a caixa de entrada e o spam."
+                if email_test_sent and email_test_sent.isdigit() and email_test_failed and email_test_failed.isdigit()
                 else f"{email_sent} aviso(s) enviado(s)." if email_sent and email_sent.isdigit()
                 else None
             ),
@@ -1106,6 +1117,8 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             database_web=_database_web(settings),
             cooldown_minutes=settings.sync_cooldown_minutes,
             email_recipients=email_recipients,
+            email_sender=email_sender,
+            email_smtp_user=email_smtp_user,
             smtp_ready=smtp_pronto(settings),
             email_pending=await run_in_threadpool(contar_pendentes, settings) if status_web.database_ready else None,
         )
@@ -1145,9 +1158,15 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         user: Annotated[WebUser, Depends(require_admin)],
         csrf: str = Form(...),
         recipients: str = Form(""),
+        sender: str | None = Form(None),
+        smtp_user: str = Form(""),
     ):
         validate_csrf(csrf, user, settings)
         try:
+            # Valida todo o formulário antes de gravar a configuração.
+            normalizar_destinatarios(recipients)
+            if sender is not None:
+                salvar_remetente(settings, sender, smtp_user)
             emails = salvar_destinatarios(settings.email_recipients_file, recipients)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -1160,6 +1179,29 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             url=request.url_for("atualizar_page").include_query_params(email_ok="1"),
             status_code=303,
         )
+
+    @app.post("/atualizar/alertas-email/testar")
+    async def atualizar_testar_email(
+        request: Request, user: Annotated[WebUser, Depends(require_admin)],
+        csrf: str = Form(...),
+    ):
+        validate_csrf(csrf, user, settings)
+        with app.state.login_lock:
+            now = time.monotonic()
+            if now < app.state.email_test_next_at:
+                raise HTTPException(429, "Aguarde um minuto antes de enviar outro teste.")
+            app.state.email_test_next_at = now + 60
+        try:
+            enviados, falhas = await run_in_threadpool(enviar_teste, settings, app.state.audit)
+        except (ValueError, RuntimeError) as exc:
+            raise HTTPException(400, str(exc)) from exc
+        except Exception as exc:
+            app.state.audit.write(request, user, "email_test", "erro", reason=type(exc).__name__)
+            raise HTTPException(503, "Não foi possível preparar o teste. Confira a configuração dos alertas.") from exc
+        app.state.audit.write(request, user, "email_test", "ok" if not falhas else "erro",
+                              sent=enviados, failed=falhas)
+        return RedirectResponse(request.url_for("atualizar_page").include_query_params(
+            email_test_sent=str(enviados), email_test_failed=str(falhas)), status_code=303)
 
     @app.post("/atualizar/alertas-email/enviar-pendentes")
     async def atualizar_enviar_pendentes(

@@ -65,7 +65,7 @@ Uma janela concluída não é repetida após reiniciar. Falhas e distribuições
 
 ## Alertas de Operação não Realizada
 
-Em **Admin → Alertas por e-mail**, cadastre até 20 endereços, separados por linha ou vírgula. Novos eventos **210240** geram avisos para os destinatários cadastrados. Reprocessar um evento já gravado não cria uma nova mensagem.
+Em **Admin → Alertas por e-mail**, cadastre até 20 endereços, separados por linha ou vírgula. Novos eventos de **Ciência da Emissão (210210)** e **Operação não Realizada (210240)** geram avisos para os destinatários cadastrados. Reprocessar um evento já gravado não cria uma nova mensagem.
 
 Os envios dependem da configuração SMTP do servidor. Falhas temporárias mantêm os avisos na fila. Após corrigir o SMTP, use **Tentar enviar pendentes**; isso não refaz a sincronização da SEFAZ. Remover um destinatário cancela seus avisos ainda pendentes.
 
@@ -215,3 +215,7 @@ Entre como administrador e abra **Admin → Gerenciar usuários**. Informe usuá
 ### Retenção do histórico de sincronização
 
 O histórico de sincronização mostra somente os últimos 30 dias. Registros SEFAZ mais antigos são removidos do log ao iniciar o servidor e diariamente na primeira gravação de auditoria. A limpeza também alcança os cinco arquivos de rotação. Registros administrativos seguem a rotação por tamanho existente. Notas, manifestações, cursores NSU, respostas pendentes e intervalos de recuperação não são apagados. A retenção não altera nem compacta o banco fiscal.
+
+Em **Admin → Alertas por e-mail**, use **Enviar e-mail de teste** após configurar o SMTP e salvar os destinatários. O teste envia uma mensagem sintética para todos os destinatários salvos, sem consultar a SEFAZ ou criar manifestações. Aguarde um minuto entre testes. Aceitação pelo SMTP não confirma a entrega; confira caixa de entrada e spam.
+
+O campo **E-mail remetente** pode ser alterado em Alertas por e-mail, junto com **Usuário SMTP**. No Gmail, os dois devem corresponder à conta da senha de app salva em `secrets/smtp-password.txt`. A configuração local persiste em `secrets/smtp-sender.json` e vale para os próximos envios sem reiniciar. Servidor, porta e segurança continuam definidos no ambiente; trocar de provedor pode exigir ajustá-los.

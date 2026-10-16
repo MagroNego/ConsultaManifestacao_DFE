@@ -54,11 +54,48 @@ def salvar_destinatarios(arquivo: Path, texto: str) -> tuple[str, ...]:
     return emails
 
 
+def remetente_atual(settings) -> tuple[str, str]:
+    arquivo = settings.email_recipients_file.parent / "smtp-sender.json"
+    if not arquivo.is_file():
+        return settings.smtp_from, settings.smtp_user
+    dados = json.loads(arquivo.read_text(encoding="utf-8"))
+    if not isinstance(dados, dict):
+        raise ValueError("Configuração do remetente inválida.")
+    remetente, usuario = dados.get("from"), dados.get("user")
+    _validar_remetente(remetente, usuario)
+    return remetente, usuario
+
+
+def _validar_remetente(remetente, usuario):
+    if (not isinstance(remetente, str) or len(remetente) > 254
+            or not EMAIL_PATTERN.fullmatch(remetente) or ".." in remetente):
+        raise ValueError("Informe um único e-mail remetente válido.")
+    if (not isinstance(usuario, str) or len(usuario) > 254
+            or any(c in usuario for c in "\r\n")):
+        raise ValueError("Usuário SMTP inválido.")
+
+
+def salvar_remetente(settings, remetente: str, usuario: str) -> None:
+    remetente, usuario = remetente.strip(), usuario.strip()
+    _validar_remetente(remetente, usuario)
+    arquivo = settings.email_recipients_file.parent / "smtp-sender.json"
+    arquivo.parent.mkdir(parents=True, exist_ok=True)
+    fd, temporario = tempfile.mkstemp(prefix=".remetente-", dir=arquivo.parent)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as stream:
+            json.dump({"from": remetente, "user": usuario}, stream)
+        os.replace(temporario, arquivo)
+    finally:
+        Path(temporario).unlink(missing_ok=True)
+
+
 def smtp_pronto(settings) -> bool:
-    return bool(
-        settings.smtp_host and settings.smtp_from
-        and (not settings.smtp_user or settings.smtp_password_file.is_file())
-    )
+    try:
+        remetente, usuario = remetente_atual(settings)
+    except (ValueError, OSError, TypeError):
+        return False
+    return bool(settings.smtp_host and remetente
+                and (not usuario or settings.smtp_password_file.is_file()))
 
 
 def contar_pendentes(settings) -> int | None:
@@ -87,16 +124,22 @@ def cancelar_pendentes_removidos(settings, destinatarios: tuple[str, ...]) -> in
         banco.fechar()
 
 
-def _enviar(settings, destinatario: str, chave: str, data: str, protocolo: str) -> None:
+def _enviar(settings, destinatario: str, chave: str, data: str, protocolo: str,
+            codigo: str = "210240") -> None:
+    descricao = {"210240": "Operação não Realizada", "210210": "Ciência da Emissão"}[codigo]
     mensagem = EmailMessage()
-    mensagem["Subject"] = "NF-e: nova Operação não Realizada"
-    mensagem["From"] = settings.smtp_from
+    mensagem["Subject"] = f"NF-e: novo evento de {descricao}"
+    mensagem["From"] = remetente_atual(settings)[0]
     mensagem["To"] = destinatario
     mensagem.set_content(
-        "Foi recebido um novo evento de Operação não Realizada (210240).\n\n"
+        f"Foi recebido um novo evento de {descricao} ({codigo}).\n\n"
         f"Chave NF-e: {chave}\nData do evento: {data}\nProtocolo: {protocolo}\n\n"
         "Confira o registro no AtlasDFE."
     )
+    _enviar_mensagem(settings, mensagem)
+
+
+def _enviar_mensagem(settings, mensagem: EmailMessage) -> None:
     if settings.smtp_security == "ssl":
         conexao = smtplib.SMTP_SSL(
             settings.smtp_host, settings.smtp_port, timeout=10,
@@ -108,10 +151,11 @@ def _enviar(settings, destinatario: str, chave: str, data: str, protocolo: str) 
         if settings.smtp_security == "starttls":
             smtp.starttls(context=ssl.create_default_context())
         senha = settings.smtp_password_file
-        if settings.smtp_user:
+        usuario = remetente_atual(settings)[1]
+        if usuario:
             if not senha.is_file():
                 raise RuntimeError("Senha SMTP ausente em secrets/smtp-password.txt.")
-            smtp.login(settings.smtp_user, senha.read_text(encoding="utf-8").rstrip("\r\n"))
+            smtp.login(usuario, senha.read_text(encoding="utf-8").rstrip("\r\n"))
         smtp.send_message(mensagem)
 
 
@@ -142,9 +186,9 @@ def _enviar_pendentes_sem_lock(settings, audit, *, limite: int) -> int:
     enviados = 0
     try:
         banco.cancelar_destinatarios_removidos(tuple(ativos))
-        for id_, destinatario, chave, data, protocolo in banco.notificacoes_pendentes(limite):
+        for id_, destinatario, chave, data, protocolo, codigo in banco.notificacoes_pendentes(limite, incluir_codigo=True):
             try:
-                _enviar(settings, destinatario, chave, data, protocolo)
+                _enviar(settings, destinatario, chave, data, protocolo, codigo)
             except Exception as exc:
                 # O log não inclui endereço nem conteúdo fiscal.
                 permanente = isinstance(exc, smtplib.SMTPRecipientsRefused) or (
@@ -166,3 +210,35 @@ def _enviar_pendentes_sem_lock(settings, audit, *, limite: int) -> int:
     finally:
         banco.fechar()
     return enviados
+
+
+def enviar_teste(settings, audit) -> tuple[int, int]:
+    """Mensagem sintética; não lê o banco nem altera filas ou NSUs."""
+    if not smtp_pronto(settings):
+        raise ValueError("Configure o SMTP antes de enviar o teste.")
+    ativos = carregar_destinatarios(settings.email_recipients_file)
+    if not ativos:
+        raise ValueError("Salve pelo menos um destinatário antes de enviar o teste.")
+    if not _delivery_lock.acquire(blocking=False):
+        raise RuntimeError("Outro envio de e-mail está em andamento. Aguarde e tente novamente.")
+    enviados = falhas = 0
+    try:
+        for destinatario in ativos:
+            mensagem = EmailMessage()
+            mensagem["Subject"] = "AtlasDFE — teste de envio de e-mail"
+            mensagem["From"] = remetente_atual(settings)[0]
+            mensagem["To"] = destinatario
+            mensagem.set_content("Este é um teste dos alertas do AtlasDFE.\n"
+                "Nenhuma consulta à SEFAZ foi realizada e nenhum evento fiscal foi criado.\n"
+                "Os alertas incluem Ciência da Emissão (210210) e Operação não Realizada (210240).")
+            try:
+                _enviar_mensagem(settings, mensagem)
+            except Exception as exc:
+                falhas += 1
+                audit.write_system("email_test", "erro", reason=type(exc).__name__)
+            else:
+                enviados += 1
+                audit.write_system("email_test", "enviado")
+    finally:
+        _delivery_lock.release()
+    return enviados, falhas

@@ -384,7 +384,7 @@ class BancoManifestacoes:
                      evento.protocolo, evento.nsu, evento.schema),
                 )
                 inseridos += cursor.rowcount
-                if cursor.rowcount and evento.codigo == "210240":
+                if cursor.rowcount and evento.codigo in {"210240", "210210"}:
                     for destinatario in destinatarios_alerta:
                         self.conexao.execute(
                             "INSERT OR IGNORE INTO notificacoes_email(manifestacao_id, destinatario) "
@@ -415,9 +415,10 @@ class BancoManifestacoes:
                     f"ultNSU={retorno.ult_nsu}; maxNSU={retorno.max_nsu}; documentos={len(retorno.documentos)}")
         return inseridos
 
-    def notificacoes_pendentes(self, limite: int = 100) -> list[tuple]:
+    def notificacoes_pendentes(self, limite: int = 100, *, incluir_codigo: bool = False) -> list[tuple]:
         return self.conexao.execute(
-            "SELECT n.id, n.destinatario, m.chave, m.data_evento, m.protocolo "
+            ("SELECT n.id, n.destinatario, m.chave, m.data_evento, m.protocolo "
+             + (", m.codigo " if incluir_codigo else "")) +
             "FROM notificacoes_email n JOIN manifestacoes m ON m.id = n.manifestacao_id "
             "WHERE n.enviado_em IS NULL AND n.cancelado_em IS NULL ORDER BY n.id LIMIT ?",
             (limite,),
