@@ -64,11 +64,13 @@ O leitor foi integrado a partir de [Leitor_XML_Saida](https://github.com/MagroNe
 
 Consulta, Status, Emissão e exportações não exigem login. **Admin** exige uma conta administrativa: importação de XML, sincronização manual, configuração e histórico são protegidos no servidor, inclusive por URLs diretas. `CONFIGURAR_ADMIN.cmd` cria ou redefine a conta escolhida, preserva as demais e faz backup do banco de contas antes de alterar uma instalação existente.
 
+Em **Admin → Gerenciar usuários**, o administrador cadastra contas com o perfil **Usuário comum** (consulta e exportação) ou **Administrador**. O usuário comum entra pelo botão **Entrar**, é direcionado para Consulta e não pode acessar configurações, importação ou sincronização. Contas existentes são preservadas; o acesso público de leitura continua disponível.
+
 A senha fica como hash em `dados/admin_accounts.db` (ou `NFE_ADMIN_ACCOUNTS_PATH`). Sessões são mantidas no servidor, expiram por inatividade e são revogadas no logout ou na redefinição da senha. O cookie é `HttpOnly` e `SameSite=Strict`; em HTTPS também usa `Secure`. Em HTTP local, o login funciona sem esse atributo; use HTTPS no servidor definitivo.
 
 - Proteção CSRF nos formulários.
 - SQL parametrizado, processamento XML com `defusedxml` e limites de upload/exportação.
-- Auditoria com rotação em `logs/web_audit.log`.
+- Auditoria com rotação em `logs/web_audit.log`. O histórico de sincronização retém 30 dias; a limpeza automática preserva os demais registros administrativos e todos os dados fiscais.
 - SQLCipher opcional para proteger o banco fiscal; a administração mostra o modo de armazenamento.
 
 Senhas do banco, certificado e SMTP ficam em `secrets`. Contas administrativas antigas continuam disponíveis; contas sem perfil Admin não entram nessa área. As credenciais não são incluídas nas releases.

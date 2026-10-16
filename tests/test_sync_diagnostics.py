@@ -1,5 +1,5 @@
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from types import SimpleNamespace
 from unittest.mock import Mock
 
@@ -112,7 +112,7 @@ def test_historico_filtra_diagnostico_e_mostra_acao_horario_e_referencia(tmp_pat
         quando='2026-10-14T01:00:00-03:00', proxima_tentativa='2026-10-14T22:00:00-03:00',
         detail='senha=segredo', banco='c:/privado', nsu_antes='<script>')
     path.write_text('2026-10-14 04:00:00 '+json.dumps(payload)+'\n')
-    item = read_sync_history(path)[0]
+    item = read_sync_history(path, now=datetime(2026, 10, 15, tzinfo=timezone.utc))[0]
     assert 'não altere o NSU' in item.detail
     assert 'consNSU' in item.diagnostic
     assert '000000000000011' in item.diagnostic
@@ -160,7 +160,7 @@ def test_metadados_invalidos_nao_quebram_historico(tmp_path):
         etapa=[], falha_comunicacao={}, quando='0001-01-01T00:00:00+00:00',
         execucao={}, nsu_salvo=[], duracao_segundos='segredo')
     path.write_text('2026-10-14 04:00:00 '+json.dumps(payload)+'\n')
-    item = read_sync_history(path)[0]
+    item = read_sync_history(path, now=datetime(2026, 10, 15, tzinfo=timezone.utc))[0]
     assert item.result == 'Falhou'
     assert item.reference == ''
     assert 'segredo' not in repr(item)
@@ -171,7 +171,7 @@ def test_fechamento_apos_lote_gravado_nao_aparece_como_nao_executada(tmp_path):
     path.write_text('2026-10-14 07:00:00 '+json.dumps(dict(
         action='sefaz_sync_auto', result='ignorado', reason='fora_janela',
         lotes_gravados=1, nsu_salvo='20'))+'\n')
-    item = read_sync_history(path)[0]
+    item = read_sync_history(path, now=datetime(2026, 10, 15, tzinfo=timezone.utc))[0]
     assert item.result == 'Interrompida pelo horário'
     assert 'já foi gravado foi mantido' in item.detail
 

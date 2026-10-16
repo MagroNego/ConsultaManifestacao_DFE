@@ -341,7 +341,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                     headers={"Cache-Control": "no-store"})
             return JSONResponse({"detail": "Entre para acessar a área Admin."}, status_code=401,
                 headers={"Cache-Control": "no-store"})
-        if path in {"/excel", "/xml/importar", "/admin/login", "/admin/notas/situacao"} and request.method == "POST":
+        if path in {"/excel", "/xml/importar", "/admin/login", "/admin/contas", "/admin/notas/situacao"} and request.method == "POST":
             try:
                 size = int(request.headers.get("content-length", "0"))
             except ValueError:
@@ -487,7 +487,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         request: Request,
         user: Annotated[WebUser, Depends(current_user)],
     ):
-        if user.is_admin:
+        if user.authenticated:
             return RedirectResponse(
                 url=request.url_for("atualizar_page" if user.is_admin else "consulta_page"),
                 status_code=303,
@@ -546,7 +546,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                            admin_configured=True, error="Muitas tentativas. Tente novamente em alguns minutos.")
 
         logged_username = await run_in_threadpool(app.state.admin_accounts.authenticate, username, password)
-        if not logged_username or app.state.admin_accounts.role(logged_username) != "admin":
+        if not logged_username:
             app.state.audit.write(
                 request,
                 PUBLIC_USER,
@@ -589,9 +589,11 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
     @app.post("/admin/logout")
     async def admin_logout(
         request: Request,
-        user: Annotated[WebUser, Depends(require_admin)],
+        user: Annotated[WebUser, Depends(current_user)],
         csrf: str = Form(...),
     ):
+        if not user.authenticated:
+            raise HTTPException(401, "Entre para encerrar a sessão.")
         validate_csrf(csrf, user, settings)
         app.state.admin_accounts.revoke_session(user.session_token)
         app.state.audit.write(
@@ -606,6 +608,40 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         )
         clear_admin_cookie(response, settings, secure=request.url.scheme == "https")
         return response
+
+    @app.get("/admin/contas", response_class=HTMLResponse, name="admin_accounts_page")
+    async def admin_accounts_page(
+        request: Request, user: Annotated[WebUser, Depends(require_admin)],
+    ):
+        accounts = await run_in_threadpool(app.state.admin_accounts.list_accounts)
+        return _render(request, "admin_accounts.html", user, accounts=accounts,
+                       success="Alteração salva." if request.query_params.get("saved") == "1" else None)
+
+    @app.post("/admin/contas", name="admin_accounts_update")
+    async def admin_accounts_update(
+        request: Request, user: Annotated[WebUser, Depends(require_admin)],
+        csrf: str = Form(...), action: str = Form(...), username: str = Form(...),
+        password: str = Form(""), role: str = Form("fiscal"),
+    ):
+        validate_csrf(csrf, user, settings)
+        accounts = app.state.admin_accounts
+        try:
+            if action == "create":
+                await run_in_threadpool(accounts.create, username, password, role)
+            elif action == "role":
+                await run_in_threadpool(accounts.set_role, username, role)
+            elif action in {"activate", "deactivate"}:
+                await run_in_threadpool(accounts.set_active, username, action == "activate")
+            elif action == "reset":
+                await run_in_threadpool(accounts.reset_password, username, password)
+            else:
+                raise ValueError("Ação inválida.")
+        except ValueError as exc:
+            return _render(request, "admin_accounts.html", user, status_code=400,
+                accounts=await run_in_threadpool(accounts.list_accounts), error=str(exc))
+        app.state.audit.write(request, user, "admin_accounts", "ok",
+                              operation=action, account=username.strip())
+        return RedirectResponse(str(request.url_for("admin_accounts_page")) + "?saved=1", status_code=303)
 
     @app.get("/admin/historico", response_class=HTMLResponse)
     async def admin_history_page(
