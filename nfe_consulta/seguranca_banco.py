@@ -9,6 +9,8 @@ import tempfile
 from contextlib import closing
 from pathlib import Path
 
+from nfe_consulta.export_control import install_progress_handler
+
 CABECALHO_SQLITE = b"SQLite format 3\x00"
 
 
@@ -58,11 +60,13 @@ def abrir_banco(caminho: str | Path, senha: str | None = None, *, somente_leitur
         except modulo.DatabaseError as exc:
             conexao.close()
             raise ValueError("Senha incorreta ou banco criptografado inválido.") from exc
+        install_progress_handler(conexao)
         return conexao
 
     conexao = sqlite3.connect(str(arquivo))
     if somente_leitura:
         conexao.execute("PRAGMA query_only = ON")
+    install_progress_handler(conexao)
     return conexao
 
 

@@ -1,5 +1,12 @@
 # Histórico de versões
 
+## Em preparação
+
+- Cancelamento interrompe consultas SQL e montagem de relatórios, mantendo a vaga da fila até o trabalho encerrar.
+- Elimina cálculo repetido por linha que tornava planilhas grandes mais lentas.
+- Botão de cancelar responde imediatamente e orienta atualizar a página quando a sessão/token muda.
+- A gravação final do Excel ainda precisa concluir o bloco em andamento antes da limpeza dos temporários.
+
 ## 2.6.0 — 2026-10-16
 
 - Versão estável com login obrigatório, cadastro próprio de usuário comum e acesso imediato.

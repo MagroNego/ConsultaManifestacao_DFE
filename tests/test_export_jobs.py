@@ -212,3 +212,47 @@ def test_admin_pode_cancelar_solicitacao_de_usuario_comum(tmp_path):
         assert app.state.export_jobs.records[id_]['status']=='cancelled'
         await app.state.export_jobs.close()
     asyncio.run(scenario())
+
+
+def test_cancel_reaches_worker_thread_and_releases_slot_without_archive(tmp_path):
+    from threading import Event
+    from starlette.concurrency import run_in_threadpool
+    from nfe_consulta.export_control import check_export_cancelled
+
+    async def scenario():
+        app = create_app(web['settings_web'](tmp_path))
+        app.state.export_queue = ExportQueue(concurrency=1, max_waiting=1)
+        entered, advance = Event(), Event()
+        finished = Event()
+        def build():
+            entered.set()
+            assert advance.wait(3)
+            try:
+                check_export_cancelled()
+            finally:
+                finished.set()
+            raise AssertionError("Cancelled worker must not finish its report")
+        async def generate(request: Request):
+            await run_in_threadpool(build)
+            return Response(b'not reached')
+        for route in app.routes:
+            if getattr(route, 'path', '') == '/xml/exportar':
+                route.app = APIRoute('/xml/exportar', generate, methods=['GET']).app
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url='http://test') as client:
+            csrf = await authenticated_async_user(client, app)
+            response = await client.get('/xml/exportar', headers={'X-NFE-Background': '1'})
+            identifier = response.json()['job_id']
+            assert await run_in_threadpool(entered.wait, 3)
+            try:
+                response = await client.post(f'/downloads/tarefas/{identifier}/cancelar', data={'csrf': csrf}, headers={'Accept': 'application/json'})
+                assert response.status_code == 200
+                assert app.state.export_queue.active == 1
+            finally:
+                advance.set()
+            await asyncio.wait_for(asyncio.gather(*list(app.state.export_jobs.tasks)), 3)
+            assert finished.is_set()
+            assert app.state.export_jobs.records[identifier]['status'] == 'cancelled'
+            assert app.state.export_queue.active == app.state.export_queue.waiting == 0
+            assert app.state.downloads.list() == []
+        await app.state.export_jobs.close()
+    asyncio.run(scenario())

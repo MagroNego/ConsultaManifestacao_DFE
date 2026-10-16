@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from nfe_consulta.export_control import cancellable_rows
 from dataclasses import dataclass, replace
 from datetime import date, datetime, timedelta, timezone
 from math import ceil
@@ -319,7 +320,7 @@ def consultar_eventos(
         conexao.close()
 
     return ResultadoEventos(
-        eventos=tuple(replace(_evento_da_linha(linha), ctes=ctes.get(linha[0], ()), cancelada=linha[0] in cancelled) for linha in linhas),
+        eventos=tuple(replace(_evento_da_linha(linha), ctes=ctes.get(linha[0], ()), cancelada=linha[0] in cancelled) for linha in cancellable_rows(linhas)),
         total=total,
         pagina=pagina_efetiva,
         por_pagina=por_pagina,
@@ -375,7 +376,7 @@ def consultar_eventos_exportacao(
     finally:
         conexao.close()
 
-    return tuple(replace(_evento_da_linha(linha), ctes=ctes.get(linha[0], ()), cancelada=linha[0] in cancelled) for linha in linhas)
+    return tuple(replace(_evento_da_linha(linha), ctes=ctes.get(linha[0], ()), cancelada=linha[0] in cancelled) for linha in cancellable_rows(linhas))
 
 
 def consultar_numero_nota(

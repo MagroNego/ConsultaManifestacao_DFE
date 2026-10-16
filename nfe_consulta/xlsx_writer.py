@@ -1,5 +1,6 @@
 """Planilha de consulta pronta para abrir no Excel, mantendo chaves como texto."""
 
+from nfe_consulta.export_control import cancellable_rows, check_export_cancelled
 import os
 import tempfile
 from datetime import datetime
@@ -57,7 +58,7 @@ def gravar_xlsx(caminho: str, resultados: list, cobertura: str) -> None:
         celula.font = Font(bold=True)
         celula.fill = PatternFill("solid", fgColor="E7E7E7")
         celula.alignment = Alignment(vertical="center")
-    for indice, resultado in enumerate(resultados, 5):
+    for indice, resultado in enumerate(cancellable_rows(resultados), 5):
         numero, serie = numero_e_serie(resultado.chave)
         evento = resultado.manifestacoes[-1] if resultado.manifestacoes else None
         valores = [
@@ -98,7 +99,9 @@ def gravar_xlsx(caminho: str, resultados: list, cobertura: str) -> None:
     descritor, temporario = tempfile.mkstemp(prefix=".nfe-consulta-", suffix=".xlsx", dir=destino.parent)
     os.close(descritor)
     try:
+        check_export_cancelled()
         wb.save(temporario)
+        check_export_cancelled()
         os.replace(temporario, destino)
     finally:
         Path(temporario).unlink(missing_ok=True)

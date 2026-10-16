@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from nfe_consulta.export_control import cancellable_rows, check_export_cancelled
 import os
 import tempfile
 from datetime import datetime
@@ -84,7 +85,7 @@ def gravar_eventos_xlsx(
         celula.fill = PatternFill("solid", fgColor="E7E7E7")
         celula.alignment = Alignment(vertical="center")
 
-    for indice, evento in enumerate(eventos, 5):
+    for indice, evento in enumerate(cancellable_rows(eventos), 5):
         valores = [
             evento.numero,
             evento.serie,
@@ -132,7 +133,9 @@ def gravar_eventos_xlsx(
     )
     os.close(descritor)
     try:
+        check_export_cancelled()
         wb.save(temporario)
+        check_export_cancelled()
         os.replace(temporario, destino)
     finally:
         Path(temporario).unlink(missing_ok=True)

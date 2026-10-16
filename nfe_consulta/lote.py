@@ -1,3 +1,4 @@
+from nfe_consulta.export_control import cancellable_rows
 from pathlib import Path
 from typing import Callable
 
@@ -30,7 +31,7 @@ def processar_lote(
 ) -> list:
     resultados = []
     total = len(chaves)
-    for idx, chave_raw in enumerate(chaves, 1):
+    for idx, chave_raw in enumerate(cancellable_rows(chaves), 1):
         try:
             chave = validar_chave(chave_raw)
             resultado = consultar_fn(chave)
