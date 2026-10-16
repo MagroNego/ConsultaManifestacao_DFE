@@ -1,4 +1,4 @@
-# Implantação Web — v2.5.1
+# Implantação Web — v2.6.0
 
 ## Processo e rede
 
@@ -52,7 +52,7 @@ NFE_CERT_THUMBPRINT=<impressão digital do certificado selecionado>
 
 No Linux, use certificado por arquivo. O certificado e o banco usados pela rotina automática são os mesmos configurados na administração.
 
-## Sincronização nos horários fixos de 08:00 e 15:00
+## Sincronização nos horários fixos de 22:00, 23:00, 00:00, 01:00, 02:00 e 03:00
 
 ```text
 NFE_AUTO_SYNC_ENABLED=1
@@ -60,13 +60,13 @@ NFE_AUTO_SYNC_WEEKDAYS=0,1,2,3,4,5,6
 NFE_AUTO_SYNC_MAX_LOTES=50
 ```
 
-As janelas são **08:00 e 15:00, horário de Brasília, todos os dias**, independentemente do fuso do sistema operacional. Segunda-feira corresponde a `0` e domingo a `6`.
+As janelas são **22:00, 23:00, 00:00, 01:00, 02:00 e 03:00, horário de Brasília, todos os dias**, independentemente do fuso do sistema operacional. Segunda-feira corresponde a `0` e domingo a `6`.
 
 O lançador Windows ativa a rotina se `NFE_AUTO_SYNC_ENABLED` não estiver definida. Defina `0` para desativar. No Linux ou em um serviço configurado diretamente, defina as variáveis no ambiente do processo. `WEB_CONFIG.example` é apenas referência e não é carregado automaticamente.
 
-O aplicativo precisa permanecer ativo. A conclusão fica em `controle_agendamento_intervalo`. Ao reiniciar, uma janela já concluída não se repete. Se houver atraso, apenas a janela mais recente é recuperada. Falhas e resultados parciais são retomados na próxima janela, respeitando cooldown e trava. Antes das 08:00, aguarda a primeira janela do dia. Não execute outra instância contra o mesmo banco.
+O aplicativo precisa permanecer ativo. A conclusão fica em `controle_agendamento_intervalo`. Ao reiniciar, uma janela já concluída não se repete. Se houver atraso, apenas a janela mais recente é recuperada. Falhas e resultados parciais são retomados na próxima janela, respeitando cooldown e trava. Das 04:00 às 22:00, aguarda a abertura da janela noturna. Não execute outra instância contra o mesmo banco.
 
-As variáveis antigas `NFE_AUTO_SYNC_ONCE_DATE`, `NFE_AUTO_SYNC_INTERVAL_HOURS`, `NFE_AUTO_SYNC_HOUR`, `NFE_AUTO_SYNC_MINUTE` e `NFE_SEFAZ_COOLDOWN_MINUTES` são ignoradas; remova-as da configuração. A rotina definitiva usa 08:00 e 15:00 e cooldown de 60 minutos.
+As variáveis antigas `NFE_AUTO_SYNC_ONCE_DATE`, `NFE_AUTO_SYNC_INTERVAL_HOURS`, `NFE_AUTO_SYNC_HOUR`, `NFE_AUTO_SYNC_MINUTE` e `NFE_SEFAZ_COOLDOWN_MINUTES` são ignoradas; remova-as da configuração. A rotina definitiva usa 22:00, 23:00, 00:00, 01:00, 02:00 e 03:00 e cooldown de 60 minutos.
 
 ## Cooldown e rejeição 656
 

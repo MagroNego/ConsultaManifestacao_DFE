@@ -10,7 +10,7 @@
       const value = JSON.parse(localStorage.getItem(jobsKey) || "[]");
       return Array.isArray(value) ? value.filter(item => item && /^[a-f0-9]{32}$/.test(item.id) &&
         Number.isFinite(item.time) && item.time > Date.now() - retention).slice(0, 20)
-        .map(item => ({ id: item.id, time: item.time, status: item.status === "generating" ? "generating" : "queued" })) : [];
+        .map(item => ({ id: item.id, time: item.time, status: ["generating", "cancelling"].includes(item.status) ? item.status : "queued" })) : [];
     } catch { return []; }
   };
   const saveJobs = () => {
@@ -64,7 +64,7 @@
       row.className = "notification-item notification-pending";
       const link = document.createElement("a");
       link.href = panel.dataset.downloadsUrl;
-      link.textContent = item.status === "generating" ? "Gerando arquivo" : "Na fila";
+      link.textContent = item.status === "cancelling" ? "Cancelando…" : item.status === "generating" ? "Gerando arquivo" : "Na fila";
       const bar = document.createElement("progress");
       bar.max = 100;
       bar.setAttribute("aria-label", link.textContent);
@@ -192,6 +192,14 @@
       setProgress(progress, 0, 0, true);
       if (notification) notify("success");
     } catch (error) {
+      if (error.name === "AbortError") {
+        if (progress) {
+          progress.dataset.state = "cancelled";
+          progress.querySelector("progress").value = 0;
+          progress.querySelector("[data-progress-label]").textContent = "Transferência cancelada";
+        }
+        return;
+      }
       if (progress) {
         progress.dataset.state = "error";
         progress.querySelector("[data-progress-label]").textContent = "Erro no download";
@@ -253,8 +261,12 @@
         const progress = link.closest("tr")?.querySelector("[data-download-progress]");
         const previousError = link.parentElement.querySelector("[data-download-error]");
         previousError?.remove();
+        const controller = new AbortController();
+        const cancel = link.closest("tr")?.querySelector("[data-cancel-transfer]");
+        const abort = () => controller.abort();
+        if (cancel) { cancel.hidden = false; cancel.addEventListener("click", abort); }
         try {
-          await download(link.href, {}, { progress, expectedBytes: Number(link.dataset.downloadSize) || 0,
+          await download(link.href, { signal: controller.signal }, { progress, expectedBytes: Number(link.dataset.downloadSize) || 0,
             notification: !link.hasAttribute("data-archived-download") });
         } catch (error) {
           const notice = document.createElement("span");
@@ -264,13 +276,41 @@
           notice.textContent = error instanceof TypeError ? "Conexão interrompida. Tente novamente." : error.message;
           link.parentElement.appendChild(notice);
         } finally {
+          if (cancel) { cancel.hidden = true; cancel.removeEventListener("click", abort); }
           delete link.dataset.busy;
           link.removeAttribute("aria-disabled");
         }
       });
       });
     }
+    function bindCancellation(root = document) {
+      root.querySelectorAll("[data-cancel-job]").forEach(form => {
+        if (form.dataset.bound === "true") return;
+        form.dataset.bound = "true";
+        form.addEventListener("submit", async event => {
+          event.preventDefault();
+          const button = form.querySelector("button");
+          if (button.disabled) return;
+          button.disabled = true;
+          try {
+            const response = await fetch(form.action, { method: "POST", credentials: "same-origin",
+              headers: { "Accept": "application/json" }, body: new FormData(form) });
+            if (!response.ok) throw new Error("Não foi possível cancelar. Atualize a página e confira se a geração já terminou.");
+            button.textContent = "Cancelando…";
+            pollJobs();
+          } catch (error) {
+            button.disabled = false;
+            const notice = document.createElement("span");
+            notice.className = "download-error";
+            notice.setAttribute("role", "alert");
+            notice.textContent = error.message;
+            form.appendChild(notice);
+          }
+        });
+      });
+    }
     bindDownloads();
+    bindCancellation();
     const table = document.querySelector("[data-downloads-table]");
     let polling = false, pollTimer;
     async function pollJobs() {
@@ -286,17 +326,18 @@
         if (!response.ok) throw new Error("Estado indisponível");
         const data = await response.json();
         const statuses = new Map(data.jobs.map(item => [item.id, item.status]));
-        const completed = new Map(data.jobs.filter(item => ["complete", "error", "unavailable"].includes(item.status)).map(item => [item.id, item.status]));
+        const completed = new Map(data.jobs.filter(item => ["complete", "error", "cancelled", "unavailable"].includes(item.status)).map(item => [item.id, item.status]));
         for (const item of trackedJobs) {
-          if (completed.has(item.id) && completed.get(item.id) !== "unavailable") notify(completed.get(item.id) === "complete" ? "success" : "error");
+          if (completed.has(item.id) && !["unavailable", "cancelled"].includes(completed.get(item.id))) notify(completed.get(item.id) === "complete" ? "success" : "error");
         }
         trackedJobs = trackedJobs.filter(item => !completed.has(item.id))
-          .map(item => ({ ...item, status: statuses.get(item.id) === "generating" ? "generating" : "queued" }));
+          .map(item => ({ ...item, status: ["generating", "cancelling"].includes(statuses.get(item.id)) ? statuses.get(item.id) : "queued" }));
         saveJobs();
         renderNotifications();
         if (table && !table.querySelector('[data-download-link][data-busy="true"]')) {
           table.innerHTML = data.html;
           bindDownloads(table);
+          bindCancellation(table);
         }
       } catch { /* Preserve a tabela e tente novamente sem marcar a geração como erro. */ }
       finally { polling = false; }

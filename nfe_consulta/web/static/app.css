@@ -1421,3 +1421,10 @@ html[data-theme="dark"] .brand-logo-dark {
   .sync-logs { padding: 16px; }
   .sync-logs-toggle { width: 100%; }
 }
+
+.download-cancel { display: inline-flex; align-items: center; gap: 5px; margin: 3px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); color: var(--text); font: inherit; font-size: 12px; cursor: pointer; }
+.download-cancel:hover { border-color: var(--danger); color: var(--danger); background: var(--danger-soft); }
+.download-cancel:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.download-cancel:disabled { opacity: .6; cursor: wait; }
+.download-cancel[hidden] { display: none; }
+.download-progress[data-generation-state="cancelled"], .download-progress[data-state="cancelled"] { color: var(--muted); }

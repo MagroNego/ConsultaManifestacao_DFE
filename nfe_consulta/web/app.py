@@ -375,7 +375,8 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                 except (TypeError, ValueError):
                     pass
             try:
-                job = app.state.export_jobs.start(app, request.scope, bytes(body), period=period)
+                job = app.state.export_jobs.start(app, request.scope, bytes(body), period=period,
+                    owner=current_user(request).username)
             except ExportQueueBusy as exc:
                 return JSONResponse({"detail": exc.detail}, status_code=exc.status_code,
                     headers={"Retry-After": "15", "Cache-Control": "no-store"})
@@ -477,8 +478,27 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         except OSError:
             raise HTTPException(503, "Não foi possível consultar os downloads.")
         html = TEMPLATES.get_template('downloads_table.html').render(request=request, user=user,
-            items=items, jobs=[job for job in records if job['status'] != 'complete'])
+            items=items, jobs=[job for job in records if job['status'] != 'complete'],
+            csrf=csrf_token(user, settings))
         return JSONResponse(dict(jobs=tracked, html=html), headers={"Cache-Control": "no-store"})
+
+    @app.post("/downloads/tarefas/{identifier}/cancelar", name="cancel_export_job")
+    async def cancel_export_job(
+        request: Request, identifier: str,
+        user: Annotated[WebUser, Depends(current_user)], csrf: str = Form(...),
+    ):
+        validate_csrf(csrf, user, settings)
+        job = app.state.export_jobs.records.get(identifier)
+        if job is None:
+            raise HTTPException(404, "Solicitação não encontrada.")
+        if not user.is_admin and job.get('owner') != user.username:
+            raise HTTPException(403, "Você só pode cancelar suas próprias solicitações.")
+        if not app.state.export_jobs.cancel(identifier):
+            raise HTTPException(409, "A geração já terminou. O arquivo pronto permanece disponível.")
+        app.state.audit.write(request, user, "export_cancel", "ok", job=identifier)
+        if "application/json" in request.headers.get("accept", ""):
+            return JSONResponse({"status": job['status']})
+        return RedirectResponse(request.url_for("downloads_page"), status_code=303)
 
     @app.get("/downloads/{identifier}")
     async def archived_download(request: Request, identifier: str, user: Annotated[WebUser, Depends(current_user)]):

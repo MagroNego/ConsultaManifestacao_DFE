@@ -128,3 +128,87 @@ def test_real_txt_background_export_still_validates_csrf(tmp_path):
             assert len(app.state.downloads.list()) == 1
         await app.state.export_jobs.close()
     asyncio.run(scenario())
+
+
+def test_cancelar_fila_e_geracao_respeita_autor_csrf_e_preserva_prontos(tmp_path):
+    async def scenario():
+        cfg = web['settings_web'](tmp_path)
+        app = create_app(cfg)
+        app.state.export_queue = ExportQueue(concurrency=1, max_waiting=2)
+        entered, release = asyncio.Event(), asyncio.Event()
+        async def generate(request: Request):
+            entered.set()
+            await release.wait()
+            await archive_file(request, b'conteudo', filename='teste.csv', media_type='text/csv',
+                               documents=1, period='Teste')
+            return Response(b'conteudo',media_type='text/csv')
+        for route in app.routes:
+            if getattr(route,'path','') == '/xml/exportar':
+                route.app=APIRoute('/xml/exportar',generate,methods=['GET']).app
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url='http://test') as client:
+            token = await authenticated_async_user(client,app)
+            first=(await client.get('/xml/exportar',headers={'X-NFE-Background':'1'})).json()['job_id']
+            await asyncio.wait_for(entered.wait(),2)
+            second=(await client.get('/xml/exportar',headers={'X-NFE-Background':'1'})).json()['job_id']
+            path=lambda id_: f'/downloads/tarefas/{id_}/cancelar'
+            headers={'Accept':'application/json'}
+            assert (await client.post(path(first),data={'csrf':'invalido'},headers=headers)).status_code == 403
+            app.state.admin_accounts.create('outra','Senha-de-outra-pessoa-123!','fiscal')
+            async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url='http://test') as other:
+                await other.post('/login',data={'csrf':csrf_token(PUBLIC_USER,cfg),
+                    'username':'outra','password':'Senha-de-outra-pessoa-123!'})
+                from nfe_consulta.web.auth import WebUser
+                other_token=csrf_token(WebUser('outra','outra',False,other.cookies[cfg.admin_cookie_name],'fiscal'),cfg)
+                assert (await other.post(path(first),data={'csrf':other_token})).status_code == 403
+            response=await client.post(path(second),data={'csrf':token},headers=headers)
+            assert response.json()['status']=='cancelled'
+            assert (await client.post(path(second),data={'csrf':token},headers=headers)).status_code==200
+            response=await client.post(path(first),data={'csrf':token},headers=headers)
+            assert response.json()['status']=='cancelling'
+            assert app.state.export_queue.active==1  # O trabalho em andamento mantém a vaga.
+            release.set()
+            await asyncio.wait_for(asyncio.gather(*list(app.state.export_jobs.tasks),return_exceptions=True),3)
+            assert app.state.export_jobs.records[first]['status']=='cancelled'
+            assert app.state.export_jobs.records[second]['status']=='cancelled'
+            assert app.state.downloads.list()==[]
+            assert app.state.export_queue.active==app.state.export_queue.waiting==0
+            state=await client.get('/downloads/estado',params={'ids':first+','+second})
+            assert 'Cancelado' in state.json()['html']
+            third=(await client.get('/xml/exportar',headers={'X-NFE-Background':'1'})).json()['job_id']
+            await asyncio.wait_for(asyncio.gather(*list(app.state.export_jobs.tasks)),3)
+            archive=app.state.export_jobs.records[third]['archive_id']
+            assert (await client.post(path(third),data={'csrf':token},headers=headers)).status_code==409
+            assert (await client.get('/downloads/'+archive)).content==b'conteudo'
+        await app.state.export_jobs.close()
+    asyncio.run(scenario())
+
+
+def test_admin_pode_cancelar_solicitacao_de_usuario_comum(tmp_path):
+    async def scenario():
+        cfg=web['settings_web'](tmp_path)
+        app=create_app(cfg)
+        entered,release=asyncio.Event(),asyncio.Event()
+        async def generate(request:Request):
+            entered.set()
+            await release.wait()
+            return Response(b'report',media_type='text/csv')
+        for route in app.routes:
+            if getattr(route,'path','')=='/xml/exportar':
+                route.app=APIRoute('/xml/exportar',generate,methods=['GET']).app
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url='http://test') as client:
+            await authenticated_async_user(client,app)
+            id_=(await client.get('/xml/exportar',headers={'X-NFE-Background':'1'})).json()['job_id']
+            await asyncio.wait_for(entered.wait(),2)
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url='http://test') as admin:
+            await admin.post('/login',data={'csrf':csrf_token(PUBLIC_USER,cfg),
+                'username':cfg.admin_username,'password':cfg.admin_password})
+            from nfe_consulta.web.auth import WebUser
+            token=csrf_token(WebUser(cfg.admin_username,cfg.admin_username,True,
+                admin.cookies[cfg.admin_cookie_name],'admin'),cfg)
+            response=await admin.post(f'/downloads/tarefas/{id_}/cancelar',data={'csrf':token},headers={'Accept':'application/json'})
+            assert response.json()['status']=='cancelling'
+        release.set()
+        await asyncio.gather(*list(app.state.export_jobs.tasks))
+        assert app.state.export_jobs.records[id_]['status']=='cancelled'
+        await app.state.export_jobs.close()
+    asyncio.run(scenario())

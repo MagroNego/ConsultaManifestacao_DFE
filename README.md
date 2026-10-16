@@ -2,7 +2,7 @@
 
 **AtlasDFE** é uma aplicação Web para consultar manifestações de NF-e, exportar relatórios Excel e sincronizar o histórico com o serviço **NFeDistribuicaoDFe** do Ambiente Nacional da NF-e.
 
-**Versão 2.5.1** · Python 3.11+ · Windows e Linux
+**Versão 2.6.0** · Python 3.11+ · Windows e Linux
 
 ## Funcionalidades
 
@@ -22,7 +22,7 @@ Consulta, Status e exportações usam o banco local e não fazem chamadas à SEF
 
 ## Instalação no Windows
 
-Baixe `ConsultaManifestacao_DFE-v2.5.1.zip` em [Releases](https://github.com/MagroNego/ConsultaManifestacao_DFE/releases), extraia em uma pasta definitiva e execute, nesta ordem:
+Baixe `ConsultaManifestacao_DFE-v2.6.0.zip` em [Releases](https://github.com/MagroNego/ConsultaManifestacao_DFE/releases), extraia em uma pasta definitiva e execute, nesta ordem:
 
 ```powershell
 .\INSTALAR.cmd
@@ -32,7 +32,7 @@ Baixe `ConsultaManifestacao_DFE-v2.5.1.zip` em [Releases](https://github.com/Mag
 
 Abra **http://127.0.0.1:8080**. Em **Admin**, configure o banco existente e o certificado A1. O certificado pode ser um PFX/P12 protegido ou estar instalado no repositório de certificados do Windows.
 
-A versão de teste mantém a recuperação consNSU pausada (`NFE_RECOVERY_ENABLED=0`), preservando as pendências. Para retomá-la após o teste, defina `NFE_RECOVERY_ENABLED=1` e reinicie o app.
+A versão estável mantém a recuperação consNSU pausada (`NFE_RECOVERY_ENABLED=0`), preservando as pendências. Só habilite `NFE_RECOVERY_ENABLED=1` após identificar uma lacuna real e validar a recuperação separadamente; reinicie após mudar a configuração.
 
 O lançador Windows inicia em modo produção e habilita a sincronização nos horários fixos de 22:00, 23:00, 00:00, 01:00, 02:00 e 03:00. Para desligá-la, defina `NFE_AUTO_SYNC_ENABLED=0` antes de executar o lançador. Banco, certificado e credenciais são configurados na instalação e não acompanham o pacote.
 

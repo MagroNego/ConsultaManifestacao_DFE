@@ -1,4 +1,4 @@
-# Arquitetura — v2.5.1
+# Arquitetura — v2.6.0
 
 ## Componentes
 
@@ -8,7 +8,7 @@
 | `web/admin_accounts.py` e `web/auth.py` | Contas, hash de senhas, sessões e CSRF |
 | `web/consulta_local.py` | Filtros, paginação e leitura do histórico |
 | `relatorio_eventos.py` e `xlsx_writer.py` | Relatórios Excel |
-| `web/scheduler.py` | Janelas das 08:00 e 15:00, recuperação e estado persistente |
+| `web/scheduler.py` | Janelas das 22:00, 23:00, 00:00, 01:00, 02:00 e 03:00, recuperação e estado persistente |
 | `web/sync_runtime.py`, `sincronizacao.py` e `distribuicao.py` | Configuração e distribuição por NSU |
 | `xml_reader.py`, `web/xml_store.py`, `web/xml_routes.py` e `web/xml_upload_limit.py` | Leitura fiscal, dados extraídos cumulativos, rotas e limite do corpo de upload |
 | `banco.py` e `seguranca_banco.py` | Persistência SQLite/SQLCipher e transações |

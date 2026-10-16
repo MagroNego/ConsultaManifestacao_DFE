@@ -1,4 +1,4 @@
-# Manual de uso — v2.5.1
+# Manual de uso — v2.6.0
 
 ## Acesso
 
@@ -223,3 +223,7 @@ O campo **E-mail remetente** pode ser alterado em Alertas por e-mail, junto com 
 ### Cadastro próprio e exclusão de contas
 
 Qualquer pessoa que alcance a tela do app pode criar uma conta comum e entrar imediatamente, conforme a política escolhida para esta instalação. O cadastro nunca permite escolher perfil administrativo. No **Admin → Gerenciar usuários**, o administrador pode redefinir senhas e excluir usuários mediante confirmação. Senhas atuais não são exibidas nem recuperáveis; são armazenadas como hash. A exclusão encerra as sessões e preserva notas, manifestações e auditoria. O último administrador ativo não pode ser excluído.
+
+### Cancelar download ou geração
+
+Em **Downloads**, **Cancelar** remove uma solicitação própria da fila ou solicita o cancelamento da geração. O administrador também pode cancelar solicitações de outras contas. Durante uma geração, o bloco que já está em execução pode terminar antes de liberar a vaga; a tela mostra **Cancelando…** e o resultado é descartado. Uma solicitação cancelada não gera alerta de erro. Arquivos já prontos são preservados. Durante a transferência de um arquivo pronto, o botão **Cancelar** interrompe somente o recebimento no navegador; a cópia do servidor continua disponível para tentar novamente.

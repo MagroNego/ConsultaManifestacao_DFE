@@ -1,5 +1,15 @@
 # Histórico de versões
 
+## 2.6.0 — 2026-10-16
+
+- Versão estável com login obrigatório, cadastro próprio de usuário comum e acesso imediato.
+- Gerenciamento administrativo de usuários, redefinição de senhas e exclusão com confirmação.
+- Remetente SMTP editável e envio de mensagem de teste; alertas somente de Operação não Realizada.
+- Retenção dos logs de sincronização por 30 dias, preservando auditoria administrativa e dados fiscais.
+- Cancelamento de solicitações de relatório e interrupção da transferência na aba Downloads.
+- Mantém rotina noturna horária, dados dos relatórios sem novos XMLs permanentes e consNSU pausado.
+- Atualiza pacote e documentação com os horários e políticas atuais.
+
 ## 2.5.1 — 2026-10-14
 
 - Sincronização automática a cada hora: 22h, 23h, 00h, 01h, 02h e 03h de Brasília.

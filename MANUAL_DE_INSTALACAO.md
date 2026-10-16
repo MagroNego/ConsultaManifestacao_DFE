@@ -1,4 +1,4 @@
-# Manual de instalação — v2.5.1
+# Manual de instalação — v2.6.0
 
 ## Requisitos
 
@@ -10,7 +10,7 @@
 
 ## Windows
 
-Extraia `ConsultaManifestacao_DFE-v2.5.1.zip`, por exemplo em `C:\ConsultaManifestacao`.
+Extraia `ConsultaManifestacao_DFE-v2.6.0.zip`, por exemplo em `C:\ConsultaManifestacao`.
 
 ```powershell
 .\INSTALAR.cmd
@@ -18,7 +18,7 @@ Extraia `ConsultaManifestacao_DFE-v2.5.1.zip`, por exemplo em `C:\ConsultaManife
 .\INICIAR_WEB.cmd
 ```
 
-O instalador cria `.venv`, instala as dependências e prepara as pastas operacionais. O lançador inicia em modo produção, cria o segredo Web persistente quando necessário e habilita a rotina das 08:00 e 15:00.
+O instalador cria `.venv`, instala as dependências e prepara as pastas operacionais. O lançador inicia em modo produção, cria o segredo Web persistente quando necessário e habilita a rotina das 22:00, 23:00, 00:00, 01:00, 02:00 e 03:00.
 
 Abra http://127.0.0.1:8080 . Em **Admin**, selecione o banco e configure o certificado. Para SQLCipher, coloque a senha em `secrets\db-password.txt`. Usuários comuns não informam essa senha na consulta.
 
@@ -72,7 +72,7 @@ As tabelas adicionais são criadas pelo aplicativo sem apagar o histórico exist
 
 ## Configuração operacional
 
-A rotina final usa **08:00 e 15:00, horário de Brasília, todos os dias**. `INICIAR_WEB.cmd` aplica a ativação se `NFE_AUTO_SYNC_ENABLED` não estiver definida. Para desativar no PowerShell antes de iniciar:
+A rotina final usa **22:00, 23:00, 00:00, 01:00, 02:00 e 03:00, horário de Brasília, todos os dias**. `INICIAR_WEB.cmd` aplica a ativação se `NFE_AUTO_SYNC_ENABLED` não estiver definida. Para desativar no PowerShell antes de iniciar:
 
 ```powershell
 $env:NFE_AUTO_SYNC_ENABLED = "0"
