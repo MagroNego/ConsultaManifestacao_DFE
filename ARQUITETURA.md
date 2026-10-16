@@ -1,56 +1,52 @@
-# Arquitetura — v2.6.0
+# Arquitetura técnica
 
 ## Componentes
 
-| Componente | Responsabilidade |
+| Módulo | Responsabilidade |
 | --- | --- |
-| `web/app.py` | Rotas, autorização, proteção HTTP e coordenação das operações |
-| `web/admin_accounts.py` e `web/auth.py` | Contas, hash de senhas, sessões e CSRF |
-| `web/consulta_local.py` | Filtros, paginação e leitura do histórico |
-| `relatorio_eventos.py` e `xlsx_writer.py` | Relatórios Excel |
-| `web/scheduler.py` | Janelas das 22:00, 23:00, 00:00, 01:00, 02:00 e 03:00, recuperação e estado persistente |
-| `web/sync_runtime.py`, `sincronizacao.py` e `distribuicao.py` | Configuração e distribuição por NSU |
-| `xml_reader.py`, `web/xml_store.py`, `web/xml_routes.py` e `web/xml_upload_limit.py` | Leitura fiscal, dados extraídos cumulativos, rotas e limite do corpo de upload |
-| `banco.py` e `seguranca_banco.py` | Persistência SQLite/SQLCipher e transações |
-| `web/email_alerts.py` | Destinatários, configuração SMTP e processamento da fila |
-| `web/audit.py` e `web/sync_history.py` | Auditoria e histórico operacional |
+| `web/app.py` | Rotas, middleware, autorização e coordenação |
+| `web/auth.py`, `web/admin_accounts.py` | Contas, hash de senha, sessões e CSRF |
+| `web/consulta_local.py` | Consultas e filtros locais |
+| `web/scheduler.py`, `web/sync_runtime.py` | Agendamento, trava, cooldown e configuração |
+| `janela_consulta.py` | Restrição de horário antes das chamadas externas |
+| `sincronizacao.py`, `distribuicao.py` | Fluxo distNSU e transporte SOAP/PowerShell |
+| `recuperacao_nsu.py` | Recuperação pontual e limite de consultas |
+| `banco.py`, `seguranca_banco.py` | Transações e SQLite/SQLCipher |
+| `xml_reader.py`, `web/xml_store.py`, `web/xml_routes.py` | Extração, importação e relatórios de emissão |
+| `cancelamento.py`, `cte.py` | Situação local e vínculos de CT-e |
+| `web/export_queue.py`, `web/export_jobs.py`, `export_control.py` | Fila, execução assíncrona e cancelamento cooperativo |
+| `web/downloads.py` | Arquivo temporário de relatórios |
+| `web/email_alerts.py` | Configuração SMTP e processamento de notificações |
+| `web/audit.py`, `web/sync_history.py` | Auditoria, diagnóstico e retenção operacional |
 
-## Persistência
+## Persistência e consistência
 
-O banco fiscal guarda manifestações, informações do emitente, cursor, cooldown e fila de e-mails. As tabelas `xml_documentos`, `xml_relatorio` e `xml_importacoes` guardam XML original, SHA-256, metadados, itens/retenções e registros dos lotes no mesmo banco fiscal, inclusive SQLCipher. São criadas na primeira importação. O envio usa a trava compartilhada com a sincronização, sem alterar o estado de distribuição. Cada lote é transacional; falhas estruturais de ZIP ou limites desfazem suas novas notas.
+O banco fiscal mantém manifestações, dados das notas, cancelamentos, CT-e, estado de distribuição, cooldown, intervalos, agendamento e fila SMTP. `xml_documentos`, `xml_relatorio` e `xml_importacoes` mantêm metadados, hash, dados extraídos e registros de importação. Colunas XML legadas permanecem por compatibilidade; documentos novos não mantêm cópias permanentes do original.
 
-Contas individuais, perfis e sessões ficam em `dados/admin_accounts.db`, separado do banco fiscal. As sessões armazenam o hash do token e possuem limite de inatividade e duração absoluta.
+Respostas `distNSU` são persistidas antes do parser. A confirmação de processamento, os dados e o cursor são transacionais. Resposta inválida permanece pendente e impede avanço silencioso. Rejeição 656 preserva cursor e registra pausa/divergência; `nsu_para_consulta()` retorna o cursor local gravado. Respostas `consNSU` também são preservadas durante o processamento e limpas após resultado confirmado.
 
-O agendamento recorrente usa `controle_agendamento_intervalo`: registra a última janela concluída por CNPJ em formato ISO com fuso. O controle anterior de execução diária é preservado para compatibilidade. Um reinício recupera somente a janela mais recente, evitando uma sequência de chamadas para todas as janelas perdidas.
+Importação usa a trava compartilhada com sincronização e não altera cursor. Cancelamentos homologados e marcações administrativas alimentam a situação local; remoção de marcação manual não desfaz evento da SEFAZ. CT-e é armazenado em `eventos_cte`, separado de manifestações. A ausência de vínculo não prova inexistência de conhecimento.
 
-A distribuição grava documentos e cursor em transação. Uma rejeição 656 preserva o cursor local e registra a pausa e os dados operacionais do retorno. Distribuições parciais permanecem elegíveis para retomada após o cooldown.
+Contas, perfis e sessões ficam em SQLite separado. Senhas usam PBKDF2; tokens de sessão, SHA-256. Alterações de acesso revogam sessões e preservam o último administrador ativo. Cadastro próprio sempre gera perfil comum. Toda rota de dados exige autenticação; rotas administrativas validam perfil no servidor.
 
-## Autorização
+## Concorrência e agendamento
 
-Consulta, Status, Emissão e exportações são públicos. O middleware e as dependências require_admin protegem importação, sincronização manual, configurações e histórico administrativo. Usuário administrativo e perfil vêm da sessão persistida, nunca de cabeçalhos do cliente.
+A implantação exige um processo/worker. As travas locais não coordenam processos separados. O banco deve permanecer preferencialmente em disco local.
 
-A alteração de perfil ou estado usa transação IMMEDIATE para preservar o último administrador ativo e revoga sessões. Senhas são hashes PBKDF2; tokens de sessão são armazenados como SHA-256. CSRF é vinculado à sessão de todos os perfis.
+Janela externa: **22:00 inclusive a 04:00 exclusiva, UTC−3**. Disparos: **22, 23, 00, 01, 02 e 03 horas**. O controle em `controle_agendamento_intervalo` evita repetir oportunidade concluída após reinício. Cooldown e pausas persistem no banco. A oportunidade mais recente elegível pode ser retomada; o agendador não reproduz todas as oportunidades perdidas.
 
-## Limites operacionais
+`consNSU` inicia desabilitado. Se habilitado com lacunas, a recuperação tem prioridade e consome a execução antes de nova distribuição. Política completa: [Distribuição DF-e e Qive](DISTRIBUICAO_DFE_QIVE.md).
 
-Execute **um processo com um worker**, pois a trava de sincronização é local ao processo. SQLite/SQLCipher deve ficar preferencialmente no disco local do servidor. Aumentar workers não cria coordenação entre instâncias.
+## Relatórios e cancelamento
 
-Consulta e exportação são operações locais. O histórico depende dos documentos disponibilizados e recebidos pelo serviço de distribuição. A situação Cancelada usa informacoes_nfe.cancelada, alimentada pela distribuição e pela importação de cancelamentos homologados. A situação exibida é Autorizada nos demais casos, por regra do banco local. A aplicação não consulta autorização atual e não transmite manifestações ou cancelamentos.
+Trabalho pesado executa em threads; duas exportações simultâneas e 16 aguardando. A interface recebe HTTP 202 e acompanha o estado em memória. Relatórios prontos ficam no filesystem por 24 horas.
 
-A fila SMTP persiste por evento/destinatário. A confirmação do servidor de e-mail e a gravação do envio não são uma transação única; a entrega pode se repetir após uma interrupção nessa etapa.
+O pedido de cancelamento sinaliza um `threading.Event`, propagado por `ContextVar`. Consultas SQL usam progress handler; montagem das linhas verifica o sinal. O worker encerra antes de liberar a vaga. A serialização final do Excel ainda conclui o bloco corrente; o resultado cancelado é descartado. Arquivos publicados não são removidos por cancelamento de geração. Interromper a transferência no navegador preserva a cópia pronta.
 
-## Validação e publicação
+## Limites de validação
 
-A suíte automatizada cobre banco, consultas, filtros, exportações, sessões, CSRF, uploads, alertas, bloqueio SEFAZ e agendamento. Os testes não usam certificado de produção nem servidores externos. O fluxo de publicação executa a suíte em Windows e Linux antes de criar a release e anexar o ZIP e seu checksum SHA-256.
+Importação verifica estrutura mínima e consistência de campos; não valida assinatura XML nem autorização atual na SEFAZ. A situação Autorizada é a classificação local quando não há cancelamento registrado. O app não transmite manifestações ou cancelamentos.
 
-`cancelamento.py` centraliza a leitura de retornos homologados e a consulta da situação. `xml_cancelamentos` conserva protocolo, data e XML do cancelamento; `informacoes_nfe.cancelada` é a fonte compartilhada por Emissão, Consulta e relatórios. A importação não altera cursores NSU nem cria manifestações. Bancos antigos sem essas tabelas continuam consultáveis; a criação é feita na importação. Importação idempotente e recebimento de uma nota original nunca reduzem uma situação cancelada para não cancelada.
+A CI executa testes sintéticos em Windows/Linux. Comunicação real SEFAZ, certificado da instalação, entrega SMTP e convivência com Qive dependem de validação operacional. Aceitação SMTP e confirmação no banco não formam transação única; pode ocorrer duplicidade após interrupção.
 
-
-Os XMLs novos são usados como entrada de processamento e não como arquivo
-permanente. As tabelas de notas/itens, manifestações, cancelamentos e vínculos
-CT-e conservam os dados estruturados usados nos relatórios. `documentos_nsu`
-conserva o recebimento de cada NSU por schema/classificação. Colunas legadas
-`xml` recebem BLOB vazio nos novos documentos, sem reescrita dos XMLs antigos.
-Respostas `distNSU`/`consNSU` são preservadas temporariamente até concluir o
-processamento; a limpeza e a confirmação dos dados ocorrem na mesma transação.
-A recuperação continua usando os registros de NSU, independentemente do BLOB.
+O empacotador usa lista explícita de arquivos, sem dados/segredos. A publicação requer CI aprovada e cria ZIP/checksum somente quando a versão ainda não possui release. Código novo na main não substitui ZIP já publicado com a mesma versão.

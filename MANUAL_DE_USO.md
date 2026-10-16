@@ -1,229 +1,99 @@
-# Manual de uso — v2.6.0
+# Operação do AtlasDFE
 
-## Acesso
+## Acesso e perfis
 
-Abra o endereço do aplicativo e entre com sua conta. Se ainda não tiver acesso, use **Criar minha conta**, escolha usuário e senha de pelo menos 12 caracteres e confirme a senha. O acesso é imediato, como usuário comum para consulta e exportação. Consulta, Status, Emissão, Downloads e exportações exigem sessão válida, inclusive por endereço direto. A área **Admin**, importação, configurações e gerenciamento de contas são exclusivos de administradores. Use **Sair** para encerrar a sessão. As operações registram a identidade autenticada.
+Todas as telas de dados exigem login. **Criar minha conta** permite escolher usuário e senha de pelo menos 12 caracteres; o cadastro libera imediatamente o perfil comum. A criação de conta é acessível a quem alcançar a aplicação na rede.
 
-## Consulta
+| Perfil | Permissões |
+| --- | --- |
+| Usuário comum | Consulta, Status, Emissão, relatórios e Downloads |
+| Administrador | Permissões comuns, importação, sincronização manual, configuração e gestão de contas |
 
-A tela **Consulta** pesquisa o histórico armazenado no banco. Os filtros são data inicial e final do evento, número da NF, chave de acesso e tipo de manifestação. A data final inclui todo o dia informado. Os resultados aparecem em páginas de até 100 registros.
+Em **Admin → Gerenciar usuários**, o administrador pode cadastrar, alterar perfil, redefinir senha, ativar, desativar ou excluir contas. Mudanças de acesso revogam sessões. A exclusão exige confirmação e preserva dados fiscais e auditoria. O último administrador ativo é protegido. Senhas atuais não são exibidas: ficam armazenadas como hash.
 
-A tabela mostra número e série da nota, emitente, situação de cancelamento, manifestação, data, protocolo, chave, NSU, CT-e e ações. Quando o documento recebido não informa a razão social, o emitente aparece pelo CNPJ extraído da chave.
+## Consulta de manifestações
 
-A ausência de registro significa que o evento não foi localizado no histórico disponível. A consulta não verifica a situação atual da NF-e na SEFAZ.
+Filtre por data do evento, número da nota, chave, manifestação e situação. A data final inclui o dia inteiro. As páginas mostram até 100 registros. Emitente sem nome disponível é identificado pelo CNPJ extraído da chave.
 
-## Exportar Excel
+**Exportar Excel** inclui todas as páginas dos filtros aplicados, até 200 mil eventos. Chaves, protocolos e NSUs são texto. A consulta por TXT aceita uma chave de 44 dígitos por linha, até 10 mil chaves e 2 MB; usa exclusivamente o histórico local.
 
-Use **Exportar Excel** após a consulta. A planilha inclui todos os registros dos mesmos filtros, inclusive os que estão em outras páginas. Chaves, protocolos e NSUs são preservados como texto.
+Ausência de evento significa ausência no banco disponível. A tela não consulta a situação atual da NF-e na SEFAZ.
 
-Colunas: Número NF, Série, Chave NF-e, Código, Manifestação, Data do evento, Protocolo, NSU, Recebido no banco (UTC), Emitente, Situação e CT-e vinculado. Para consultas acima de 200 mil eventos, refine os filtros antes de exportar.
+## Emissão e importação
 
-## Consulta por arquivo
+Em **Admin → Importar XML**, envie os XMLs completos ou o ZIP obtido no Synchro. Confira importados, duplicados e recusados; o registro do lote fica restrito ao administrador. A importação acumula dados entre meses. Chaves duplicadas preservam a primeira importação.
 
-Selecione um TXT com uma chave de 44 dígitos por linha e use **Gerar Excel por chaves**. O arquivo serve para recortar o histórico do banco; não dispara uma consulta pontual à SEFAZ. O limite é de 10 mil chaves e 2 MB por upload.
+Aceita NF-e modelo 55 emitida pelo CNPJ configurado, com ou sem envelope `nfeProc`, e cancelamentos homologados compatíveis. Verifica estrutura mínima e correspondência de chave/emitente/número/série; não valida assinatura digital, schema fiscal completo ou autorização atual.
 
-## Emissão — XMLs e cancelamentos
+| Limite | Valor |
+| --- | --- |
+| Arquivo XML | 8 MB |
+| Upload | 100 MB |
+| Conteúdo expandido | 250 MB |
+| Quantidade de arquivos | 5.000 |
+| Exportação por relatório | 100.000 linhas |
 
-1. Baixe o lote mensal de XMLs completos no Synchro.
-2. Abra **Admin → Importar XML**, selecione o ZIP ou vários XMLs e clique **Importar dados**.
-3. Confira as quantidades importadas, duplicadas e recusadas. **Baixar registro do lote** lista o resultado por arquivo.
-4. Consulte **Notas emitidas**, **Itens e impostos** ou **PIS/COFINS retidos**. Os dados dos meses anteriores permanecem no banco. Chaves repetidas preservam os dados da primeira importação, mesmo que o XML reenviado tenha conteúdo diferente.
+O período em **Emissão** usa a data de emissão da nota; **Consulta** usa a data do evento. O filtro **Item** pesquisa código, descrição e NCM. Em notas/retenções, seleciona documentos com o item; no relatório de itens, seleciona as linhas correspondentes.
 
-O período do leitor filtra a **emissão da nota**. A consulta de manifestações continua filtrando a data do evento. A busca localiza número, chave e destinatário; nos itens também pesquisa o conteúdo fiscal e o produto. Os resultados têm 100 linhas por página. O Excel reúne Notas, Itens e Retencoes com os mesmos filtros e todas as páginas. O CSV exporta o relatório selecionado. Cada relatório tem limite de 100 mil linhas na exportação.
+O Excel reúne Notas, Itens e Retencoes, com os filtros e todas as páginas. O CSV exporta a visão selecionada. Os ícones **Itens** e **Manifestações** abrem detalhes da nota; **Voltar** preserva filtros/página e restaura rolagem quando o navegador permitir.
 
-Na tela **Consulta**, uma nota importada permite **Ver itens**. Na aba Emissão, cada nota oferece Itens e Manifestações. Notas sem evento de manifestação também podem ser importadas. O app não oferece download do XML original; use o Synchro.
+Novos XMLs originais não ficam armazenados permanentemente nem podem ser baixados pelo app. Dados extraídos continuam disponíveis para relatórios; obtenha o original no Synchro. Para extrair futuramente um campo não armazenado, será necessário reobter o XML. Cópias legadas existentes não são removidas automaticamente.
 
-Não há chamadas à SEFAZ na importação, leitura ou exportação de relatórios; o certificado não é necessário. A importação não altera NSU, cooldown, agendamento ou manifestações.
+## Situação e CT-e
 
-Limites: 100 MiB de arquivos por envio, 250 MiB descompactados no lote, 5.000 entradas por ZIP/documentos no lote e 8 MiB por XML. ZIPs podem ter subpastas, mas não devem ser protegidos por senha. Arquivos que não sejam XML, eventos sem cancelamento homologado, resumos e documentos de outro emitente são recusados com registro. Se houver ZIP estruturalmente inválido ou excesso de limite do lote, nenhuma nova nota daquele envio é gravada; divida ou corrija o lote. Erros em XMLs individuais permitem importar os demais arquivos válidos.
+A situação é calculada pelo banco local: cancelamento recebido ou marcação manual resulta em **Cancelada**; nos demais casos, **Autorizada**. Não é consulta online de autorização. Cancelamento homologado pode chegar antes da nota; reimportar a nota não o desfaz.
 
-São aceitas NF-e modelo 55 completas, com ou sem envelope nfeProc, emitidas pelo CNPJ configurado no aplicativo. O leitor verifica a estrutura mínima e a correspondência da chave/emitente/número/série; não valida assinatura digital, schema fiscal completo nem autorização atual. Use o XML original autorizado obtido no sistema emissor.
+Em **Admin → Alterar situação de notas**, informe até 100 números/chaves e o motivo. Números ambíguos exigem chave. Se houver entrada inválida, nenhuma nota do pedido é alterada. **Remover marcação manual** desfaz somente a correção interna, preservando cancelamentos recebidos por XML/NSU. A operação não transmite evento à SEFAZ.
 
-Os dados extraídos para consulta e relatórios ficam no banco fiscal configurado; bancos SQLCipher protegem os novos dados com a mesma senha. O banco cresce conforme as importações: inclua-o nos backups e mantenha espaço livre. O arquivo recebido é usado temporariamente durante a importação e removido ao terminar.
+Abra **CT-e vinculado** para ver os conhecimentos recebidos. Número, chave, transportadora e data aparecem somente quando disponíveis. Cada vínculo é exibido em uma linha, com rolagem horizontal quando necessário. **Vínculo identificado** não implica chave conhecida. **CT-e cancelado** indica todos os vínculos apresentados cancelados; não cancela a NF-e. **Não localizado** indica ausência no banco, não inexistência na SEFAZ. Não há download de XML completo de CT-e.
 
-## Status
+Relatórios já gerados preservam o estado da geração. Gere novamente após importações ou correções.
 
-Apresenta última gravação, `ultNSU`, `maxNSU`, disponibilidade da sincronização e as últimas dez execuções. `ultNSU` é o cursor local; `maxNSU` é o limite informado no retorno recebido.
+## Downloads e cancelamento
 
-**Completo** indica que a última distribuição alcançou o limite disponível. **Parcial** indica que ainda há distribuição a processar. O bloqueio e a próxima tentativa permitida são mostrados quando houver cooldown.
+Os relatórios ficam disponíveis por 24 horas após a geração, em `dados/downloads`, fora do banco fiscal. Repetir o download não renova a validade. A tabela informa documentos processados, período, geração, expiração, tamanho e estado. Nos relatórios, documentos representam notas distintas, não necessariamente linhas.
 
-## Admin
+| Estado/ação | Comportamento |
+| --- | --- |
+| Na fila | Aguarda vaga de geração |
+| Gerando arquivo | Trabalho em segundo plano; progresso sem percentual de conclusão |
+| Cancelar solicitação | Remove da fila ou sinaliza interrupção da geração |
+| Cancelando | Aguarda término e limpeza do trabalho ativo |
+| Pronto | Arquivo disponível para transferência |
+| Cancelar transferência | Interrompe o recebimento no navegador; preserva a cópia pronta |
 
-A área exige login administrativo e reúne:
+Usuários cancelam suas próprias solicitações; administradores podem cancelar outras. O cancelamento é verificado durante SQL e montagem das linhas. A gravação final do Excel ainda pode concluir seu bloco antes de descartar o resultado. A porcentagem exibida na transferência mede bytes recebidos, não progresso de geração. Tarefas em andamento não sobrevivem ao reinício do servidor; arquivos concluídos permanecem até expirar.
 
-- Configuração do banco e certificado A1.
-- Sincronização manual e estado do agendamento automático.
-- Importação de XML e ZIP.
-- Destinatários e fila dos alertas por e-mail.
-- Histórico administrativo.
+## Status e sincronização
 
-## Sincronização automática
+**Status** mostra disponibilidade, última gravação, `ultNSU`, `maxNSU` e próxima tentativa. **Abrir logs** exibe execuções e intervalos. `ultNSU == maxNSU` indica que a distribuição alcançou o limite informado naquele retorno; não garante que toda nota emitida já esteja disponível.
 
-A rotina executa às **22:00, 23:00, 00:00, 01:00, 02:00 e 03:00 (Brasília)**, todos os dias. Usa o mesmo banco, certificado, cursor e cooldown da rotina manual. O aplicativo precisa permanecer em execução.
+O AtlasDFE consulta externamente das **22:00 até antes de 04:00, Brasília**. Disparos: **22h, 23h, 00h, 01h, 02h e 03h**. Manual, automático e retentativas compartilham banco, certificado, cursor, trava e cooldown. O processo precisa permanecer ativo. A rotina manual exige as confirmações exibidas pela interface.
 
-Uma janela concluída não é repetida após reiniciar. Falhas e distribuições parciais são retomadas na próxima janela, respeitando o bloqueio vigente. A rejeição 656 registra uma pausa; não altere o NSU para tentar eliminar esse bloqueio.
+`consNSU` permanece pausado (`NFE_RECOVERY_ENABLED=0`). “Intervalo recuperado” pode refletir documentos anteriores ou recebidos por `distNSU`; verifique as colunas de origem da execução. Intervalos completos não são pendências. A conferência cobre somente os intervalos registrados pelo app.
 
-## Alertas de Operação não Realizada
+O histórico de sincronização retém 30 dias, sem excluir notas, manifestações, NSUs ou pendências. Registros antigos podem usar o horário do servidor; registros identificados como Brasília devem ser lidos nesse fuso.
 
-Em **Admin → Alertas por e-mail**, cadastre até 20 endereços, separados por linha ou vírgula. Novos eventos de **Operação não Realizada (210240)** geram avisos para os destinatários cadastrados. Reprocessar um evento já gravado não cria uma nova mensagem.
+Regras detalhadas, atendimento Qive e tratamento de 656: [Distribuição DF-e e Qive](DISTRIBUICAO_DFE_QIVE.md).
 
-Os envios dependem da configuração SMTP do servidor. Falhas temporárias mantêm os avisos na fila. Após corrigir o SMTP, use **Tentar enviar pendentes**; isso não refaz a sincronização da SEFAZ. Remover um destinatário cancela seus avisos ainda pendentes.
+## E-mail
 
-Uma interrupção após a aceitação pelo SMTP e antes da confirmação no banco pode provocar um segundo envio. A entrega efetiva também depende das regras do servidor de e-mail.
+Em **Admin → Alertas por e-mail**, configure remetente/usuário SMTP e até 20 destinatários. Os avisos automáticos são somente para novos eventos **Operação não Realizada (`210240`)** adicionados ao banco, mesmo quando a data do evento é antiga. Ciência da Operação não gera alerta. Reprocessar evento já registrado não cria outro aviso.
 
-Na consulta, digite `01052026` para visualizar `01/05/2026` enquanto escreve. Informar apenas `01/02` completa o ano atual de Brasília ao sair do campo ou consultar. Datas inexistentes são recusadas.
+**Enviar e-mail de teste** envia mensagem sintética aos destinatários salvos, sem consultar a SEFAZ. Aguarde um minuto entre testes. Aceitação SMTP não confirma entrega; verifique entrada e spam.
 
-A sincronização manual exige marcação da confirmação e confirmação final. Repetir o envio ou alterar o botão no navegador não remove o cooldown do servidor.
+**Tentar enviar pendentes** reprocessa a fila de e-mail, sem repetir sincronização. Falhas temporárias permanecem pendentes; destinatário removido encerra avisos correspondentes. Uma interrupção entre aceitação SMTP e confirmação local pode duplicar o envio.
 
-## Downloads
+Remetente e usuário salvos na interface valem nos próximos envios sem reiniciar. Servidor, porta e segurança são variáveis do processo; sua alteração exige reinício. Configuração técnica: [Servidor Web](SERVIDOR_WEB.md).
 
-Abra **Downloads** para baixar novamente os arquivos gerados nas últimas 24 horas. A tabela informa os documentos processados, o período, a data de geração e a expiração. O prazo é contado a partir da geração e não muda quando o arquivo é baixado novamente. Após expirar, gere um novo relatório. Os registros de importação exigem acesso ao Admin. A exclusão das cópias não remove as notas do banco.
+## Diagnóstico
 
-Ao solicitar EXCEL ou CSV, você é direcionado a Downloads. A solicitação aparece imediatamente como **Na fila** ou **Gerando arquivo**, com uma barra de atividade. A tabela se atualiza automaticamente e libera o botão de baixar quando o arquivo está pronto. Você pode mudar de página sem cancelar a geração. A geração em andamento depende do processo do servidor; reiniciar o servidor interrompe as tarefas pendentes.
-
-O sininho ao lado do tema também acompanha **Na fila** e **Gerando arquivo** com uma barra de atividade, em qualquer aba. Quando termina, mostra **Processamento concluído** ou **Erro na geração** após uma solicitação de arquivo. Os avisos ficam neste navegador por até 24 horas, limitados aos 20 mais recentes. Abra o sininho para marcar os avisos como lidos ou use **Limpar** para removê-los.
-
-Ao baixar pela aba Downloads, a barra mostra a porcentagem do arquivo recebida pelo navegador. Quando a transferência termina, ela chega a **100%** e o navegador inicia o salvamento. Se a conexão for interrompida, aparece **Erro no download** e você pode tentar novamente.
-
-## CT-e vinculado
-
-Nas abas Consulta e Emissão, abra o indicador **CT-e vinculado** para ver os conhecimentos associados à nota. O indicador **CT-e cancelado** aparece quando todos os vínculos apresentados estão cancelados. Número, chave e transportadora aparecem somente quando recebidos no evento. Se houver somente um resumo, aparece **Vínculo identificado** ou um cancelamento sem chave; esse cancelamento não é atribuído automaticamente a outro conhecimento. O Excel/CSV também inclui esses dados.
-
-As informações chegam pela sincronização habitual. Depois de atualizar e reiniciar o aplicativo, aguarde a próxima sincronização permitida. Eventos ignorados por versões anteriores não são recuperados automaticamente. **Não localizado** indica ausência de vínculo no banco local, não ausência definitiva de CT-e na SEFAZ.
-
-O Admin aceita XMLs completos de NF-e e XMLs de cancelamento homologado, individualmente ou no ZIP. O evento pode chegar antes da nota. Cancelamentos são ligados pela chave de acesso, preservam os dados do evento e aparecem na coluna **Situação** da Consulta, Emissão, itens, retenções e novos relatórios Excel/CSV, inclusive na consulta por TXT. Reenviar a nota não remove o cancelamento. Um pedido sem retorno, rejeitado, não vinculado ou de homologação não altera a situação. Cancelamentos já recebidos via NSU usam a mesma informação.
-
-A situação mostra **Autorizada** ou **Cancelada**, conforme os registros do banco local. Um cancelamento registrado tem prioridade. Se o arquivo contém apenas a nota autorizada e não traz o cancelamento, importe também o XML do evento. Em buscas por chave ou número, a Consulta mostra o cancelamento mesmo sem manifestações. A importação não altera o NSU nem faz chamadas à SEFAZ. A classificação não consulta a autorização atual na SEFAZ. Relatórios já gerados são cópias do momento da geração; gere outro para refletir novas importações.
-
-Em **Consulta** e **Emissão**, o filtro **Situação** oferece **Todas**, **Autorizada** e **Cancelada**. Ele combina com datas e busca, permanece na paginação e é aplicado aos arquivos exportados. Em Emissão, a seleção vale para notas, itens e retenções; o Excel aplica a mesma situação a todas as abas. **Limpar** volta a mostrar todas as situações.
-
-### Alteração manual de situação
-
-Em **Admin → Alterar situação de notas**, informe números ou chaves de acesso, uma por linha, e o motivo. **Marcar como cancelada** atualiza a situação local na Consulta, Emissão e nos novos relatórios. São aceitas até 100 notas existentes no banco da empresa; números ambíguos exigem a chave. Se qualquer nota for inválida ou não encontrada, nenhuma nota do pedido é alterada.
-
-**Remover marcação manual** desfaz somente a correção interna. Um cancelamento recebido pelo NSU ou XML continua válido. Reimportações preservam a marcação manual. O histórico no banco registra usuário, motivo, ação e data; os dados dos eventos da SEFAZ são preservados. Essa função não transmite um evento à SEFAZ. Arquivos já gerados permanecem com a situação existente na geração; gere um novo relatório após a alteração.
-
-### Filtro e tela de itens
-
-Na Emissão, **Item** pesquisa descrição, código ou NCM dos produtos. Em notas e retenções, mostra os documentos que contêm o produto; no relatório de itens, mostra apenas as linhas correspondentes. O filtro combina com datas, busca e situação e acompanha as exportações.
-
-O ícone **Itens** de uma nota abre uma tela própria, com os dados da nota, filtro de produtos e exportação dos seus itens. **Voltar** retorna à Emissão com os filtros e a página anteriores, restaurando a posição de rolagem quando o navegador permite armazenamento de sessão.
-
-O ícone **Manifestações** na Emissão abre uma tela da nota com os eventos existentes no banco local, filtros por data e manifestação e exportação para Excel. **Voltar** mantém os filtros, a página e a posição da lista. Se não houver eventos, a tela informa que nenhum registro foi encontrado.
-
-
-### Convivência com a captura do Qive
-
-As consultas externas deste aplicativo são permitidas diariamente das 22h às
-04h, no horário de Brasília (UTC-3). A sincronização automática mantém os
-horários de 22h, 23h, 00h, 01h, 02h e 03h nos dias configurados. Recuperações e retentativas também
-respeitam a janela, inclusive entre lotes. Uma requisição já iniciada pode terminar
-após o fechamento; a próxima não é enviada. Consultas locais e exportações seguem
-disponíveis. O limite é verificado no servidor, independentemente do botão.
-
-Ative a rotina em produção após o Qive confirmar o ajuste. A janela foi
-escolhida para separar o app da janela de 08h às 18h solicitada ao suporte do Qive. Isso não garante, por si só, que a SEFAZ aceitará cursores
-independentes: acompanhe os retornos e confirme a configuração ativa com o Qive.
-
-O ultNSU de uma rejeição 656 fica registrado como divergência para conferência e
-recuperação. Ele não substitui o cursor de distribuição. A próxima distribuição
-parte do último cursor gravado com sucesso; os documentos de lacunas continuam
-sendo recuperados via consNSU, respeitando o limite horário e o bloqueio.
-As respostas recebidas são preservadas antes do processamento e os documentos e
-cursor são gravados na mesma transação. Esta atualização não restaura cursores
-antigos nem elimina pendências de bancos existentes.
-
-
-### Primeiro teste com as janelas separadas
-
-Antes de ativar a rotina, confirme com o Qive que as consultas e novas tentativas
-foram limitadas às 08h–18h de Brasília. Mantenha o computador e o aplicativo
-ligados durante a noite. O app dispara às 22h, 23h, 00h, 01h, 02h e 03h; fora das 22h–04h, consultas
-externas manuais, recuperação e retentativas ficam bloqueadas. A consulta ao
-banco local pode ser usada durante o dia.
-
-No Status, abra **Abrir logs** para acompanhar a execução. Erros novos mostram a
-etapa (distribuição ou recuperação), o código da SEFAZ quando recebido, o NSU
-inicial, o solicitado, o informado pela SEFAZ e o efetivamente salvo. Também
-mostram os lotes gravados, respostas pendentes, duração, próxima tentativa
-permitida e uma referência que reúne os registros da mesma execução no arquivo
-`logs/web_audit.log`. Horários novos de erro são identificados como Brasília;
-registros antigos conservam o horário do servidor.
-
-Se ocorrer 656, respeite a pausa e acompanhe as lacunas; não altere o cursor nem
-apague pendências para forçar o teste. Se houver falha de gravação, a resposta
-preservada permanece para processamento posterior. Falhas de certificado,
-configuração ou comunicação são registradas e a rotina automática aguarda a
-próxima janela de disparo, evitando repetir o mesmo erro a cada minuto.
-
-Depois da primeira noite, confira o NSU salvo, os documentos recuperados e os
-retornos da SEFAZ. Se a 656 persistir mesmo com os horários separados, use a
-referência e os NSUs do log para retomar a análise com o Qive.
-
-
-### Versão de teste: recuperação consNSU pausada
-
-Esta versão inicia com `NFE_RECOVERY_ENABLED=0`. Consultas manuais e automáticas
-via aplicativo web usam distNSU, mantendo a fila e as respostas de recuperação
-consNSU salvas no banco. O agendador não usa essa fila pausada para antecipar uma
-consulta. A janela das 22h–04h, os disparos às 22h/01h e a pausa após 656 permanecem.
-O Status indica que a recuperação está pausada.
-
-Após avaliar o teste, para retomar a recuperação, feche o app e execute no Prompt
-de Comando, dentro da pasta da instalação:
-
-```bat
-set NFE_RECOVERY_ENABLED=1
-INICIAR_WEB.cmd
-```
-
-Para manter a recuperação pausada, use `NFE_RECOVERY_ENABLED=0`. As pendências não
-são apagadas ao alternar essa configuração. Antes do teste noturno, confirme que
-o Qive aplicou a janela combinada; atualizar o código não confirma o ajuste deles.
-
-
-### Armazenamento de dados sem cópias permanentes dos XMLs
-
-Novas importações preservam cabeçalhos, itens, impostos, retenções, cancelamentos
-homologados e os demais dados extraídos usados pelas consultas e relatórios.
-Documentos distribuídos pela SEFAZ deixam registros de NSU, schema e classificação,
-as manifestações e os vínculos com CT-e. O XML original não fica guardado depois
-de o processamento terminar; consulte-o no Synchro.
-
-Uma resposta SEFAZ recebida permanece temporariamente no banco até os dados e o
-controle de processamento serem gravados na mesma transação. Se a gravação falhar,
-a resposta permanece pendente para nova tentativa. Respostas consNSU já tratadas
-são limpas ao confirmar o recebimento, a indisponibilidade ou a rejeição 656.
-
-A opção de baixar XML e sua rota foram retiradas. A aba Downloads continua com
-Excel, CSV e registros dos lotes; cópias antigas de XML não são disponibilizadas.
-
-Esta mudança não apaga retroativamente os XMLs existentes, não altera o cursor,
-não remove pendências e não compacta o banco. Os 161 MB atuais podem permanecer;
-o benefício imediato é evitar o crescimento por novas cópias de XML. Uma limpeza
-do histórico existente exige uma manutenção separada. Colunas legadas de XML
-continuam no schema por compatibilidade, sem conteúdo em novos documentos.
-
-Dados já extraídos podem gerar novos relatórios. Para extrair futuramente um campo
-que não foi armazenado, será necessário obter novamente o XML na origem; o app
-não terá uma cópia permanente para reprocessamento.
-
-### Cadastrar usuário comum
-
-Entre como administrador e abra **Admin → Gerenciar usuários**. Informe usuário, senha inicial de pelo menos 12 caracteres e mantenha **Usuário comum** no perfil. Clique em **Cadastrar usuário**. A pessoa pode entrar pelo botão **Entrar**, consultar e exportar relatórios; não acessa a administração. Nessa mesma tela o administrador pode alterar perfil, redefinir senha, ativar ou desativar contas. Mudanças de perfil, senha e ativação revogam as sessões da conta. O último administrador ativo não pode ser removido nem perder o perfil.
-
-### Retenção do histórico de sincronização
-
-O histórico de sincronização mostra somente os últimos 30 dias. Registros SEFAZ mais antigos são removidos do log ao iniciar o servidor e diariamente na primeira gravação de auditoria. A limpeza também alcança os cinco arquivos de rotação. Registros administrativos seguem a rotação por tamanho existente. Notas, manifestações, cursores NSU, respostas pendentes e intervalos de recuperação não são apagados. A retenção não altera nem compacta o banco fiscal.
-
-Em **Admin → Alertas por e-mail**, use **Enviar e-mail de teste** após configurar o SMTP e salvar os destinatários. O teste envia uma mensagem sintética para todos os destinatários salvos, sem consultar a SEFAZ ou criar manifestações. Aguarde um minuto entre testes. Aceitação pelo SMTP não confirma a entrega; confira caixa de entrada e spam.
-
-O campo **E-mail remetente** pode ser alterado em Alertas por e-mail, junto com **Usuário SMTP**. No Gmail, os dois devem corresponder à conta da senha de app salva em `secrets/smtp-password.txt`. A configuração local persiste em `secrets/smtp-sender.json` e vale para os próximos envios sem reiniciar. Servidor, porta e segurança continuam definidos no ambiente; trocar de provedor pode exigir ajustá-los.
-
-### Cadastro próprio e exclusão de contas
-
-Qualquer pessoa que alcance a tela do app pode criar uma conta comum e entrar imediatamente, conforme a política escolhida para esta instalação. O cadastro nunca permite escolher perfil administrativo. No **Admin → Gerenciar usuários**, o administrador pode redefinir senhas e excluir usuários mediante confirmação. Senhas atuais não são exibidas nem recuperáveis; são armazenadas como hash. A exclusão encerra as sessões e preserva notas, manifestações e auditoria. O último administrador ativo não pode ser excluído.
-
-### Cancelar download ou geração
-
-Em **Downloads**, **Cancelar** remove uma solicitação própria da fila ou solicita o cancelamento da geração. O administrador também pode cancelar solicitações de outras contas. Durante uma geração, o bloco que já está em execução pode terminar antes de liberar a vaga; a tela mostra **Cancelando…** e o resultado é descartado. Uma solicitação cancelada não gera alerta de erro. Arquivos já prontos são preservados. Durante a transferência de um arquivo pronto, o botão **Cancelar** interrompe somente o recebimento no navegador; a cópia do servidor continua disponível para tentar novamente.
+| Ocorrência | Procedimento |
+| --- | --- |
+| Token inválido | Atualizar a página, entrar novamente e repetir a ação |
+| Intervalo ainda ativo | Aguardar a próxima tentativa indicada; não reiniciar para contornar |
+| Rejeição 656 | Preservar cursor e logs, respeitar pausa e conferir janelas/instâncias |
+| Resposta pendente | Verificar detalhe da falha; não apagar resposta ou avançar NSU |
+| SMTP pendente | Conferir servidor, autenticação, destinatários e detalhe do erro |
+| Relatório não reflete alteração | Gerar novo arquivo com os filtros necessários |
+| Geração perdida após reinício | Solicitar novamente; tarefas são mantidas em memória |

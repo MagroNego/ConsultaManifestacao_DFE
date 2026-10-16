@@ -1,103 +1,93 @@
-# Implantação Web — v2.6.0
+# Implantação do servidor
 
 ## Processo e rede
 
-Execute **um único processo com um worker** e mantenha o banco preferencialmente no disco local. O comando `nfe-consulta-web` e o lançador Windows iniciam com um worker.
+Execute **um processo com um worker**, usando banco preferencialmente em disco local. Travas, fila de exportação e tarefas são locais ao processo; múltiplas instâncias não coordenam o consumo SEFAZ. O lançador e `python -m nfe_consulta.web.app` iniciam um worker.
 
-A aplicação escuta em `127.0.0.1:8080`. Publique o acesso interno por HTTPS em IIS ou outro reverse proxy. Configure o serviço para iniciar com o sistema operacional e reiniciar após falhas. A conta do serviço precisa acessar o banco, o certificado e as pastas `dados`, `secrets` e `logs`.
+O endereço padrão é `127.0.0.1:8080`. Para acesso interno, use HTTPS por reverse proxy e limite o acesso de rede aos usuários autorizados. A conta do serviço precisa ler certificado/segredos e gravar banco e pastas operacionais. Configure inicialização e reinício pelo gerenciador de serviços do sistema operacional; o pacote não instala automaticamente um serviço.
 
-```text
-NFE_WEB_ENV=production
-NFE_WEB_HOST=127.0.0.1
-NFE_WEB_PORT=8080
-NFE_WEB_FORWARDED_ALLOW_IPS=127.0.0.1
-```
+`GET /healthz` retorna estado básico e versão, sem verificar disponibilidade do banco fiscal. Teste também login e Status após implantação.
 
-Se o proxy estiver em outra máquina, informe somente os endereços confiáveis em `NFE_WEB_FORWARDED_ALLOW_IPS`. O endpoint `GET /healthz` retorna somente estado básico e versão, sem indicar a disponibilidade do banco.
+## Configuração do processo
 
-## Controle de acesso
+`WEB_CONFIG.example` não é carregado automaticamente. Defina variáveis no lançador/ambiente do serviço e reinicie após alterações.
 
-Consultas, downloads e exportações exigem login. O cadastro público cria imediatamente uma conta de usuário comum, sem privilégio administrativo. Restrinja o acesso de rede ao público autorizado. **Admin**, a importação XML e os registros de lote exigem uma sessão administrativa válida. A validação é feita no servidor antes de processar uploads. Contas sem perfil Admin não entram nessa área.
+| Variável | Padrão/uso |
+| --- | --- |
+| `NFE_WEB_ENV` | `production` no lançador Windows |
+| `NFE_WEB_HOST` / `NFE_WEB_PORT` | `127.0.0.1` / `8080` |
+| `NFE_WEB_FORWARDED_ALLOW_IPS` | `127.0.0.1`; somente proxies confiáveis |
+| `NFE_DATABASE_PATH` | Caminho alternativo ao padrão; `secrets/db-path.txt` salvo pelo Admin prevalece |
+| `NFE_ADMIN_ACCOUNTS_PATH` | Banco de contas; padrão `dados/admin_accounts.db` |
+| `NFE_ADMIN_SESSION_MINUTES` | Inatividade: 30 minutos; faixa aceita 5–480 |
+| `NFE_AUTO_SYNC_ENABLED` | `1` no lançador; `0` quando app iniciado diretamente sem configuração |
+| `NFE_AUTO_SYNC_WEEKDAYS` | `0,1,2,3,4,5,6`; segunda=0, domingo=6 |
+| `NFE_AUTO_SYNC_MAX_LOTES` | 50; faixa 1–500 |
+| `NFE_RECOVERY_ENABLED` | `0`; recuperação pontual pausada |
+| `NFE_WEB_AUDIT_LOG` | Padrão `logs/web_audit.log` |
 
-Configure ou redefina a conta com `CONFIGURAR_ADMIN.cmd` (Windows) ou `python -m nfe_consulta.web.configure_admin` (Linux). A senha fica como hash no banco de contas e os tokens são mantidos no servidor. Sessões expiram por inatividade (30 minutos por padrão) e são revogadas no logout ou redefinição da senha. Cookies são HttpOnly e SameSite=Strict; Secure é aplicado quando a requisição usa HTTPS. O modo HTTP local continua funcional; prefira HTTPS na implantação definitiva. Configure o proxy e `NFE_WEB_FORWARDED_ALLOW_IPS` apenas com origens confiáveis.
+A janela é fixa: **22:00 ≤ horário ou horário < 04:00**, Brasília (UTC−3). Disparos às **22h, 23h, 00h, 01h, 02h e 03h**. A rotina considera os dias configurados e os bloqueios persistidos. Leitura local não depende dessa janela.
 
-## Segredos do servidor
+`NFE_AUTO_SYNC_ONCE_DATE`, `NFE_AUTO_SYNC_INTERVAL_HOURS`, `NFE_AUTO_SYNC_HOUR`, `NFE_AUTO_SYNC_MINUTE` e `NFE_SEFAZ_COOLDOWN_MINUTES` não substituem o agendamento atual nem o cooldown fixo de 60 minutos. Remova configurações legadas. Detalhes: [Distribuição e Qive](DISTRIBUICAO_DFE_QIVE.md).
 
-`INICIAR_WEB.cmd` cria `secrets/web-csrf-secret.txt` na primeira execução e preserva o arquivo nos reinícios. Em outro método de inicialização, configure esse arquivo com pelo menos 32 caracteres aleatórios ou defina `NFE_WEB_CSRF_SECRET` no ambiente do serviço.
+## Autenticação e segredos
 
-As senhas do banco, certificado e SMTP são lidas dos arquivos de `secrets`; `NFE_DATABASE_PASSWORD`, `NFE_CERT_PASSWORD` e `NFE_ADMIN_PASSWORD` não são fontes de senha.
+Login obrigatório para todas as telas de dados. Cadastro próprio libera acesso comum imediatamente; Admin, importação e configuração exigem perfil administrativo. Senhas são hashes, sessões persistem no banco de contas e são revogadas em alterações de acesso. Cookies usam `HttpOnly`, `SameSite=Strict` e `Secure` quando a requisição é HTTPS. Formulários possuem CSRF vinculado à sessão.
 
-Restrinja as permissões NTFS ou Unix das pastas operacionais à conta do processo e aos administradores autorizados.
+`INICIAR_WEB.cmd` gera `secrets/web-csrf-secret.txt` quando ausente. Em outros lançadores, forneça esse arquivo ou `NFE_WEB_CSRF_SECRET`, com pelo menos 32 caracteres aleatórios. Preserve o segredo entre reinícios.
 
-## Banco fiscal
+| Arquivo padrão | Conteúdo |
+| --- | --- |
+| `secrets/db-path.txt` | Banco fiscal selecionado |
+| `secrets/db-password.txt` | Senha SQLCipher |
+| `secrets/cert-path.txt` | Caminho do PFX/P12 |
+| `secrets/cert-password.txt` | Senha do certificado |
+| `secrets/web-csrf-secret.txt` | Segredo Web persistente |
+| `secrets/smtp-password.txt` | Credencial SMTP |
+| `secrets/smtp-sender.json` | Remetente e usuário salvos pela interface |
+| `secrets/email-recipients.json` | Destinatários cadastrados |
 
-Em **Admin**, selecione o banco existente. A configuração é salva em `secrets/db-path.txt`; a senha SQLCipher fica em `secrets/db-password.txt`. A tela administrativa identifica se o arquivo usa SQLite ou SQLCipher.
+A senha de acesso fica no banco de contas como hash, não em arquivo de senha de administrador. `NFE_DATABASE_PASSWORD`, `NFE_CERT_PASSWORD` e `NFE_ADMIN_PASSWORD` não são fontes de senha. Restrinja permissões NTFS/Unix das pastas operacionais.
 
-SQLCipher é opcional e protege o banco fiscal em repouso. Não criptografa automaticamente exportações, logs, o banco de contas ou arquivos de segredo. Consulte [SEGURANCA_BANCO.md](SEGURANCA_BANCO.md) para continuidade e restauração.
+## Certificado e SEFAZ
 
-## Certificado A1
-
-### Arquivo PFX/P12
-
-Armazene o certificado em pasta protegida, por exemplo `C:\Certificados\certificado.pfx`, e configure-o em **Admin**. A conta do serviço precisa ler o arquivo. O aplicativo guarda o caminho em `secrets/cert-path.txt` e a senha em `secrets/cert-password.txt`; não copia o certificado para o projeto.
-
-### Windows Certificate Store
-
-O repositório pode ser `CurrentUser` ou `LocalMachine`. Para uma conta de serviço, instale o A1 em `Cert:\LocalMachine\My` e conceda acesso à chave privada para essa conta.
+Configure PFX/P12 em Admin; a aplicação referencia o arquivo original. Para Windows Certificate Store, use `CurrentUser` ou `LocalMachine`. Sob conta de serviço, conceda leitura da chave privada à identidade que executa o processo.
 
 ```text
 NFE_CERT_STORE=LocalMachine
-NFE_CERT_THUMBPRINT=<impressão digital do certificado selecionado>
+NFE_CERT_THUMBPRINT=<impressão digital do certificado>
 ```
 
-No Linux, use certificado por arquivo. O certificado e o banco usados pela rotina automática são os mesmos configurados na administração.
-
-## Sincronização nos horários fixos de 22:00, 23:00, 00:00, 01:00, 02:00 e 03:00
+O cliente atual usa PowerShell e o endpoint de produção:
 
 ```text
-NFE_AUTO_SYNC_ENABLED=1
-NFE_AUTO_SYNC_WEEKDAYS=0,1,2,3,4,5,6
-NFE_AUTO_SYNC_MAX_LOTES=50
+https://www1.nfe.fazenda.gov.br/NFeDistribuicaoDFe/NFeDistribuicaoDFe.asmx
+SOAPAction: http://www.portalfiscal.inf.br/nfe/wsdl/NFeDistribuicaoDFe/nfeDistDFeInteresse
 ```
 
-As janelas são **22:00, 23:00, 00:00, 01:00, 02:00 e 03:00, horário de Brasília, todos os dias**, independentemente do fuso do sistema operacional. Segunda-feira corresponde a `0` e domingo a `6`.
+O endpoint consta em `nfe_consulta/distribuicao.py`; não há configuração do Gateway Qive na interface. Linux é documentado para uso local/desenvolvimento, não como sincronização real já validada.
 
-O lançador Windows ativa a rotina se `NFE_AUTO_SYNC_ENABLED` não estiver definida. Defina `0` para desativar. No Linux ou em um serviço configurado diretamente, defina as variáveis no ambiente do processo. `WEB_CONFIG.example` é apenas referência e não é carregado automaticamente.
-
-O aplicativo precisa permanecer ativo. A conclusão fica em `controle_agendamento_intervalo`. Ao reiniciar, uma janela já concluída não se repete. Se houver atraso, apenas a janela mais recente é recuperada. Falhas e resultados parciais são retomados na próxima janela, respeitando cooldown e trava. Das 04:00 às 22:00, aguarda a abertura da janela noturna. Não execute outra instância contra o mesmo banco.
-
-As variáveis antigas `NFE_AUTO_SYNC_ONCE_DATE`, `NFE_AUTO_SYNC_INTERVAL_HOURS`, `NFE_AUTO_SYNC_HOUR`, `NFE_AUTO_SYNC_MINUTE` e `NFE_SEFAZ_COOLDOWN_MINUTES` são ignoradas; remova-as da configuração. A rotina definitiva usa 22:00, 23:00, 00:00, 01:00, 02:00 e 03:00 e cooldown de 60 minutos.
-
-## Cooldown e rejeição 656
-
-O bloqueio padrão é de **60 minutos**, persistido no banco e validado no backend. Reiniciar o aplicativo não o remove. A rejeição 656 preserva o cursor local, registra a pausa e permite consultar o NSU enviado e o informado no retorno, quando disponível.
-
-Não avance o cursor com base na rejeição e não alterne entre cópias de banco para tentar contornar o bloqueio. Outros sistemas de distribuição do mesmo CNPJ também podem afetar a sequência e o consumo do serviço.
-
-## Alertas SMTP
-
-Configure no ambiente do processo:
+## SMTP
 
 ```text
-NFE_SMTP_HOST=<servidor SMTP>
+NFE_SMTP_HOST=<servidor>
 NFE_SMTP_PORT=587
 NFE_SMTP_SECURITY=starttls
 NFE_SMTP_FROM=<remetente autorizado>
-NFE_SMTP_USER=<usuário, quando necessário>
+NFE_SMTP_USER=<usuário SMTP>
 ```
 
-Use `ssl` e a porta correspondente quando o servidor exigir TLS direto. Grave a senha em `secrets/smtp-password.txt`. Reinicie após alterar variáveis. Cadastre os destinatários pela interface; não edite manualmente `secrets/email-recipients.json`.
+Use `ssl` quando o provedor exigir TLS direto, com a porta correspondente. A senha fica em `secrets/smtp-password.txt`. Remetente/usuário em `secrets/smtp-sender.json` prevalecem sobre o ambiente. Cadastre destinatários pela interface.
 
-Sem host e remetente configurados, não há envio. A fila `notificacoes_email` persiste no banco fiscal. Falhas temporárias permanecem pendentes; destinatários removidos e rejeições permanentes encerram os avisos correspondentes. A sincronização não é repetida para reenviar e-mails. Uma interrupção após a aceitação SMTP pode causar duplicidade.
+Para Gmail com senha de app, remetente/usuário devem corresponder à conta autorizada dessa credencial. Trocar o endereço sem ajustar a autenticação não configura outra conta de envio. O botão de teste valida a aceitação SMTP; a entrega deve ser conferida na caixa destinatária.
 
-## Auditoria e backup
+A fila `notificacoes_email` persiste no banco fiscal. Somente `210240` gera novos alertas. Reenvio da fila não consulta a SEFAZ. Aceitação SMTP e confirmação no banco não são atômicas; uma interrupção pode duplicar mensagem.
 
-O log fica em `logs/web_audit.log`, com rotação. Registra responsável, ação, resultado e dados operacionais; não registra senhas ou chaves de NF-e. `NFE_WEB_AUDIT_LOG` permite mudar o caminho.
+## Exportações, logs e continuidade
 
-Faça backup do banco fiscal, `dados/admin_accounts.db`, `secrets`, certificado e logs em local protegido. Pare o processo antes de copiar os bancos para um backup consistente ou restaurá-los. Após restauração, confira versão, acesso administrativo, caminho do banco e cursores em **Status** antes de retomar a operação.
-
-### Exportações simultâneas
-
-A geração de relatórios permite duas exportações em paralelo. Até 16 pedidos adicionais aguardam uma vaga, por no máximo cinco minutos, sem bloquear as consultas ou a sincronização. Uma vaga é liberada ao terminar a geração da resposta, inclusive em erro ou cancelamento. Downloads já arquivados e XMLs individuais não entram nessa fila. Se a capacidade de espera for atingida, a resposta é 429; se a espera expirar, é 503, com `Retry-After: 15`. Os formulários de Excel voltam a habilitar o botão após sucesso ou erro. A fila é mantida em memória por processo; não persiste após reiniciar o servidor.
-
-As exportações solicitadas pela interface são aceitas com HTTP 202 e executadas em segundo plano, mantendo os mesmos limites da fila e as validações das rotas originais. A aba Downloads consulta o estado a cada dois segundos: na fila, gerando, pronto ou erro. O progresso da geração é indeterminado; a porcentagem mede os bytes da transferência. As tarefas e seus estados são locais ao processo e não sobrevivem a uma reinicialização. As cópias concluídas continuam disponíveis no arquivo de Downloads por 24 horas.
+- Geração: duas tarefas simultâneas, até 16 em espera, timeout de cinco minutos. Fila cheia retorna 429; espera expirada, 503; `Retry-After: 15`.
+- Interface solicita geração em segundo plano com HTTP 202 e consulta estado a cada dois segundos. Estados/tarefas em andamento não persistem após reiniciar.
+- Cancelamento mantém a vaga até encerrar o trabalho; verifica SQL e linhas. A gravação final do Excel pode terminar antes da limpeza.
+- Arquivos prontos ficam em `dados/downloads` por 24 horas. Downloads prontos não entram na fila de geração.
+- Auditoria: `logs/web_audit.log` e rotação. Histórico de sincronização: retenção de 30 dias. Registros administrativos seguem a rotação por tamanho.
+- Backup completo é manual. Consulte [Banco e backup](SEGURANCA_BANCO.md).

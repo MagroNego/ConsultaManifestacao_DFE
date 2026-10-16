@@ -21,3 +21,7 @@ A sincronização noturna teve duas noites com resultado favorável nos registro
 ## Atualização e backup
 
 Pare o app e faça uma cópia consistente do banco fiscal, do banco de contas e da pasta secrets; preserve também o certificado A1 quando externo. O backup completo ainda é manual. Atualize o código e as dependências com INSTALAR.cmd, preserve os caminhos e reinicie com INICIAR_WEB.cmd. Confira login, certificado e cursores no Status. O computador e o processo do app precisam permanecer ativos durante a noite.
+
+## Documentação e correções posteriores na main
+
+A main inclui cancelamento cooperativo durante SQL/montagem das linhas, otimização do Excel e CT-e sem quebra de linha. Essas alterações posteriores não substituem o ZIP 2.6.0 já publicado. A documentação foi revisada em 16/10/2026; configuração e atendimento Qive estão em [Distribuição DF-e e Qive](DISTRIBUICAO_DFE_QIVE.md).
