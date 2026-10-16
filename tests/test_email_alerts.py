@@ -26,10 +26,11 @@ def test_apenas_evento_novo_gera_um_aviso_por_destinatario(tmp_path):
         banco.fechar()
 
 
-def test_sem_destinatarios_ou_outro_evento_nao_gera_aviso(tmp_path):
+@pytest.mark.parametrize("codigo", ["210210", "210220"])
+def test_sem_destinatarios_ou_outro_evento_nao_gera_aviso(tmp_path, codigo):
     banco = BancoManifestacoes(str(tmp_path / "eventos.db"))
     try:
-        banco.salvar_retorno("123", retorno("210220"), ("a@empresa.com.br",))
+        banco.salvar_retorno("123", retorno(codigo), ("a@empresa.com.br",))
         assert banco.notificacoes_pendentes() == []
     finally:
         banco.fechar()
@@ -206,8 +207,8 @@ def test_diagnostico_correlaciona_processo_banco_e_lote_sem_senhas(tmp_path, mon
     assert all('senha' not in chave and 'password' not in chave for r in diagnosticos for chave in r[2])
 
 
-@pytest.mark.parametrize('codigo', ['210210', '210240'])
-def test_alertas_ciencia_e_operacao_com_evento_correto_e_sem_duplicar(tmp_path, monkeypatch, codigo):
+@pytest.mark.parametrize('codigo', ['210240'])
+def test_alerta_operacao_com_evento_correto_e_sem_duplicar(tmp_path, monkeypatch, codigo):
     caminho = tmp_path / 'eventos.db'
     recipients = tmp_path / 'secrets' / 'recipients.json'
     email_alerts.salvar_destinatarios(recipients, 'teste@empresa.com.br')
@@ -226,7 +227,7 @@ def test_alertas_ciencia_e_operacao_com_evento_correto_e_sem_duplicar(tmp_path, 
     assert email_alerts.enviar_pendentes(settings, audit) == 1
     assert email_alerts.enviar_pendentes(settings, audit) == 0
     assert codigo in enviados[0].get_content()
-    assert ('Ciência da Emissão' if codigo == '210210' else 'Operação não Realizada') in str(enviados[0]['Subject'])
+    assert 'Operação não Realizada' in str(enviados[0]['Subject'])
 
 
 def test_remetente_salvo_persiste_valida_e_atualiza_autenticacao(tmp_path, monkeypatch):
@@ -242,7 +243,7 @@ def test_remetente_salvo_persiste_valida_e_atualiza_autenticacao(tmp_path, monke
     from unittest.mock import MagicMock
     smtp = MagicMock()
     monkeypatch.setattr(email_alerts.smtplib, 'SMTP', lambda *a, **kw: smtp)
-    email_alerts._enviar(settings, 'teste@empresa.com.br', '3'*44, '2026-10-16', '123', '210210')
+    email_alerts._enviar(settings, 'teste@empresa.com.br', '3'*44, '2026-10-16', '123', '210240')
     smtp.__enter__().login.assert_called_once_with('novo@gmail.com', 'senha-de-app')
     message = smtp.__enter__().send_message.call_args.args[0]
     assert str(message['From']) == 'novo@gmail.com'
@@ -263,3 +264,27 @@ def test_email_de_teste_nao_abre_banco_e_nao_consulta_sefaz(tmp_path, monkeypatc
     assert email_alerts.enviar_teste(settings, audit) == (1, 0)
     assert 'teste' in str(enviados[0]['Subject'])
     assert enviados[0]['To'] == 'teste@empresa.com.br'
+
+
+
+def test_ciencia_na_fila_antiga_e_cancelada_sem_enviar_nem_apagar_evento(tmp_path, monkeypatch):
+    caminho = tmp_path/'eventos.db'
+    arquivo = tmp_path/'recipients.json'
+    email_alerts.salvar_destinatarios(arquivo,'teste@empresa.com.br')
+    banco = BancoManifestacoes(str(caminho))
+    banco.salvar_retorno('123',retorno('210210'),('teste@empresa.com.br',))
+    assert banco.contar_notificacoes_pendentes() == 0
+    with banco.conexao:
+        banco.conexao.execute("INSERT INTO notificacoes_email(manifestacao_id,destinatario) SELECT id,? FROM manifestacoes",('teste@empresa.com.br',))
+    banco.fechar()
+    settings = SimpleNamespace(smtp_host='smtp.test',smtp_from='app@gmail.com',smtp_user='',
+        smtp_password_file=tmp_path/'senha.txt',email_recipients_file=arquivo,current_database_password=lambda:None)
+    monkeypatch.setattr(sync_runtime,'caminho_banco_configurado',lambda _:caminho)
+    def proibido(*args,**kwargs):
+        pytest.fail('Ciência não deve ser enviada por e-mail')
+    monkeypatch.setattr(email_alerts,'_enviar',proibido)
+    assert email_alerts.enviar_pendentes(settings,SimpleNamespace(write_system=lambda *a,**kw:None)) == 0
+    banco = BancoManifestacoes(str(caminho))
+    assert banco.contar_notificacoes_pendentes() == 0
+    assert banco.conexao.execute("SELECT count(*) FROM manifestacoes WHERE codigo='210210'").fetchone()[0] == 1
+    banco.fechar()

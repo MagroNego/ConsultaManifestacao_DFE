@@ -65,7 +65,7 @@ Uma janela concluída não é repetida após reiniciar. Falhas e distribuições
 
 ## Alertas de Operação não Realizada
 
-Em **Admin → Alertas por e-mail**, cadastre até 20 endereços, separados por linha ou vírgula. Novos eventos de **Ciência da Emissão (210210)** e **Operação não Realizada (210240)** geram avisos para os destinatários cadastrados. Reprocessar um evento já gravado não cria uma nova mensagem.
+Em **Admin → Alertas por e-mail**, cadastre até 20 endereços, separados por linha ou vírgula. Novos eventos de **Operação não Realizada (210240)** geram avisos para os destinatários cadastrados. Reprocessar um evento já gravado não cria uma nova mensagem.
 
 Os envios dependem da configuração SMTP do servidor. Falhas temporárias mantêm os avisos na fila. Após corrigir o SMTP, use **Tentar enviar pendentes**; isso não refaz a sincronização da SEFAZ. Remover um destinatário cancela seus avisos ainda pendentes.
 

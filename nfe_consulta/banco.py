@@ -384,7 +384,7 @@ class BancoManifestacoes:
                      evento.protocolo, evento.nsu, evento.schema),
                 )
                 inseridos += cursor.rowcount
-                if cursor.rowcount and evento.codigo in {"210240", "210210"}:
+                if cursor.rowcount and evento.codigo == "210240":
                     for destinatario in destinatarios_alerta:
                         self.conexao.execute(
                             "INSERT OR IGNORE INTO notificacoes_email(manifestacao_id, destinatario) "

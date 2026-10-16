@@ -153,7 +153,7 @@
   <div class="card-title">
     <div>
       <h2>Alertas por e-mail</h2>
-      <span class="muted">Ciência da Emissão e Operação não Realizada</span>
+      <span class="muted">Operação não Realizada</span>
     </div>
     <span class="status-dot {{ 'ok' if smtp_ready else 'bad' }}">
       {{ 'Envio configurado' if smtp_ready else 'SMTP pendente' }}
@@ -174,7 +174,7 @@
   </form>
   <p class="cooldown-note">
     Um endereço por linha ou separados por vírgula, até 20. Ao remover um endereço, avisos ainda pendentes para ele são cancelados. Deixe vazio para não gerar novos avisos.
-    O aviso é criado quando um evento novo de Ciência da Emissão (210210) ou Operação não Realizada (210240) entra no banco. Eventos já gravados não são reenviados.
+    O aviso é criado quando um evento novo de Operação não Realizada (210240) entra no banco. Eventos já gravados não são reenviados.
     {% if not smtp_ready %}Configure o servidor SMTP para realizar os envios.{% endif %}
   </p>
   <form action="{{ url_for('atualizar_testar_email') }}" method="post">

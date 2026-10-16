@@ -126,7 +126,9 @@ def cancelar_pendentes_removidos(settings, destinatarios: tuple[str, ...]) -> in
 
 def _enviar(settings, destinatario: str, chave: str, data: str, protocolo: str,
             codigo: str = "210240") -> None:
-    descricao = {"210240": "Operação não Realizada", "210210": "Ciência da Emissão"}[codigo]
+    if codigo != "210240":
+        raise ValueError("Este evento não está habilitado para alertas por e-mail.")
+    descricao = "Operação não Realizada"
     mensagem = EmailMessage()
     mensagem["Subject"] = f"NF-e: novo evento de {descricao}"
     mensagem["From"] = remetente_atual(settings)[0]
@@ -187,6 +189,9 @@ def _enviar_pendentes_sem_lock(settings, audit, *, limite: int) -> int:
     try:
         banco.cancelar_destinatarios_removidos(tuple(ativos))
         for id_, destinatario, chave, data, protocolo, codigo in banco.notificacoes_pendentes(limite, incluir_codigo=True):
+            if codigo != "210240":
+                banco.cancelar_notificacao(id_, "evento_alerta_desativado")
+                continue
             try:
                 _enviar(settings, destinatario, chave, data, protocolo, codigo)
             except Exception as exc:
@@ -230,7 +235,7 @@ def enviar_teste(settings, audit) -> tuple[int, int]:
             mensagem["To"] = destinatario
             mensagem.set_content("Este é um teste dos alertas do AtlasDFE.\n"
                 "Nenhuma consulta à SEFAZ foi realizada e nenhum evento fiscal foi criado.\n"
-                "Os alertas incluem Ciência da Emissão (210210) e Operação não Realizada (210240).")
+                "Os alertas incluem somente Operação não Realizada (210240).")
             try:
                 _enviar_mensagem(settings, mensagem)
             except Exception as exc:
