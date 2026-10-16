@@ -1,4 +1,4 @@
-"""Admin exige sessão; consultas e exportações continuam públicas."""
+"""Acesso ao app exige sessão e ações administrativas exigem perfil Admin."""
 import runpy
 import sqlite3
 from pathlib import Path
@@ -29,11 +29,12 @@ def setup(tmp_path):
 
 
 @pytest.mark.parametrize('path', ['/consulta', '/status', '/xml', '/xml?tipo=itens', '/xml?tipo=retencoes', '/xml/exportar?formato=csv', '/consulta/exportar'])
-def test_leitura_e_exportacao_publicas(tmp_path, path):
+def test_leitura_e_exportacao_exigem_login(tmp_path, path):
     cfg, app = setup(tmp_path)
     with TestClient(app) as client:
-        assert client.get(path).status_code == 200
-        assert 'Sair do Admin' not in client.get('/consulta').text
+        response = client.get(path, follow_redirects=False)
+        assert response.status_code == 303
+        assert response.headers['location'].endswith('/login')
 
 
 @pytest.mark.parametrize('path', ['/atualizar', '/admin/historico', '/xml/lote/1/registro'])
@@ -70,7 +71,7 @@ def test_login_admin_importa_e_logout_revoga_sessao(tmp_path):
         assert client.post('/admin/logout', data={'csrf': token}, follow_redirects=False).status_code == 303
         client.cookies.set(cfg.admin_cookie_name, cookie)
         assert client.get('/atualizar', follow_redirects=False).status_code == 303
-        assert client.get('/xml/arquivo/' + helpers['CHAVE']).status_code == 404
+        assert client.get('/xml/arquivo/' + helpers['CHAVE'], follow_redirects=False).status_code == 303
         assert client.post('/xml/importar', data={'csrf': token}, files={'files': ('a.xml', helpers['xml']())}).status_code == 401
 
 

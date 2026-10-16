@@ -1,3 +1,4 @@
+from conftest import authenticated_user
 from io import BytesIO
 from types import SimpleNamespace
 import asyncio
@@ -61,6 +62,7 @@ def criar_banco(caminho):
 
 
 def entrar_admin(client, cfg):
+    client.cookies.clear()
     response = client.post('/admin/login', data={'csrf': csrf_token(PUBLIC_USER, cfg),
         'username': cfg.admin_username, 'password': cfg.admin_password}, follow_redirects=False)
     assert response.status_code == 303
@@ -258,6 +260,7 @@ def test_headers_de_seguranca_e_healthcheck(tmp_path):
     app = create_app(cfg)
 
     with TestClient(app) as client:
+        token_usuario = authenticated_user(client)
         health = client.get("/healthz")
         home = client.get("/")
 

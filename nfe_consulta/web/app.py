@@ -342,7 +342,14 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                     headers={"Cache-Control": "no-store"})
             return JSONResponse({"detail": "Entre para acessar a área Admin."}, status_code=401,
                 headers={"Cache-Control": "no-store"})
-        if path in {"/excel", "/xml/importar", "/admin/login", "/admin/contas", "/admin/notas/situacao"} and request.method == "POST":
+        public_path = path in {"/login", "/cadastro", "/admin/login", "/healthz"} or path.startswith("/static/")
+        if not public_path and not current_user(request).authenticated:
+            if request.method in {"GET", "HEAD"}:
+                return RedirectResponse(request.url_for("login_page"), status_code=303,
+                    headers={"Cache-Control": "no-store"})
+            return JSONResponse({"detail": "Entre para acessar o AtlasDFE."}, status_code=401,
+                headers={"Cache-Control": "no-store"})
+        if path in {"/excel", "/xml/importar", "/admin/login", "/login", "/cadastro", "/admin/contas", "/admin/notas/situacao"} and request.method == "POST":
             try:
                 size = int(request.headers.get("content-length", "0"))
             except ValueError:
@@ -483,6 +490,49 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             filename=item['filename'], media_type=item['media_type'],
             headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"})
 
+    @app.get("/cadastro", response_class=HTMLResponse, name="register_page")
+    async def register_page(request: Request, user: Annotated[WebUser, Depends(current_user)]):
+        if user.authenticated:
+            return RedirectResponse(request.url_for("consulta_page"), status_code=303)
+        return _render(request, "register.html", user)
+
+    @app.post("/cadastro", name="register_submit")
+    async def register_submit(
+        request: Request, user: Annotated[WebUser, Depends(current_user)],
+        csrf: str = Form(...), username: str = Form(...), password: str = Form(...),
+        password_confirmation: str = Form(...),
+    ):
+        validate_csrf(csrf, user, settings)
+        if user.authenticated:
+            raise HTTPException(403, "Saia da conta atual para criar outro acesso.")
+        address = request.client.host if request.client else "unknown"
+        now = time.monotonic()
+        with app.state.login_lock:
+            attempts = app.state.login_attempts
+            # Usa o mesmo limite de memória do login, com contagem separada.
+            for key in list(attempts):
+                attempts[key] = [t for t in attempts[key] if now - t < 300]
+                if not attempts[key]:
+                    del attempts[key]
+            key = ("register", address)
+            recent = attempts.get(key, [])
+            if len(recent) >= 5 or (len(attempts) >= 5000 and key not in attempts):
+                raise HTTPException(429, "Muitos cadastros. Aguarde alguns minutos e tente novamente.")
+            attempts[key] = recent + [now]
+        try:
+            if password != password_confirmation:
+                raise ValueError("As senhas não coincidem. Digite novamente.")
+            # O perfil é fixo no servidor, independentemente do formulário.
+            await run_in_threadpool(app.state.admin_accounts.create, username, password, "fiscal")
+        except ValueError as exc:
+            return _render(request, "register.html", user, status_code=400, error=str(exc),
+                           username=username[:64])
+        app.state.audit.write(request, user, "user_register", "ok")
+        return _render(request, "login.html", user,
+            admin_configured=app.state.admin_accounts.configured(),
+            success="Conta criada. Entre com seu usuário e senha.")
+
+    @app.get("/login", response_class=HTMLResponse, name="login_page")
     @app.get("/admin/login", response_class=HTMLResponse)
     async def admin_login_page(
         request: Request,
@@ -501,6 +551,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             admin_configured=app.state.admin_accounts.configured(),
         )
 
+    @app.post("/login", name="login_submit")
     @app.post("/admin/login")
     async def admin_login(
         request: Request,
@@ -623,6 +674,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         request: Request, user: Annotated[WebUser, Depends(require_admin)],
         csrf: str = Form(...), action: str = Form(...), username: str = Form(...),
         password: str = Form(""), role: str = Form("fiscal"),
+        confirm_delete: bool = Form(False),
     ):
         validate_csrf(csrf, user, settings)
         accounts = app.state.admin_accounts
@@ -633,6 +685,10 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
                 await run_in_threadpool(accounts.set_role, username, role)
             elif action in {"activate", "deactivate"}:
                 await run_in_threadpool(accounts.set_active, username, action == "activate")
+            elif action == "delete":
+                if not confirm_delete:
+                    raise ValueError("Confirme a exclusão da conta.")
+                await run_in_threadpool(accounts.delete, username)
             elif action == "reset":
                 await run_in_threadpool(accounts.reset_password, username, password)
             else:
@@ -641,7 +697,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             return _render(request, "admin_accounts.html", user, status_code=400,
                 accounts=await run_in_threadpool(accounts.list_accounts), error=str(exc))
         app.state.audit.write(request, user, "admin_accounts", "ok",
-                              operation=action, account=username.strip())
+                              operation=action, target=username.strip())
         return RedirectResponse(str(request.url_for("admin_accounts_page")) + "?saved=1", status_code=303)
 
     @app.get("/admin/historico", response_class=HTMLResponse)

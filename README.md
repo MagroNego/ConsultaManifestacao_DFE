@@ -62,9 +62,9 @@ O leitor foi integrado a partir de [Leitor_XML_Saida](https://github.com/MagroNe
 
 ## Administração e segurança
 
-Consulta, Status, Emissão e exportações não exigem login. **Admin** exige uma conta administrativa: importação de XML, sincronização manual, configuração e histórico são protegidos no servidor, inclusive por URLs diretas. `CONFIGURAR_ADMIN.cmd` cria ou redefine a conta escolhida, preserva as demais e faz backup do banco de contas antes de alterar uma instalação existente.
+Consulta, Status, Emissão, downloads e exportações exigem login. A tela de entrada oferece **Criar minha conta**: cada pessoa escolhe usuário e senha e recebe acesso imediato como usuário comum. **Admin** exige uma conta administrativa: importação de XML, sincronização manual, configuração e histórico são protegidos no servidor, inclusive por URLs diretas. `CONFIGURAR_ADMIN.cmd` cria ou redefine a conta escolhida, preserva as demais e faz backup do banco de contas antes de alterar uma instalação existente.
 
-Em **Admin → Gerenciar usuários**, o administrador cadastra contas com o perfil **Usuário comum** (consulta e exportação) ou **Administrador**. O usuário comum entra pelo botão **Entrar**, é direcionado para Consulta e não pode acessar configurações, importação ou sincronização. Contas existentes são preservadas; o acesso público de leitura continua disponível.
+Em **Admin → Gerenciar usuários**, o administrador cadastra contas com o perfil **Usuário comum** (consulta e exportação) ou **Administrador**. O usuário comum entra pelo botão **Entrar**, é direcionado para Consulta e não pode acessar configurações, importação ou sincronização. Contas existentes são preservadas. O administrador pode redefinir senhas, ativar, desativar ou excluir contas; as senhas atuais nunca são exibidas. A exclusão exige confirmação, encerra sessões e preserva dados fiscais e auditoria. O último administrador ativo não pode ser excluído.
 
 A senha fica como hash em `dados/admin_accounts.db` (ou `NFE_ADMIN_ACCOUNTS_PATH`). Sessões são mantidas no servidor, expiram por inatividade e são revogadas no logout ou na redefinição da senha. O cookie é `HttpOnly` e `SameSite=Strict`; em HTTPS também usa `Secure`. Em HTTP local, o login funciona sem esse atributo; use HTTPS no servidor definitivo.
 

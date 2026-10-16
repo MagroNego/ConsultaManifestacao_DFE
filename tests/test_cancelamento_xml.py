@@ -1,3 +1,4 @@
+from conftest import authenticated_user
 from io import BytesIO
 from pathlib import Path
 import runpy
@@ -97,6 +98,7 @@ def test_all_ui_and_reports_use_same_cancellation_flag(tmp_path):
     assert events.eventos[0].cancelada and events.eventos[0].descricao == 'Operação não Realizada'
     app = create_app(cfg)
     with TestClient(app) as client:
+        token_usuario = authenticated_user(client)
         for url in ['/consulta?chave=' + KEY, '/xml', '/xml?tipo=itens', '/xml?tipo=retencoes']:
             response = client.get(url)
             assert response.status_code == 200
@@ -120,6 +122,7 @@ def test_cancellation_without_note_or_manifestation_is_visible_on_lookup(tmp_pat
     web['criar_banco'](cfg.database_path)
     assert batch(cfg, tmp_path, [cancellation()])['cancelamentos'] == 1
     with TestClient(create_app(cfg)) as client:
+        token_usuario = authenticated_user(client)
         for query in ['chave=' + KEY, 'numero=' + str(int(KEY[25:34]))]:
             page = client.get('/consulta?' + query)
             assert 'Cancelada' in page.text and KEY in page.text

@@ -47,6 +47,13 @@
       <input type="hidden" name="action" value="{{ 'deactivate' if account.active else 'activate' }}">
       <button class="button secondary" type="submit">{{ 'Desativar' if account.active else 'Ativar' }}</button>
     </form>
+    <form action="{{ url_for('admin_accounts_update') }}" method="post">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="username" value="{{ account.username }}">
+      <input type="hidden" name="action" value="delete">
+      <label class="field"><span><input type="checkbox" name="confirm_delete" value="1" required> Confirmo excluir a conta {{ account.username }}</span></label>
+      <button class="button secondary" type="submit">Excluir usuário</button>
+    </form>
     {% if account.active %}
     <form action="{{ url_for('admin_accounts_update') }}" method="post">
       <input type="hidden" name="csrf" value="{{ csrf }}">
@@ -58,6 +65,7 @@
     {% endif %}
   </div>
   {% else %}<p>Nenhum usuário cadastrado.</p>{% endfor %}
+  <p class="muted">A exclusão remove a conta e encerra suas sessões, preservando os dados fiscais e a auditoria. Senhas não são exibidas; o administrador pode redefini-las.</p>
   <p class="muted">Alterar perfil, trocar senha ou desativar uma conta encerra suas sessões. O último administrador ativo não pode ser desativado nem perder esse perfil.</p>
   <p class="muted">Após cadastrar um administrador pessoal, desative a conta compartilhada inicial. Guarde uma cópia de segurança de dados/admin_accounts.db.</p>
 </section>

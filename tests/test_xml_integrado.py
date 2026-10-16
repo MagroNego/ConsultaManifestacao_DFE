@@ -1,3 +1,4 @@
+from conftest import authenticated_user
 from datetime import date
 from io import BytesIO
 from pathlib import Path
@@ -170,6 +171,7 @@ def test_web_lote_manifestacao_sem_download_xml_export_e_permissoes(tmp_path, mo
     monkeypatch.setattr('nfe_consulta.web.app.sincronizar_configurado', proibido)
     app = create_app(cfg)
     with TestClient(app) as client:
+        authenticated_user(client)
         assert client.get('/xml',follow_redirects=False).status_code == 200
         token = login(client, cfg)
         assert client.post('/xml/importar', data={'csrf':'errado'}, files={'files':('a.xml',xml())}).status_code == 403
@@ -189,6 +191,7 @@ def test_web_lote_manifestacao_sem_download_xml_export_e_permissoes(tmp_path, mo
         assert 'Baixar XML' not in consulta.text and '/xml/arquivo/' not in consulta.text
         assert client.get('/xml?tipo=itens&q=produto').status_code == 200
     with TestClient(create_app(cfg)) as client:
+        authenticated_user(client)
         assert client.get('/xml/arquivo/'+CHAVE).status_code == 404
         login(client,cfg)
         assert '1 nota importada' in client.get('/xml').text
@@ -294,6 +297,7 @@ def test_datas_xml_em_formato_brasileiro_sem_inverter_dia_mes(tmp_path, emission
     source.write_bytes(xml(emission=emission))
     store.import_batch(cfg.database_path, CNPJ_PADRAO, [(source, 'nota.xml')])
     with TestClient(create_app(cfg)) as client:
+        token_usuario = authenticated_user(client)
         for tipo in ['notas', 'itens', 'retencoes']:
             response = client.get('/xml', params={'tipo': tipo})
             assert response.status_code == 200

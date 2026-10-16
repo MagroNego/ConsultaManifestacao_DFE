@@ -1,3 +1,4 @@
+from conftest import authenticated_user
 import csv
 from html import unescape
 from io import BytesIO, StringIO
@@ -46,6 +47,7 @@ def test_item_filter_is_literal_and_applies_before_pagination_and_to_all_kinds(t
 def test_item_screen_and_return_keep_original_filters(tmp_path):
     cfg = setup(tmp_path)
     with TestClient(create_app(cfg)) as client:
+        token_usuario = authenticated_user(client)
         original = '/xml?pagina=2&q=123&situacao=autorizada&data_inicial=01%2F10%2F2026&item=teste'
         page = client.get(original).text
         link = unescape(re.search(r'data-items-open href="([^"]+)"', page).group(1))
@@ -67,6 +69,7 @@ def test_item_screen_and_return_keep_original_filters(tmp_path):
 def test_detail_export_has_only_matching_items_of_selected_note(tmp_path):
     cfg = setup(tmp_path)
     with TestClient(create_app(cfg)) as client:
+        token_usuario = authenticated_user(client)
         params = {'chave': KEY, 'item': 'teste', 'tipo': 'itens'}
         response = client.get('/xml/exportar', params={**params, 'formato': 'csv'})
         rows = list(csv.DictReader(StringIO(response.content.decode('utf-8-sig')), delimiter=';'))
