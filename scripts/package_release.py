@@ -10,7 +10,7 @@ from zipfile import ZIP_DEFLATED, ZipFile
 ROOT_FILES = (
     "pyproject.toml", "README.md", "LEIA_PRIMEIRO.md",
     "MANUAL_DE_INSTALACAO.md", "MANUAL_DE_USO.md", "SERVIDOR_WEB.md",
-    "SEGURANCA_BANCO.md", "ARQUITETURA.md", "CHANGELOG.md", "RELEASE_NOTES.md",
+    "SEGURANCA_BANCO.md", "ARQUITETURA.md", "DISTRIBUICAO_DFE_QIVE.md", "CHANGELOG.md", "RELEASE_NOTES.md",
     "WEB_CONFIG.example", "INSTALAR.cmd", "CONFIGURAR_ADMIN.cmd", "INICIAR_WEB.cmd",
 )
 

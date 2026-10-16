@@ -41,10 +41,11 @@ echo.
 echo Instalacao concluida.
 echo.
 echo Proximos passos:
-echo   1. Coloque o banco em dados\nfe_manifestacoes_seguro.db
-echo   2. Coloque a senha do banco em secrets\db-password.txt
-echo   3. Execute CONFIGURAR_ADMIN.cmd para definir a senha do Admin
-echo   4. Execute INICIAR_WEB.cmd ou INICIAR_REDE.bat
+echo   1. Execute CONFIGURAR_ADMIN.cmd para criar a conta administrativa
+echo   2. Execute INICIAR_WEB.cmd e acesse http://127.0.0.1:8080
+echo   3. Em Admin, selecione o banco existente e configure o certificado A1
+echo   4. Para SQLCipher, use secrets\db-password.txt
+echo   Consulte MANUAL_DE_INSTALACAO.md e DISTRIBUICAO_DFE_QIVE.md
 echo.
 pause
 exit /b 0

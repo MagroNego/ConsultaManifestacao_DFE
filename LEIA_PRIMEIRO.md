@@ -1,23 +1,26 @@
-# AtlasDFE — v2.6.0
+# AtlasDFE — início rápido
 
-## Primeira instalação
+## Instalar no Windows
 
-1. Extraia o pacote em uma pasta definitiva.
-2. Execute `INSTALAR.cmd` e `CONFIGURAR_ADMIN.cmd`.
-3. Execute `INICIAR_WEB.cmd` e abra http://127.0.0.1:8080.
-4. Entre em **Admin** com sua conta e configure o banco existente e o certificado A1.
-5. Importe XMLs em **Admin → Importar XML**. Consulte o histórico em **Consulta** e acompanhe a sincronização em **Status**.
+1. Instale Python 3.11+ com o Python Launcher (`py`).
+2. Extraia o pacote em uma pasta definitiva.
+3. Execute `INSTALAR.cmd` e depois `CONFIGURAR_ADMIN.cmd`.
+4. Execute `INICIAR_WEB.cmd` e acesse `http://127.0.0.1:8080`.
+5. Entre como administrador; configure o banco de manifestações existente e o certificado A1.
+6. Confira **Status** e, se necessário, configure **Admin → Alertas por e-mail**.
 
-O lançador habilita a sincronização às **22:00, 23:00, 00:00, 01:00, 02:00 e 03:00 (Brasília)**. Mantenha o processo em execução. Para desativar, configure `NFE_AUTO_SYNC_ENABLED=0` antes de iniciar.
+Usuários comuns usam **Criar minha conta** e escolhem sua própria senha. Todas as telas de dados exigem login.
 
-## Atualização
+## Rotina
 
-Pare a instalação, faça backup e substitua o código e os lançadores pela nova versão. Preserve `dados`, `secrets`, logs, certificado e os caminhos configurados. Execute `INSTALAR.cmd` para atualizar as dependências e reinicie por `INICIAR_WEB.cmd`. Confirme **AtlasDFE** no cabeçalho e confira o cursor NSU em **Status**.
+- **AtlasDFE:** 22:00 até antes de 04:00, Brasília. Disparos às 22h, 23h, 00h, 01h, 02h e 03h.
+- **Qive:** janela solicitada de 08:00–18:00, incluindo retentativas. A aplicação não verifica a configuração do Qive.
+- **consNSU:** pausado por padrão; pendências preservadas.
+- Mantenha o computador ligado, sem suspensão/hibernação, e o processo Web ativo. Bloquear a sessão com `Win+L` não encerra o processo; sair da sessão pode encerrá-lo.
+- Importações, consultas locais e relatórios continuam disponíveis durante o dia.
 
-Consulta e exportações exigem login. Use **Criar minha conta** para escolher seu usuário e senha; o cadastro libera acesso comum imediatamente. Admin exige perfil administrativo. Contas antigas são preservadas; use `CONFIGURAR_ADMIN.cmd` para definir ou redefinir a senha da conta escolhida.
+## Atualizar
 
-O lançador de teste de data única foi retirado. Remova `NFE_AUTO_SYNC_ONCE_DATE` do ambiente, caso tenha sido configurada; a rotina final é recorrente nos horários fixos de 22:00, 23:00, 00:00, 01:00, 02:00 e 03:00.
+Pare o app, faça backup e siga [Instalação](MANUAL_DE_INSTALACAO.md). Preserve banco fiscal, `dados`, `secrets`, certificado e logs. Após reiniciar, confira versão, acesso e cursores em **Status**.
 
-Leia o [manual de instalação](MANUAL_DE_INSTALACAO.md) para o procedimento completo e o [manual de uso](MANUAL_DE_USO.md) para operar a aplicação.
-
-A recuperação consNSU permanece pausada por padrão; não há necessidade de reconsultar intervalos já completos. Os alertas por e-mail são somente para Operação não Realizada (210240). O Admin permite editar o remetente e enviar uma mensagem de teste sem consultar a SEFAZ.
+[Uso](MANUAL_DE_USO.md) · [Distribuição e Qive](DISTRIBUICAO_DFE_QIVE.md) · [Backup](SEGURANCA_BANCO.md)

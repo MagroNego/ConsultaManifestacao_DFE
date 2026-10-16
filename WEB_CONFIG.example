@@ -1,6 +1,7 @@
 # Exemplo de variáveis não sensíveis/operacionais.
 # INICIAR_WEB.cmd NÃO carrega este arquivo automaticamente.
-# As senhas do banco, administrador e certificado são lidas de secrets/.
+# Senhas do banco, certificado e SMTP: arquivos de secrets/.
+# Contas/senhas de acesso: hashes em dados/admin_accounts.db.
 
 NFE_WEB_ENV=production
 NFE_WEB_HOST=127.0.0.1
@@ -32,5 +33,9 @@ NFE_SMTP_USER=
 # NFE_CERT_STORE=LocalMachine
 # NFE_CERT_THUMBPRINT=<impressão digital quando necessário>
 # Para desativar a rotina automática: NFE_AUTO_SYNC_ENABLED=0
-# Janelas padrão: 22:00, 23:00, 00:00, 01:00, 02:00 e 03:00 (Brasília).
+# Janela externa: 22:00 inclusive até 04:00 exclusiva, Brasília (UTC-3).
+# Disparos: 22:00, 23:00, 00:00, 01:00, 02:00 e 03:00. Não dispara às 04:00.
+# Qive: janela solicitada 08:00-18:00, incluindo novas tentativas.
+# O app não verifica nem configura a janela do Qive.
+# Política e atendimento: DISTRIBUICAO_DFE_QIVE.md.
 

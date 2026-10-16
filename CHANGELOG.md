@@ -1,6 +1,11 @@
 # Histórico de versões
 
-## Em preparação
+## Alterações na main após 2.6.0
+
+- Documentação técnica consolidada: instalação, autenticação, persistência, backup e operação.
+- Registro das informações do suporte Qive, janelas 08h–18h / 22h–04h, evidências e limites da validação.
+- Corrige a orientação de instalação Linux: comunicação SEFAZ depende de PowerShell; produção documentada em Windows.
+- Detalhes de CT-e em uma linha, com ampliação da tabela e rolagem horizontal.
 
 - Cancelamento interrompe consultas SQL e montagem de relatórios, mantendo a vaga da fila até o trabalho encerrar.
 - Elimina cálculo repetido por linha que tornava planilhas grandes mais lentas.
