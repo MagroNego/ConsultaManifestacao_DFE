@@ -1,35 +1,18 @@
 # Histórico de versões
 
-## 2.6.0 — acesso pela infraestrutura
+## Main após a release 2.6.0 — revisão de 2026-10-19
 
-- Login, cadastro, gerenciamento de usuários e senha administrativa desativados por padrão. Controle de acesso delegado ao TI; contas antigas preservadas.
-- CSRF, janela SEFAZ, cooldown e travas mantidos.
+A versão declarada continua 2.6.0. As alterações abaixo pertencem à main e não atualizam o ZIP já publicado dessa release.
 
-
-## Em preparação
-
-- ZIPs aceitam subpastas relativas com dois-pontos em horários; mantém recusa de caminhos absolutos, travessia e links, sem extração para o filesystem. Registro de lote passa a detalhar o motivo de caminho recusado.
-
-- Consulta por notas.txt com um número por linha, todas as correspondências locais e aba de conferência dos números solicitados. Tutorial acessível pelo ícone de interrogação; seleção de arquivos independente por opção.
-
-- Formulário de sincronização manual não é renderizado durante bloqueios. Requisições diretas continuam sujeitas à autorização, CSRF, janela e cooldown no servidor.
-
-- Agenda automática configurável no Admin: ativação, dias e até seis horários, com persistência e aplicação sem reinício. Mantém janela 22h–04h e intervalo mínimo de 60 minutos.
-
-- Gestão de usuários com campos e ações organizados, exclusão recolhida e exibição da senha em digitação no Admin.
-- E-mail único obrigatório nos novos cadastros Web e login por e-mail ou usuário; contas antigas preservadas com vinculação administrativa. Troca de e-mail revoga sessões.
-
-## Alterações na main após 2.6.0
-
-- Documentação técnica consolidada: instalação, autenticação, persistência, backup e operação.
-- Registro das informações do suporte Qive, janelas 08h–18h / 22h–04h, evidências e limites da validação.
-- Corrige a orientação de instalação Linux: comunicação SEFAZ depende de PowerShell; produção documentada em Windows.
-- Detalhes de CT-e em uma linha, com ampliação da tabela e rolagem horizontal.
-
-- Cancelamento interrompe consultas SQL e montagem de relatórios, mantendo a vaga da fila até o trabalho encerrar.
-- Elimina cálculo repetido por linha que tornava planilhas grandes mais lentas.
-- Botão de cancelar responde imediatamente e orienta atualizar a página quando a sessão/token muda.
-- A gravação final do Excel ainda precisa concluir o bloco em andamento antes da limpeza dos temporários.
+- Acesso padrão sem login, cadastro ou senha administrativa; controle de acesso delegado ao TI. Contas antigas preservadas no modo legado opcional.
+- Agenda configurável no Admin: ativação, dias e até seis horários, persistidos sem reinício, dentro da janela 22h–04h e separados por pelo menos 60 minutos.
+- Sincronização manual bloqueada também no backend por janela, cooldown, CSRF e trava de execução.
+- Consulta por NOTAS.TXT, correspondências locais e aba de conferência dos números solicitados.
+- Importação de ZIP com subpastas relativas contendo dois-pontos em horários; mantém bloqueio de caminhos absolutos, travessia e links. Diagnóstico por arquivo no registro do lote.
+- Cancelamento cooperativo de exportações durante SQL e montagem das linhas; otimização de planilhas e retorno imediato da solicitação de cancelamento.
+- Detalhes de CT-e em uma linha, com rolagem horizontal.
+- Cadastro por e-mail e melhorias de gestão de contas disponíveis somente no modo legado de autenticação.
+- Documentação revisada contra o código: instalação, restauração com agenda desativada, retenção, implantação, Qive e limites de distribuição dos cancelamentos de emissão própria.
 
 ## 2.6.0 — 2026-10-16
 
@@ -109,5 +92,3 @@
 ## 2.0.0
 
 - Interface Web com administração centralizada e consulta ao histórico local.
-
-<!-- 2.6.0 -->

@@ -14,31 +14,41 @@
 
 A instalação não fornece certificado, senha, banco fiscal preenchido ou credenciais SMTP. O CNPJ e a UF padrão desta distribuição estão em `nfe_consulta/config.py`; valide-os antes de usar o app para outra empresa. O banco selecionado deve conter a tabela `manifestacoes`; um arquivo SQLite vazio não atende à configuração administrativa.
 
-## Windows: instalação
+## Código e versão
 
-Extraia o pacote em `C:\AtlasDFE` ou outra pasta definitiva com permissão de escrita. No PowerShell:
+Esta documentação descreve a `main` revisada em 19/10/2026, ainda identificada como 2.6.0. O ZIP da release `v2.6.0` pode ter comportamento anterior, inclusive login obrigatório. Para obter as mudanças atuais, use Git. Um novo ZIP só é publicado pelo workflow quando existe uma versão ainda não lançada.
+
+## Windows: instalação por Git
+
+Use uma pasta definitiva com permissão de escrita. O diretório `C:\AtlasDFE` deve estar ausente ou vazio para o clone. No PowerShell:
 
 ```powershell
+git clone --branch main https://github.com/MagroNego/ConsultaManifestacao_DFE.git C:\AtlasDFE
 Set-Location C:\AtlasDFE
+git rev-parse HEAD
 py --version
 .\INSTALAR.cmd
+$env:NFE_AUTO_SYNC_ENABLED = "0"
+$env:NFE_WEB_LOCAL_AUTH = "0"
 .\INICIAR_WEB.cmd
 ```
 
 `INSTALAR.cmd` cria `.venv`, instala as dependências e prepara `dados`, `secrets` e `logs`. O acesso não exige conta ou senha local, inclusive no Admin; o TI deve restringir o acesso na infraestrutura.
 
-O lançador inicia em produção, gera `secrets/web-csrf-secret.txt` se necessário e ativa a sincronização automática quando a variável não foi definida. Para configurar inicialmente sem disparos automáticos:
+O lançador inicia em produção, gera `secrets/web-csrf-secret.txt` se necessário e ativa a sincronização automática quando a variável não foi definida. Os comandos de instalação acima desativam os disparos iniciais. A variável abaixo só controla a ativação quando não existe agenda salva:
 
 ```powershell
 $env:NFE_AUTO_SYNC_ENABLED = "0"
 .\INICIAR_WEB.cmd
 ```
 
+Se `secrets/auto-sync.json` já existir, seu campo `enabled` prevalece sobre a variável. Desative a agenda no Admin ou, com o processo parado, altere esse campo para `false`, preservando `times` e `weekdays`. Não remova o arquivo para pausar a agenda.
+
 ## Configuração inicial
 
 1. Acesse `http://127.0.0.1:8080` e abra **Admin**.
 2. Em **Admin**, selecione o banco fiscal existente. O caminho padrão é `dados/nfe_manifestacoes_seguro.db`; a seleção salva em `secrets/db-path.txt` prevalece.
-3. Para SQLCipher, disponibilize a senha em `secrets/db-password.txt`. Usuários comuns não informam essa senha.
+3. Para SQLCipher, disponibilize a senha em `secrets/db-password.txt`. Essa credencial pertence ao banco, não ao acesso Web.
 4. Configure o certificado A1 por arquivo ou repositório Windows. O arquivo PFX/P12 permanece no caminho selecionado; não é copiado para o projeto.
 5. Confira banco, última gravação, `ultNSU` e `maxNSU` em **Status**.
 6. Se houver alertas, configure SMTP e destinatários e use **Enviar e-mail de teste**.
@@ -61,6 +71,10 @@ As variáveis acima valem para esse PowerShell e os processos iniciados por ele.
 A janela é **22:00 inclusive até 04:00 exclusiva, Brasília (UTC−3)**. Os disparos ocorrem às **22h, 23h, 00h, 01h, 02h e 03h**, todos os dias por padrão. Consultas manuais e retentativas também respeitam janela, trava e cooldown de 60 minutos. Não há disparo às 04h.
 
 Mantenha o computador sem suspensão/hibernação e o app em execução. Fechar o terminal encerra a aplicação. O agendador não liga o computador nem inicia sozinho um processo encerrado. Use um serviço do sistema operacional para inicialização automática, conforme [Servidor Web](SERVIDOR_WEB.md).
+
+## Rede interna
+
+O lançador padrão escuta somente em `127.0.0.1:8080`. Para produção na rede, configure o proxy/autenticação e a restrição de acesso com o TI antes de expor o serviço. `INICIAR_REDE.bat`, disponível no repositório, usa `0.0.0.0:8080` e não adiciona controle de acesso. O ZIP gerado pelo empacotador não inclui esse BAT. Veja [Servidor Web](SERVIDOR_WEB.md).
 
 ## Linux: consultas locais e desenvolvimento
 
@@ -95,13 +109,15 @@ Se houver alterações locais ou divergência, resolva-as antes de atualizar; n�
 
 ## Atualização por ZIP
 
+Use um pacote identificado por versão/commit e confira o checksum quando fornecido. Rebaixar para um ZIP anterior pode restaurar comportamentos antigos. Arquivo de código baixado do GitHub não é o mesmo artefato que o ZIP montado por `scripts/package_release.py`.
+
 1. Pare o app e faça backup do banco fiscal, inclusive quando estiver fora da pasta do projeto.
 2. Extraia o pacote novo em pasta temporária.
 3. Substitua `nfe_consulta` por inteiro e atualize `pyproject.toml`, lançadores, configuração de exemplo e documentação.
 4. Preserve `dados`, `secrets`, `logs`, certificado, entradas e saídas. Preserve `.venv` e atualize suas dependências pelo instalador.
 5. Execute `INSTALAR.cmd` e reinicie com `INICIAR_WEB.cmd`.
 
-Em ambos os métodos, confira acesso, versão, banco, certificado e cursores. Use `Ctrl+F5` no navegador para recarregar os recursos da interface. Não zere o NSU nem apague pendências para validar a atualização. Remova lançadores de teste antigos e variáveis de agendamento legadas descritas em [Servidor Web](SERVIDOR_WEB.md).
+Em ambos os métodos, confira acesso, versão/commit, banco, certificado, agenda salva e cursores. Use `Ctrl+F5` no navegador para recarregar os recursos da interface. Não zere o NSU nem apague pendências para validar a atualização. Remova lançadores de teste antigos e variáveis de agendamento legadas descritas em [Servidor Web](SERVIDOR_WEB.md).
 
 ## Diagnóstico de instalação
 
@@ -111,6 +127,6 @@ Em ambos os métodos, confira acesso, versão, banco, certificado e cursores. Us
 | Falha ao instalar SQLCipher | Conferir a saída do pip e as dependências nativas da plataforma |
 | Banco indisponível | Caminho selecionado, permissões e senha SQLCipher |
 | Certificado indisponível | Validade, chave privada, senha e conta que executa o processo |
-| Token de segurança inválido | Atualizar a página e entrar novamente antes de repetir a ação |
-| Sincronização não inicia | Horário Brasília, processo ativo, variável de ativação e próxima tentativa em Status |
+| Token de segurança inválido | Recarregar a página para obter um token atual; repetir a ação sem reutilizar formulário antigo |
+| Sincronização não inicia | Horário Brasília, processo ativo, agenda efetiva salva e próxima tentativa em Status |
 | Porta ocupada | Verificar outra instância antes de mudar a porta; manter um único processo |

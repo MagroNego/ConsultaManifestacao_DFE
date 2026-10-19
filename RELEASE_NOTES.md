@@ -1,28 +1,28 @@
-# AtlasDFE 2.6.0 — versão estável
+# AtlasDFE 2.6.0
 
-Consolida a sincronização noturna validada na instalação do usuário, o acesso controlado pelo TI e os alertas por e-mail.
+## Escopo desta revisão
 
-- Consulta automática às **22h, 23h, 00h, 01h, 02h e 03h**, no horário de Brasília. A janela fecha às 04h. Cooldown, pausas da SEFAZ e trava de execução continuam prevalecendo.
-- Acesso sem login local, cadastro ou senha administrativa. O TI controla o acesso de rede a todas as funções, inclusive Admin. Contas antigas preservadas e desativadas no modo padrão; CSRF e proteções SEFAZ mantidos.
-- Alertas somente de **Operação não Realizada (210240)**. Remetente e usuário SMTP editáveis; botão de teste sem consultar a SEFAZ ou gerar eventos. A senha de app continua em arquivo local.
-- Downloads com botão Cancelar para solicitações próprias na fila ou em geração; administradores podem cancelar outras solicitações. A geração conclui o bloco em andamento antes de liberar recursos e descarta o resultado. Durante a transferência, Cancelar interrompe o recebimento e preserva o arquivo pronto.
-- Logs de sincronização com retenção de **30 dias**, preservando auditoria administrativa e dados fiscais. A rotação por tamanho permanece ativa.
-- Preserva dados dos relatórios sem novos XMLs permanentes; XMLs históricos existentes não são apagados. O original continua sendo obtido pelo Synchro.
+Documentação do estado da main em 19/10/2026. A versão declarada permanece 2.6.0, mas o ZIP publicado em 16/10/2026 não contém todas as alterações posteriores. Identifique a instalação pelo commit. O workflow não substitui uma release existente.
 
-## Recuperação consNSU
+## Comportamento atual
 
-Permanece **pausada por padrão**. Intervalos completos não precisam ser reconsultados. A recuperação de uma futura lacuna deve ser validada separadamente, dentro da janela noturna e respeitando as pausas. O cursor distNSU nunca é avançado a partir de uma rejeição.
+- Acesso sem login local; todos os acessos têm permissão administrativa. O TI controla o acesso pela infraestrutura. Contas antigas permanecem preservadas no modo legado opcional.
+- Sincronização dentro da janela **22h–04h, Brasília**. Agenda padrão às 22h, 23h, 00h, 01h, 02h e 03h; ativação, dias e horários configuráveis no Admin. Cooldown, pausas e trava continuam obrigatórios.
+- Recuperação `consNSU` desabilitada por padrão; pendências preservadas. O cursor de distribuição avança somente após processamento confirmado.
+- Alertas de Operação não Realizada (`210240`), remetente SMTP configurável e botão de envio de teste.
+- Importação de XMLs/ZIPs com subpastas, consultas por chaves ou NOTAS.TXT e relatórios Excel/CSV.
+- Cancelamento cooperativo de exportações. No modo padrão, a identidade administrativa compartilhada permite cancelar qualquer solicitação. A serialização final do Excel pode concluir antes da limpeza.
+- Relatórios temporários por 24 horas. Logs de sincronização descartados após 30 dias, sujeitos também à rotação por tamanho; dados fiscais permanecem no banco.
+- Novos XMLs não são arquivados permanentemente. Respostas pendentes são preservadas até processamento; XMLs legados não são apagados automaticamente.
 
-## Validação
+## Validação e limites
 
-A sincronização noturna teve duas noites com resultado favorável nos registros fornecidos. O usuário confirmou o teste de acesso e a entrega de e-mail na instalação. A suíte automatizada verifica os fluxos com dados sintéticos; a publicação exige aprovação em Windows e Linux. Não foi realizada inspeção visual em navegador nesta preparação.
+Os registros operacionais de 15 e 16/10 mostram distribuição concluída e cursores atualizados nos trechos fornecidos. O operador confirmou a entrega de e-mail na instalação. Esses resultados são históricos; não comprovam a configuração interna do Qive nem todos os cenários de convivência.
 
-## Atualização e backup
+A CI está configurada para testes sintéticos em Windows e Linux. Certificado, comunicação SEFAZ e entrega SMTP dependem da instalação. O aplicativo não transmite manifestações/cancelamentos nem consulta a situação fiscal atual de cada nota. Cancelamentos de emissão própria exigem fonte adicional, conforme [Distribuição DF-e e Qive](DISTRIBUICAO_DFE_QIVE.md#cancelamentos-e-papel-do-cnpj).
 
-Pare o app e faça uma cópia consistente do banco fiscal, do banco de contas e da pasta secrets; preserve também o certificado A1 quando externo. O backup completo ainda é manual. Atualize o código e as dependências com INSTALAR.cmd, preserve os caminhos e reinicie com INICIAR_WEB.cmd. Confira acesso, certificado e cursores no Status. O computador e o processo do app precisam permanecer ativos durante a noite.
+## Atualização
 
-## Documentação e correções posteriores na main
+Pare o processo, faça backup consistente e registre o commit instalado. Atualize código e dependências, preserve configuração e certificado e valide o banco antes de reativar a agenda. Uma agenda salva prevalece sobre `NFE_AUTO_SYNC_ENABLED`; siga o procedimento de [restauração](SEGURANCA_BANCO.md#restauração) para impedir disparos durante a conferência.
 
-A main inclui cancelamento cooperativo durante SQL/montagem das linhas, otimização do Excel e CT-e sem quebra de linha. Essas alterações posteriores não substituem o ZIP 2.6.0 já publicado. A documentação foi revisada em 16/10/2026; configuração e atendimento Qive estão em [Distribuição DF-e e Qive](DISTRIBUICAO_DFE_QIVE.md).
-
-<!-- 2.6.0 -->
+Consulte [Instalação](MANUAL_DE_INSTALACAO.md), [Servidor](SERVIDOR_WEB.md) e [Histórico](CHANGELOG.md).

@@ -1,6 +1,6 @@
 # Distribuição DF-e e convivência com Qive
 
-Revisão: 16/10/2026. Escopo: configuração do AtlasDFE, atendimento Qive transcrito pelo operador e resultados apresentados no Status. O AtlasDFE não acessa a configuração interna do Qive.
+Revisão: 19/10/2026. Escopo: configuração do AtlasDFE, atendimento Qive transcrito pelo operador e resultados apresentados no Status. O AtlasDFE não acessa a configuração interna do Qive.
 
 ## Janelas operacionais
 
@@ -37,7 +37,7 @@ A explicação inicial do suporte associou a captura à identificação das nota
 
 A NT 2014.002 inclui consulta fora da sequência entre os critérios de consumo indevido e prevê retorno do último NSU em rejeições 656 de `distNSU`. Portanto, a afirmação do suporte de que apenas simultaneidade ou intervalo insuficiente explicam a rejeição não deve ser tratada como regra geral. Separar horários reduz sobreposição, mas não cria sequências independentes nem autoriza retroceder o cursor arbitrariamente. A disponibilidade histórica citada pelo suporte também não elimina controles de consumo.
 
-Referência oficial: [NT 2014.002 — distribuição DF-e](https://www.nfe.fazenda.gov.br/Portal/exibirArquivo.aspx?conteudo=P0U3lU1Fe40%3D), seção de uso indevido. O endereço identifica o documento consultado nesta revisão; verifique atualizações no Portal Nacional da NF-e.
+Referência oficial: [NT 2014.002 — distribuição DF-e](https://www.nfe.fazenda.gov.br/Portal/exibirArquivo.aspx?conteudo=VgPuhtPApQo%3D), seção de uso indevido. O endereço identifica o documento consultado nesta revisão; verifique atualizações no Portal Nacional da NF-e.
 
 ## Comportamento implementado
 
@@ -46,7 +46,7 @@ Referência oficial: [NT 2014.002 — distribuição DF-e](https://www.nfe.fazen
 3. Preservar a resposta antes de interpretar o XML. Gravar dados, cursor e confirmação de processamento na mesma transação.
 4. Ao receber 137 ou alcançar `ultNSU == maxNSU`, encerrar a distribuição. O limite por execução automática é de 50 lotes, configurável entre 1 e 500.
 5. Respeitar cooldown de 60 minutos, bloqueios persistidos, trava única e janela. Reiniciar não remove o bloqueio.
-6. Em 656, registrar pausa e divergência válida como intervalo para conferência; manter o cursor de sucesso. O NSU informado pela rejeição é diagnóstico.
+6. Em 656, registrar pausa e divergência válida como intervalo para conferência; manter o cursor de sucesso. O NSU informado pela rejeição é diagnóstico. Preservar o cursor é a política do AtlasDFE para evitar saltos sem processamento; não significa que a especificação proíba todo uso do cursor retornado em 656.
 
 O agendador pode retomar ao expirar o cooldown dentro da janela. Assim, um disparo às 23:00 pode ser registrado como não executado e ter execução efetiva às 23:01. Falhas de comunicação/configuração e execuções parciais aguardam a próxima oportunidade programada, respeitando os controles. Ao reiniciar, somente a oportunidade mais recente elegível é recuperada; não se executa uma sequência de todos os horários perdidos.
 
@@ -59,6 +59,14 @@ Quando habilitada e existem lacunas, a execução prioriza recuperação antes d
 O limite de 20 refere-se à recuperação pontual; não significa que o `distNSU` receba somente 20 documentos. Intervalos já completos não precisam ser reconsultados. Um documento recebido por `distNSU` também pode completar um intervalo registrado. Por isso, “Intervalo recuperado” não comprova uma execução recente de `consNSU`; consulte as contagens por origem nos logs.
 
 Para testar recuperação: identificar pendência real, registrar cursores e contagens, fazer backup, habilitar `NFE_RECOVERY_ENABLED=1`, reiniciar e executar dentro da janela. Verificar documentos recebidos, indisponíveis e faltantes separadamente. Não criar lacunas ou alterar NSUs manualmente apenas para testar.
+
+## Cancelamentos e papel do CNPJ
+
+A distribuição depende do papel do CNPJ no documento. A tabela de distribuição da NT 2014.002 não disponibiliza ao emitente o evento de cancelamento da própria NF-e por esse serviço. Portanto, atingir `ultNSU == maxNSU` não comprova que todos os cancelamentos das notas emitidas pela Yorozu foram registrados localmente.
+
+Para essas notas, importe o XML do evento de cancelamento ou registre a marcação administrativa com base em evidência externa. Importar novamente apenas o XML original da NF-e não acrescenta um evento ausente. O AtlasDFE não possui integração automática com a API do Synchro.
+
+Referência: [NT 2014.002 — tabela de documentos distribuídos](https://www.nfe.fazenda.gov.br/Portal/exibirArquivo.aspx?AspxAutoDetectCookieSupport=1&conteudo=155Wx5%2FJB5A%3D).
 
 ## Evidência dos testes noturnos
 
@@ -78,5 +86,3 @@ Antes de integrar, obter do fornecedor: contratação/habilitação, endpoint co
 ## Análise de incidentes
 
 Em 656 ou divergência: preservar banco e logs, respeitar a próxima tentativa indicada e reunir horário/fuso, etapa, NSU inicial/enviado/informado/salvo, código/motivo, lotes gravados e referência da execução. Verificar se há outra instância do AtlasDFE e solicitar ao Qive confirmação da janela efetivamente ativa. Não apagar pendências, zerar cursor ou alternar bancos para contornar o bloqueio.
-
-<!-- 2.6.0 -->

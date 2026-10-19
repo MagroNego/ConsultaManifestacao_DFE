@@ -16,6 +16,7 @@ O endereço padrão é `127.0.0.1:8080`. Para acesso interno, use HTTPS por reve
 | --- | --- |
 | `NFE_WEB_ENV` | `production` no lançador Windows |
 | `NFE_WEB_HOST` / `NFE_WEB_PORT` | `127.0.0.1` / `8080` |
+| `NFE_WEB_ROOT_PATH` | Prefixo da aplicação quando publicada em subcaminho pelo proxy |
 | `NFE_WEB_FORWARDED_ALLOW_IPS` | `127.0.0.1`; somente proxies confiáveis |
 | `NFE_DATABASE_PATH` | Caminho alternativo ao padrão; `secrets/db-path.txt` salvo pelo Admin prevalece |
 | `NFE_WEB_LOCAL_AUTH` | `0`: sem login; `1`: modo legado com contas locais |
@@ -33,7 +34,7 @@ A janela é fixa: **22:00 ≤ horário ou horário < 04:00**, Brasília (UTC−3
 
 ## Autenticação e segredos
 
-O acesso padrão dispensa login local, cadastro e senha de administrador (`NFE_WEB_LOCAL_AUTH=0`). Todos os acessos de rede têm permissão administrativa. A autenticação e a autorização devem ser configuradas pelo TI no proxy/infraestrutura. Não são interpretados cabeçalhos de identidade para conceder perfis nesse modo. A auditoria local usa a identidade compartilhada `acesso-rede`; a identificação individual depende dos registros da infraestrutura. CSRF, limites de upload, trava e janela SEFAZ permanecem ativos.
+O acesso padrão dispensa login local, cadastro e senha de administrador (`NFE_WEB_LOCAL_AUTH=0`). Todos os acessos de rede têm permissão administrativa. A autenticação e a autorização devem ser configuradas pelo TI no proxy/infraestrutura. Não são interpretados cabeçalhos de identidade para conceder perfis nesse modo. `NFE_WEB_AUTH_MODE` e cabeçalhos de identidade não habilitam autenticação no modo padrão. As rotas de login, cadastro e gerenciamento de contas retornam 404. A auditoria local usa a identidade compartilhada `acesso-rede`; a identificação individual depende dos registros da infraestrutura. CSRF, limites de upload, trava e janela SEFAZ permanecem ativos.
 
 O modo legado de contas pode ser reativado explicitamente com `NFE_WEB_LOCAL_AUTH=1` e reinício; nesse modo são usados os registros e sessões de `dados/admin_accounts.db`. Não é necessário executar `CONFIGURAR_ADMIN.cmd` no modo padrão. Os dados de contas existentes são preservados sem serem abertos ou alterados no modo sem login.
 
@@ -91,9 +92,9 @@ A fila `notificacoes_email` persiste no banco fiscal. Somente `210240` gera novo
 
 ## Exportações, logs e continuidade
 
-- Geração: duas tarefas simultâneas, até 16 em espera, timeout de cinco minutos. Fila cheia retorna 429; espera expirada, 503; `Retry-After: 15`.
+- Geração: duas tarefas simultâneas, até 16 em espera, limite de cinco minutos de espera por vaga (não é limite da duração da geração). Fila cheia retorna 429; espera expirada, 503; `Retry-After: 15`.
 - Interface solicita geração em segundo plano com HTTP 202 e consulta estado a cada dois segundos. Estados/tarefas em andamento não persistem após reiniciar.
 - Cancelamento mantém a vaga até encerrar o trabalho; verifica SQL e linhas. A gravação final do Excel pode terminar antes da limpeza.
 - Arquivos prontos ficam em `dados/downloads` por 24 horas. Downloads prontos não entram na fila de geração.
-- Auditoria: `logs/web_audit.log` e rotação. Histórico de sincronização: retenção de 30 dias. Registros administrativos seguem a rotação por tamanho.
+- Auditoria: `logs/web_audit.log` e rotação. Ações de sincronização são descartadas após 30 dias; a rotação por tamanho pode removê-las antes. Arquivos de até 5 MiB, com cinco cópias; demais ações seguem essa rotação.
 - Backup completo é manual. Consulte [Banco e backup](SEGURANCA_BANCO.md).

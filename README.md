@@ -1,6 +1,8 @@
 # AtlasDFE
 
-Aplicação Web para consulta local de manifestações de NF-e, importação de dados de XML e geração de relatórios Excel/CSV. A sincronização usa o serviço `NFeDistribuicaoDFe` do Ambiente Nacional.
+Aplicação Web interna para consulta de manifestações de NF-e, importação de dados de XML e geração de relatórios Excel/CSV. Desenvolvida em Python, FastAPI e SQLite/SQLCipher. A captura de eventos usa `NFeDistribuicaoDFe`; consultas e relatórios usam o banco local.
+
+Documentação revisada em **19/10/2026** para o código da `main`, versão declarada **2.6.0**. O ZIP da release `v2.6.0` foi publicado antes das últimas alterações e não é atualizado automaticamente. Identifique a instalação pelo commit, além do número da versão.
 
 ## Operação
 
@@ -24,14 +26,19 @@ A interface e os testes locais também executam em Linux. O transporte SEFAZ e a
 
 ## Instalação Windows
 
-Extraia o ZIP de [Releases](https://github.com/MagroNego/ConsultaManifestacao_DFE/releases) em pasta definitiva. Execute no PowerShell dessa pasta:
+Para instalar o estado descrito nesta documentação, obtenha a `main` por Git e execute na pasta do projeto:
 
 ```powershell
+git clone --branch main https://github.com/MagroNego/ConsultaManifestacao_DFE.git
+Set-Location ConsultaManifestacao_DFE
 .\INSTALAR.cmd
+$env:NFE_AUTO_SYNC_ENABLED = "0"
 .\INICIAR_WEB.cmd
 ```
 
-Acesse `http://127.0.0.1:8080`. Abra Admin e configure o banco de manifestações existente e o certificado A1. As credenciais, o certificado e o banco fiscal não acompanham o pacote. Procedimento completo: [Instalação](MANUAL_DE_INSTALACAO.md).
+O comando acima desativa a agenda inicial em uma instalação nova. Uma agenda já salva em `secrets/auto-sync.json` prevalece.
+
+Acesse `http://127.0.0.1:8080`. Abra Admin e configure o banco de manifestações existente e o certificado A1. As credenciais, o certificado e o banco fiscal não acompanham o pacote. O Admin também abre sem senha: a restrição de acesso deve existir na infraestrutura do TI. Procedimento completo: [Instalação](MANUAL_DE_INSTALACAO.md).
 
 ## Recursos
 
@@ -43,6 +50,8 @@ Acesse `http://127.0.0.1:8080`. Abra Admin e configure o banco de manifestaçõe
 - Remetente SMTP configurável e e-mail de teste.
 
 Consultas, importações e relatórios trabalham no banco local. O AtlasDFE não transmite manifestações ou cancelamentos. Novos XMLs são processados e os dados necessários ficam no banco; o original deve ser obtido no Synchro. Respostas SEFAZ pendentes de processamento são preservadas temporariamente.
+
+O app não consulta a situação fiscal atual de cada nota. O rótulo **Autorizada** significa ausência de cancelamento no banco local. Cancelamentos de emissão própria precisam de uma fonte adicional, como o XML do evento; o lote de XMLs originais não comprova a situação atual. Veja [Situação e CT-e](MANUAL_DE_USO.md#situação-e-ct-e).
 
 ## Distribuição e Qive
 
@@ -56,7 +65,7 @@ Os detalhes do atendimento, o comportamento do cursor, os resultados das duas no
 | --- | --- |
 | [Leia primeiro](LEIA_PRIMEIRO.md) | Sequência inicial |
 | [Instalação](MANUAL_DE_INSTALACAO.md) | Requisitos, instalação, configuração e atualização |
-| [Uso](MANUAL_DE_USO.md) | Telas, relatórios, contas e diagnóstico |
+| [Uso](MANUAL_DE_USO.md) | Telas, relatórios, importação e diagnóstico |
 | [Distribuição DF-e e Qive](DISTRIBUICAO_DFE_QIVE.md) | Janelas, NSU, 656, consNSU e informações do suporte |
 | [Servidor Web](SERVIDOR_WEB.md) | Processo, rede, variáveis e SMTP |
 | [Banco e backup](SEGURANCA_BANCO.md) | Arquivos persistentes, backup e restauração |
