@@ -9,7 +9,7 @@
   </div>
 </section>
 <div class="actions">
-  <a class="button secondary" href="{{ url_for('admin_accounts_page') }}">Gerenciar usuários</a>
+  {% if request.app.state.settings.local_auth_enabled %}<a class="button secondary" href="{{ url_for('admin_accounts_page') }}">Gerenciar usuários</a>{% endif %}
   <a class="button secondary" href="{{ url_for('admin_history_page') }}">Histórico administrativo</a>
 </div>
 

@@ -4,12 +4,12 @@
 
 1. Instale Python 3.11+ com o Python Launcher (`py`).
 2. Extraia o pacote em uma pasta definitiva.
-3. Execute `INSTALAR.cmd` e depois `CONFIGURAR_ADMIN.cmd`.
+3. Execute `INSTALAR.cmd`.
 4. Execute `INICIAR_WEB.cmd` e acesse `http://127.0.0.1:8080`.
-5. Entre como administrador; configure o banco de manifestações existente e o certificado A1.
+5. Abra **Admin**; configure o banco de manifestações existente e o certificado A1.
 6. Confira **Status** e, se necessário, configure **Admin → Alertas por e-mail**.
 
-Usuários comuns usam **Criar minha conta** e escolhem sua própria senha. Todas as telas de dados exigem login.
+O app não exige login ou senha de administrador. O TI deve controlar o acesso ao endereço, incluindo a área Admin.
 
 ## Rotina
 

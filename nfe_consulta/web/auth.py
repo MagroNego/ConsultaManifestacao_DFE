@@ -43,12 +43,17 @@ def _session_username(token: str, settings: WebSettings, accounts: AdminAccounts
 
 def admin_session_active(request: Request) -> bool:
     settings: WebSettings = request.app.state.settings
+    if not settings.local_auth_enabled:
+        return False
     token = request.cookies.get(settings.admin_cookie_name, "")
     return _session_username(token, settings, request.app.state.admin_accounts) is not None
 
 
 def current_user(request: Request) -> WebUser:
     settings: WebSettings = request.app.state.settings
+    if not settings.local_auth_enabled:
+        # Identidade técnica compartilhada; acesso de rede controlado pelo TI.
+        return WebUser("acesso-rede", "Acesso de rede", True, "acesso-rede", "admin")
 
     identity = request.app.state.admin_accounts.session_identity(
         request.cookies.get(settings.admin_cookie_name, ""),

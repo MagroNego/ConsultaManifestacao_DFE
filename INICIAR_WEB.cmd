@@ -21,3 +21,4 @@ if not exist "%PYTHON_EXE%" (
 
 "%PYTHON_EXE%" -m nfe_consulta.web.app
 
+rem 2.6.0

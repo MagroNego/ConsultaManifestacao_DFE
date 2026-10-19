@@ -7,6 +7,7 @@ from nfe_consulta.web import settings
 
 
 def test_web_settings_usa_senhas_da_pasta_secrets_e_ignora_env(tmp_path, monkeypatch):
+    monkeypatch.setenv("NFE_WEB_LOCAL_AUTH", "1")
     secrets_dir = tmp_path / "secrets"
     secrets_dir.mkdir()
 

@@ -36,3 +36,4 @@ include = ["nfe_consulta*"]
 testpaths = ["tests"]
 pythonpath = ["."]
 
+# 2.6.0

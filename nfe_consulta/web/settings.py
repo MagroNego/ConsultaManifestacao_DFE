@@ -101,6 +101,7 @@ class WebSettings:
     admin_session_minutes: int = 30
     admin_cookie_name: str = "nfe_admin_session"
     admin_accounts_path: Path | None = None
+    local_auth_enabled: bool = False
     certificate_path_file: Path | None = None
     certificate_password_file: Path | None = None
     database_path_file: Path | None = None
@@ -160,8 +161,9 @@ def get_settings() -> WebSettings:
     elif not csrf_secret:
         csrf_secret = secrets.token_urlsafe(32)
 
-    admin_password = _senha_admin()
-    admin_username = _usuario_admin()
+    local_auth_enabled = os.getenv("NFE_WEB_LOCAL_AUTH", "0").strip() == "1"
+    admin_password = _senha_admin() if local_auth_enabled else None
+    admin_username = _usuario_admin() if local_auth_enabled else "admin"
     if admin_password and not 12 <= len(admin_password) <= 1024:
         raise RuntimeError("A senha do administrador deve ter entre 12 e 1024 caracteres.")
     accounts_path = Path(os.getenv("NFE_ADMIN_ACCOUNTS_PATH", str(RAIZ_PROJETO / "dados" / "admin_accounts.db"))).expanduser()
@@ -248,6 +250,7 @@ def get_settings() -> WebSettings:
         audit_log=audit,
         sync_cooldown_minutes=60,
         admin_username=admin_username,
+        local_auth_enabled=local_auth_enabled,
         admin_password=admin_password,
         admin_accounts_path=accounts_path,
         admin_session_minutes=admin_session_minutes,

@@ -22,11 +22,10 @@ Extraia o pacote em `C:\AtlasDFE` ou outra pasta definitiva com permissão de es
 Set-Location C:\AtlasDFE
 py --version
 .\INSTALAR.cmd
-.\CONFIGURAR_ADMIN.cmd
 .\INICIAR_WEB.cmd
 ```
 
-`INSTALAR.cmd` cria `.venv`, instala as dependências e prepara `dados`, `secrets` e `logs`. `CONFIGURAR_ADMIN.cmd` solicita usuário e senha de pelo menos 12 caracteres, grava o hash e preserva as outras contas. Em banco de contas existente, cria um backup antes da alteração.
+`INSTALAR.cmd` cria `.venv`, instala as dependências e prepara `dados`, `secrets` e `logs`. O acesso não exige conta ou senha local, inclusive no Admin; o TI deve restringir o acesso na infraestrutura.
 
 O lançador inicia em produção, gera `secrets/web-csrf-secret.txt` se necessário e ativa a sincronização automática quando a variável não foi definida. Para configurar inicialmente sem disparos automáticos:
 
@@ -37,7 +36,7 @@ $env:NFE_AUTO_SYNC_ENABLED = "0"
 
 ## Configuração inicial
 
-1. Acesse `http://127.0.0.1:8080` e entre com a conta administrativa.
+1. Acesse `http://127.0.0.1:8080` e abra **Admin**.
 2. Em **Admin**, selecione o banco fiscal existente. O caminho padrão é `dados/nfe_manifestacoes_seguro.db`; a seleção salva em `secrets/db-path.txt` prevalece.
 3. Para SQLCipher, disponibilize a senha em `secrets/db-password.txt`. Usuários comuns não informam essa senha.
 4. Configure o certificado A1 por arquivo ou repositório Windows. O arquivo PFX/P12 permanece no caminho selecionado; não é copiado para o projeto.
@@ -74,7 +73,6 @@ python3 -m venv .venv
 .venv/bin/python -m pip install -e .
 mkdir -p secrets dados logs
 chmod 700 secrets dados logs
-.venv/bin/python -m nfe_consulta.web.configure_admin
 .venv/bin/python -c "from pathlib import Path; import secrets; p=Path('secrets/web-csrf-secret.txt'); p.exists() or p.write_text(secrets.token_urlsafe(48), encoding='utf-8')"
 chmod 600 secrets/*
 env NFE_WEB_ENV=production NFE_AUTO_SYNC_ENABLED=0 NFE_RECOVERY_ENABLED=0 .venv/bin/python -m nfe_consulta.web.app
@@ -103,7 +101,7 @@ Se houver alterações locais ou divergência, resolva-as antes de atualizar; n�
 4. Preserve `dados`, `secrets`, `logs`, certificado, entradas e saídas. Preserve `.venv` e atualize suas dependências pelo instalador.
 5. Execute `INSTALAR.cmd` e reinicie com `INICIAR_WEB.cmd`.
 
-Em ambos os métodos, confira login, versão, banco, certificado e cursores. Use `Ctrl+F5` no navegador para recarregar os recursos da interface. Não zere o NSU nem apague pendências para validar a atualização. Remova lançadores de teste antigos e variáveis de agendamento legadas descritas em [Servidor Web](SERVIDOR_WEB.md).
+Em ambos os métodos, confira acesso, versão, banco, certificado e cursores. Use `Ctrl+F5` no navegador para recarregar os recursos da interface. Não zere o NSU nem apague pendências para validar a atualização. Remova lançadores de teste antigos e variáveis de agendamento legadas descritas em [Servidor Web](SERVIDOR_WEB.md).
 
 ## Diagnóstico de instalação
 

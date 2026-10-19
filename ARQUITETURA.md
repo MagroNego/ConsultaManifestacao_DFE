@@ -5,7 +5,7 @@
 | Módulo | Responsabilidade |
 | --- | --- |
 | `web/app.py` | Rotas, middleware, autorização e coordenação |
-| `web/auth.py`, `web/admin_accounts.py` | Contas, hash de senha, sessões e CSRF |
+| `web/auth.py`, `web/admin_accounts.py` | Identidade técnica de rede, CSRF e compatibilidade opcional com contas legadas |
 | `web/consulta_local.py` | Consultas e filtros locais |
 | `web/scheduler.py`, `web/auto_sync_config.py`, `web/sync_runtime.py` | Agendamento, trava, cooldown e configuração |
 | `janela_consulta.py` | Restrição de horário antes das chamadas externas |
@@ -27,7 +27,7 @@ Respostas `distNSU` são persistidas antes do parser. A confirmação de process
 
 Importação usa a trava compartilhada com sincronização e não altera cursor. Cancelamentos homologados e marcações administrativas alimentam a situação local; remoção de marcação manual não desfaz evento da SEFAZ. CT-e é armazenado em `eventos_cte`, separado de manifestações. A ausência de vínculo não prova inexistência de conhecimento.
 
-Contas, perfis e sessões ficam em SQLite separado. A migração adiciona e-mail opcional às contas antigas e um índice único sem distinção de maiúsculas. Novos cadastros Web exigem e-mail; autenticação aceita e-mail ou username e preserva username como identidade da sessão/auditoria. Conflitos entre usernames existentes e e-mails são recusados. Alterar e-mail revoga sessões. O vínculo ainda não possui confirmação de propriedade por mensagem. Senhas usam PBKDF2; tokens de sessão, SHA-256. Alterações de acesso revogam sessões e preservam o último administrador ativo. Cadastro próprio sempre gera perfil comum. Toda rota de dados exige autenticação; rotas administrativas validam perfil no servidor.
+Por padrão, não há login ou cadastro local. `current_user` fornece a identidade técnica compartilhada `acesso-rede`, com permissão administrativa, sem cookies de sessão. A autenticação fica a cargo da infraestrutura do TI. As rotas de contas respondem 404 e o banco de contas não é aberto. CSRF continua validado no servidor. O modo legado de contas está disponível somente com `NFE_WEB_LOCAL_AUTH=1`; nesse caso, preserva PBKDF2, sessões e perfis existentes.
 
 ## Concorrência e agendamento
 
@@ -52,3 +52,5 @@ Importação verifica estrutura mínima e consistência de campos; não valida a
 A CI executa testes sintéticos em Windows/Linux. Comunicação real SEFAZ, certificado da instalação, entrega SMTP e convivência com Qive dependem de validação operacional. Aceitação SMTP e confirmação no banco não formam transação única; pode ocorrer duplicidade após interrupção.
 
 O empacotador usa lista explícita de arquivos, sem dados/segredos. A publicação requer CI aprovada e cria ZIP/checksum somente quando a versão ainda não possui release. Código novo na main não substitui ZIP já publicado com a mesma versão.
+
+<!-- 2.6.0 -->

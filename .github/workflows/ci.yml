@@ -71,3 +71,4 @@ jobs:
         shell: pwsh
         run: python -m pytest -q
 
+# 2.6.0

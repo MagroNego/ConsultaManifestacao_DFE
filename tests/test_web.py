@@ -22,6 +22,7 @@ CHAVE = "33260812345678000199550010000917791147439711"
 
 def settings_web(tmp_path, *, admin=False, auth_mode="dev", admin_users=frozenset()):
     return WebSettings(
+        local_auth_enabled=True,
         environment="development",
         auth_mode=auth_mode,
         user_header="X-NFE-User",

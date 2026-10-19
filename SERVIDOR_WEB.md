@@ -6,7 +6,7 @@ Execute **um processo com um worker**, usando banco preferencialmente em disco l
 
 O endereço padrão é `127.0.0.1:8080`. Para acesso interno, use HTTPS por reverse proxy e limite o acesso de rede aos usuários autorizados. A conta do serviço precisa ler certificado/segredos e gravar banco e pastas operacionais. Configure inicialização e reinício pelo gerenciador de serviços do sistema operacional; o pacote não instala automaticamente um serviço.
 
-`GET /healthz` retorna estado básico e versão, sem verificar disponibilidade do banco fiscal. Teste também login e Status após implantação.
+`GET /healthz` retorna estado básico e versão, sem verificar disponibilidade do banco fiscal. Teste também acesso e Status após implantação.
 
 ## Configuração do processo
 
@@ -18,6 +18,7 @@ O endereço padrão é `127.0.0.1:8080`. Para acesso interno, use HTTPS por reve
 | `NFE_WEB_HOST` / `NFE_WEB_PORT` | `127.0.0.1` / `8080` |
 | `NFE_WEB_FORWARDED_ALLOW_IPS` | `127.0.0.1`; somente proxies confiáveis |
 | `NFE_DATABASE_PATH` | Caminho alternativo ao padrão; `secrets/db-path.txt` salvo pelo Admin prevalece |
+| `NFE_WEB_LOCAL_AUTH` | `0`: sem login; `1`: modo legado com contas locais |
 | `NFE_ADMIN_ACCOUNTS_PATH` | Banco de contas; padrão `dados/admin_accounts.db` |
 | `NFE_ADMIN_SESSION_MINUTES` | Inatividade: 30 minutos; faixa aceita 5–480 |
 | `NFE_AUTO_SYNC_ENABLED` | `1` no lançador; `0` quando app iniciado diretamente sem configuração |
@@ -32,7 +33,9 @@ A janela é fixa: **22:00 ≤ horário ou horário < 04:00**, Brasília (UTC−3
 
 ## Autenticação e segredos
 
-Login obrigatório para todas as telas de dados. Cadastro próprio libera acesso comum imediatamente; Admin, importação e configuração exigem perfil administrativo. Senhas são hashes, sessões persistem no banco de contas e são revogadas em alterações de acesso. Cookies usam `HttpOnly`, `SameSite=Strict` e `Secure` quando a requisição é HTTPS. Formulários possuem CSRF vinculado à sessão.
+O acesso padrão dispensa login local, cadastro e senha de administrador (`NFE_WEB_LOCAL_AUTH=0`). Todos os acessos de rede têm permissão administrativa. A autenticação e a autorização devem ser configuradas pelo TI no proxy/infraestrutura. Não são interpretados cabeçalhos de identidade para conceder perfis nesse modo. A auditoria local usa a identidade compartilhada `acesso-rede`; a identificação individual depende dos registros da infraestrutura. CSRF, limites de upload, trava e janela SEFAZ permanecem ativos.
+
+O modo legado de contas pode ser reativado explicitamente com `NFE_WEB_LOCAL_AUTH=1` e reinício; nesse modo são usados os registros e sessões de `dados/admin_accounts.db`. Não é necessário executar `CONFIGURAR_ADMIN.cmd` no modo padrão. Os dados de contas existentes são preservados sem serem abertos ou alterados no modo sem login.
 
 `INICIAR_WEB.cmd` gera `secrets/web-csrf-secret.txt` quando ausente. Em outros lançadores, forneça esse arquivo ou `NFE_WEB_CSRF_SECRET`, com pelo menos 32 caracteres aleatórios. Preserve o segredo entre reinícios.
 
@@ -48,7 +51,7 @@ Login obrigatório para todas as telas de dados. Cadastro próprio libera acesso
 | `secrets/smtp-sender.json` | Remetente e usuário salvos pela interface |
 | `secrets/email-recipients.json` | Destinatários cadastrados |
 
-A senha de acesso fica no banco de contas como hash, não em arquivo de senha de administrador. `NFE_DATABASE_PASSWORD`, `NFE_CERT_PASSWORD` e `NFE_ADMIN_PASSWORD` não são fontes de senha. Restrinja permissões NTFS/Unix das pastas operacionais.
+No modo legado de contas, a senha de acesso fica no banco de contas como hash. No modo padrão nenhuma senha administrativa é carregada. `NFE_DATABASE_PASSWORD`, `NFE_CERT_PASSWORD` e `NFE_ADMIN_PASSWORD` não são fontes de senha. Restrinja permissões NTFS/Unix das pastas operacionais.
 
 ## Certificado e SEFAZ
 

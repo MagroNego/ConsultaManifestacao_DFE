@@ -20,3 +20,5 @@ if errorlevel 1 (
 )
 echo.
 pause
+
+rem 2.6.0

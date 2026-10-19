@@ -1,7 +1,8 @@
 # Exemplo de variáveis não sensíveis/operacionais.
 # INICIAR_WEB.cmd NÃO carrega este arquivo automaticamente.
 # Senhas do banco, certificado e SMTP: arquivos de secrets/.
-# Contas/senhas de acesso: hashes em dados/admin_accounts.db.
+# Acesso ao app e ao Admin controlado pelo TI na infraestrutura.
+NFE_WEB_LOCAL_AUTH=0
 
 NFE_WEB_ENV=production
 NFE_WEB_HOST=127.0.0.1

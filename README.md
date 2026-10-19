@@ -9,7 +9,7 @@ Aplicação Web para consulta local de manifestações de NF-e, importação de 
 | Runtime | Python 3.11+; CI com Python 3.12 |
 | Servidor | FastAPI/Uvicorn; um processo, um worker |
 | Banco fiscal | SQLite ou SQLCipher; caminho selecionado em Admin |
-| Acesso | Login por e-mail ou usuário; cadastro próprio com perfil comum |
+| Acesso | Sem login local; controle de acesso sob responsabilidade do TI |
 | Sincronização SEFAZ | Windows com PowerShell e certificado A1 |
 | Janela AtlasDFE | **22:00 inclusive até 04:00 exclusiva, Brasília (UTC−3)** |
 | Disparos automáticos | **22:00, 23:00, 00:00, 01:00, 02:00 e 03:00** por padrão; configuráveis no Admin |
@@ -28,11 +28,10 @@ Extraia o ZIP de [Releases](https://github.com/MagroNego/ConsultaManifestacao_DF
 
 ```powershell
 .\INSTALAR.cmd
-.\CONFIGURAR_ADMIN.cmd
 .\INICIAR_WEB.cmd
 ```
 
-Acesse `http://127.0.0.1:8080`. Entre com a conta administrativa e configure o banco de manifestações existente e o certificado A1. As credenciais, o certificado e o banco fiscal não acompanham o pacote. Procedimento completo: [Instalação](MANUAL_DE_INSTALACAO.md).
+Acesse `http://127.0.0.1:8080`. Abra Admin e configure o banco de manifestações existente e o certificado A1. As credenciais, o certificado e o banco fiscal não acompanham o pacote. Procedimento completo: [Instalação](MANUAL_DE_INSTALACAO.md).
 
 ## Recursos
 
@@ -41,7 +40,7 @@ Acesse `http://127.0.0.1:8080`. Entre com a conta administrativa e configure o b
 - Consulta por TXT de chaves ou números de notas, exportação de todas as páginas filtradas e Downloads.
 - Vínculos de CT-e recebidos por eventos, com os campos efetivamente disponíveis.
 - Sincronização automática e manual administrativa, cursor NSU e diagnóstico de falhas.
-- Contas comuns, administração de usuários, remetente SMTP e e-mail de teste.
+- Remetente SMTP configurável e e-mail de teste.
 
 Consultas, importações e relatórios trabalham no banco local. O AtlasDFE não transmite manifestações ou cancelamentos. Novos XMLs são processados e os dados necessários ficam no banco; o original deve ser obtido no Synchro. Respostas SEFAZ pendentes de processamento são preservadas temporariamente.
 

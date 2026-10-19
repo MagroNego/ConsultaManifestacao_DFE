@@ -287,7 +287,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         settings.admin_accounts_path or settings.database_path.parent / "admin_accounts.db",
         bootstrap_username=settings.admin_username,
         bootstrap_password=settings.admin_password,
-    )
+    ) if settings.local_auth_enabled else None
     app.state.login_attempts = {}
     app.state.login_lock = threading.Lock()
     app.state.email_test_next_at = 0.0
@@ -337,6 +337,12 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
     @app.middleware("http")
     async def security_headers(request: Request, call_next):
         path = request.url.path
+        if not settings.local_auth_enabled and (
+            path in {"/login", "/cadastro", "/admin/login", "/admin/logout", "/admin/contas"}
+            or path.startswith("/admin/contas/")
+        ):
+            return JSONResponse({"detail": "Recurso de contas locais desativado."}, status_code=404,
+                headers={"Cache-Control": "no-store"})
         protected = (path.startswith("/atualizar") or
                      (path.startswith("/admin/") and path not in {"/admin/login", "/admin/logout"}) or
                      path == "/xml/importar" or path.startswith("/xml/lote/"))

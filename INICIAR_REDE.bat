@@ -25,3 +25,5 @@ if errorlevel 1 (
     pause
     exit /b 1
 )
+
+rem 2.6.0

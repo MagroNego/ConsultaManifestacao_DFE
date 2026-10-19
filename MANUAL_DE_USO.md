@@ -1,23 +1,18 @@
 # Operação do AtlasDFE
 
-## Acesso e perfis
+## Acesso
 
-Todas as telas de dados exigem login. **Criar minha conta** exige e-mail único, usuário e senha de pelo menos 12 caracteres; o cadastro libera imediatamente o perfil comum. É possível entrar pelo e-mail ou pelo usuário. O vínculo cadastral não confirma a propriedade da caixa postal e não envia mensagem de verificação. A criação de conta é acessível a quem alcançar a aplicação na rede.
+A aplicação abre diretamente, sem login, cadastro ou senha de administrador. Quem alcançar o endereço tem acesso também ao Admin, importações e configurações. A autenticação e as restrições de rede ficam sob responsabilidade do TI, no proxy ou na infraestrutura.
 
-| Perfil | Permissões |
-| --- | --- |
-| Usuário comum | Consulta, Status, Emissão, relatórios e Downloads |
-| Administrador | Permissões comuns, importação, sincronização manual, configuração e gestão de contas |
+As ações são registradas com a identidade técnica compartilhada `acesso-rede`; o AtlasDFE não identifica individualmente os operadores nesse modo. A identificação individual deve ser mantida pela infraestrutura do TI. As contas antigas não são apagadas, mas deixam de ser utilizadas.
 
-Em **Admin → Gerenciar usuários**, o administrador pode cadastrar, alterar perfil, redefinir senha, ativar, desativar ou excluir contas. Mudanças de acesso revogam sessões. A exclusão exige confirmação e preserva dados fiscais e auditoria. O último administrador ativo é protegido. Contas antigas continuam entrando pelo usuário; o administrador pode vincular um e-mail em Gerenciar usuários. Alterar o endereço encerra as sessões da conta. O e-mail de acesso não é adicionado automaticamente aos destinatários dos alertas.
-
-Senhas atuais não são recuperáveis: ficam armazenadas como hash. Nos campos de senha inicial e nova senha, Mostrar/Ocultar permite conferir somente o valor digitado antes de salvar.
+As senhas do banco SQLCipher, certificado e SMTP continuam necessárias. Formulários mantêm a validação CSRF e as consultas à SEFAZ continuam limitadas à janela das 22h às 04h, com cooldown e trava.
 
 ## Consulta de manifestações
 
 Filtre por data do evento, número da nota, chave, manifestação e situação. A data final inclui o dia inteiro. As páginas mostram até 100 registros. Emitente sem nome disponível é identificado pelo CNPJ extraído da chave.
 
-**Exportar Excel** inclui todas as páginas dos filtros aplicados, até 200 mil eventos. Chaves, protocolos e NSUs são texto. A consulta por TXT oferece **CHAVES.txt** (uma chave de 44 dígitos por linha) e **notas.txt** (um número de NF de 1 a 9 dígitos por linha). Ambas usam exclusivamente o histórico local, com limite de 10 mil entradas e 2 MB. O ícone de interrogação abre o tutorial.
+**Exportar Excel** inclui todas as páginas dos filtros aplicados, até 200 mil eventos. Chaves, protocolos e NSUs são texto. A consulta por TXT oferece **CHAVES.txt** (uma chave de 44 dígitos por linha) e **NOTAS.txt** (um número de NF de 1 a 9 dígitos por linha). Ambas usam exclusivamente o histórico local, com limite de 10 mil entradas e 2 MB. O ícone de interrogação abre o tutorial.
 
 Para números, salve um TXT UTF-8, sem cabeçalho, série ou pontuação:
 

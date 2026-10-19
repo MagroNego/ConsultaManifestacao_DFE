@@ -78,3 +78,5 @@ Antes de integrar, obter do fornecedor: contratação/habilitação, endpoint co
 ## Análise de incidentes
 
 Em 656 ou divergência: preservar banco e logs, respeitar a próxima tentativa indicada e reunir horário/fuso, etapa, NSU inicial/enviado/informado/salvo, código/motivo, lotes gravados e referência da execução. Verificar se há outra instância do AtlasDFE e solicitar ao Qive confirmação da janela efetivamente ativa. Não apagar pendências, zerar cursor ou alternar bancos para contornar o bloqueio.
+
+<!-- 2.6.0 -->

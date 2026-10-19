@@ -46,3 +46,5 @@ def package(root: Path) -> Path:
 
 if __name__ == "__main__":
     print(package(Path(__file__).resolve().parents[1]))
+
+# 2.6.0

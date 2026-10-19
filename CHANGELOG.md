@@ -1,5 +1,11 @@
 # Histórico de versões
 
+## 2.6.0 — acesso pela infraestrutura
+
+- Login, cadastro, gerenciamento de usuários e senha administrativa desativados por padrão. Controle de acesso delegado ao TI; contas antigas preservadas.
+- CSRF, janela SEFAZ, cooldown e travas mantidos.
+
+
 ## Em preparação
 
 - ZIPs aceitam subpastas relativas com dois-pontos em horários; mantém recusa de caminhos absolutos, travessia e links, sem extração para o filesystem. Registro de lote passa a detalhar o motivo de caminho recusado.
@@ -103,3 +109,5 @@
 ## 2.0.0
 
 - Interface Web com administração centralizada e consulta ao histórico local.
+
+<!-- 2.6.0 -->
