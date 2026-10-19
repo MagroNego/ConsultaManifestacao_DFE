@@ -163,7 +163,9 @@ async def executar_sincronizacao_automatica(
     janela_agendada: datetime | None = None,
 ) -> datetime | None:
     """Executa uma sincronização automática respeitando lock, cooldown e persistência."""
-    settings = app.state.settings
+    settings = getattr(app.state, "scheduler_settings", app.state.settings)
+    if not getattr(settings, "auto_sync_enabled", True):
+        return None
     dia = dia_agendado or datetime.now().astimezone().date()
 
     lock = app.state.sync_lock
@@ -209,7 +211,7 @@ async def executar_sincronizacao_automatica(
                 reason=type(exc).__name__,
                 **detalhes_erro(exc),
             )
-            return proxima_abertura(janelas_diarias(agora_brasilia())[1])
+            return proxima_abertura(janelas_diarias(agora_brasilia(), times=getattr(settings, "auto_sync_times", None), weekdays=getattr(settings, "auto_sync_weekdays", tuple(range(7))))[1])
 
         try:
             if resumo.completo:
@@ -222,7 +224,7 @@ async def executar_sincronizacao_automatica(
                 "sefaz_sync_auto", "erro",
                 reason=f"schedule_state_{type(exc).__name__}",
             )
-            return proxima_abertura(janelas_diarias(agora_brasilia())[1])
+            return proxima_abertura(janelas_diarias(agora_brasilia(), times=getattr(settings, "auto_sync_times", None), weekdays=getattr(settings, "auto_sync_weekdays", tuple(range(7))))[1])
 
         app.state.audit.write_system(
             "sefaz_sync_auto",
@@ -247,7 +249,7 @@ async def executar_sincronizacao_automatica(
 
 async def executar_sincronizacao_unica(app, dia: date) -> None:
     """Registra a tentativa antes da chamada para não repetir após reinício."""
-    settings = app.state.settings
+    settings = getattr(app.state, "scheduler_settings", app.state.settings)
     try:
         if await asyncio.to_thread(ultima_execucao_agendada, settings) == dia:
             return
@@ -263,7 +265,7 @@ async def executar_sincronizacao_unica(app, dia: date) -> None:
 
 async def loop_sincronizacao_automatica(app) -> None:
     """Executa uma data única ou mantém a rotina diária opcional."""
-    settings = app.state.settings
+    settings = getattr(app.state, "scheduler_settings", app.state.settings)
     if settings.auto_sync_once_date is not None:
         # A execução de data única usa o horário de Brasília.
         alvo = horario_unico(
@@ -283,17 +285,26 @@ async def loop_sincronizacao_automatica(app) -> None:
         return
 
     while True:
+        settings = getattr(app.state, "scheduler_settings", app.state.settings)
+        if not getattr(settings, "auto_sync_enabled", True):
+            app.state.auto_sync_next_at = None
+            await _wait_schedule(app, 60.0)
+            continue
         agora = agora_brasilia()
+        janela, proxima = janelas_diarias(agora, times=getattr(settings, "auto_sync_times", None), weekdays=getattr(settings, "auto_sync_weekdays", tuple(range(7))))
         abertura = proxima_abertura(agora)
         if abertura > agora:
-            app.state.auto_sync_next_at = abertura
-            await asyncio.sleep(min(60.0, (abertura - agora).total_seconds()))
+            app.state.auto_sync_next_at = proxima
+            await _wait_schedule(app, min(60.0, (proxima - agora).total_seconds()))
             continue
-        janela, proxima = janelas_diarias(agora)
         recuperacao = await asyncio.to_thread(proxima_recuperacao_nsu, settings)
         adiada = None
         app.state.auto_sync_next_at = proxima
-        if janela.weekday() in settings.auto_sync_weekdays:
+        inicio = agora.replace(hour=22, minute=0, second=0, microsecond=0)
+        if agora.hour < 4:
+            inicio -= timedelta(days=1)
+        elegivel = janela >= inicio and agora.weekday() in settings.auto_sync_weekdays
+        if elegivel:
             try:
                 ultima = await asyncio.to_thread(ultima_janela_concluida, settings)
             except Exception as exc:
@@ -306,12 +317,14 @@ async def loop_sincronizacao_automatica(app) -> None:
             else:
                 if (ultima is None or ultima < janela
                         or (recuperacao is not None and recuperacao <= agora)):
+                    if settings is not getattr(app.state, "scheduler_settings", app.state.settings):
+                        continue
                     adiada = await executar_sincronizacao_automatica(app, janela_agendada=janela)
         agora = agora_brasilia()
         # Rejeições com cursor recuperável retomam após a pausa, sem esperar
         # pelo próximo disparo horário e sem repetir durante o bloqueio.
         recuperacao = await asyncio.to_thread(proxima_recuperacao_nsu, settings)
-        if recuperacao is not None:
+        if elegivel and recuperacao is not None:
             proxima = min(proxima, max(recuperacao, agora + timedelta(seconds=60)))
         if adiada is not None:
             # Uma tentativa bloqueada/erro de configuração também limita a
@@ -324,7 +337,7 @@ async def loop_sincronizacao_automatica(app) -> None:
         # aguarda a janela diária. Releia o banco sem consultar a SEFAZ.
         if recuperacao is None and adiada is None:
             espera = min(espera, 60.0)
-        await asyncio.sleep(espera)
+        await _wait_schedule(app, espera)
 
 
 def proxima_tentativa_permitida(settings) -> datetime | None:
@@ -359,19 +372,33 @@ def proxima_recuperacao_nsu(settings) -> datetime | None:
     return None
 
 
-def janelas_diarias(agora: datetime) -> tuple[datetime, datetime]:
-    """Disparos horários de 22h até 03h de Brasília; às 04h a janela fecha."""
+async def _wait_schedule(app, seconds):
+    wake = getattr(app.state, "auto_sync_wake", None)
+    if wake is None:
+        await asyncio.sleep(seconds)
+        return
+    try:
+        await asyncio.wait_for(wake.wait(), timeout=seconds)
+    except TimeoutError:
+        pass
+    finally:
+        wake.clear()
+
+
+def janelas_diarias(agora: datetime, *, times=None, weekdays=tuple(range(7))) -> tuple[datetime, datetime]:
+    """Último disparo e próximo disparo nos dias civis de Brasília selecionados."""
+    from nfe_consulta.web.auto_sync_config import DEFAULT_TIMES, validate_schedule
+    values = validate_schedule(True, times or DEFAULT_TIMES, weekdays)
     if agora.tzinfo is None:
         raise ValueError("O instante deve ter fuso horário.")
     agora = agora.astimezone(timezone(timedelta(hours=-3)))
     candidatos = sorted(
-        datetime.combine(agora.date() + timedelta(days=dia), time(hora), tzinfo=agora.tzinfo)
-        for dia in (-1, 0, 1) for hora in (0, 1, 2, 3, 22, 23)
+        datetime.combine(agora.date() + timedelta(days=day), time.fromisoformat(value), tzinfo=agora.tzinfo)
+        for day in range(-8, 9)
+        if (agora.date() + timedelta(days=day)).weekday() in values['auto_sync_weekdays']
+        for value in values['auto_sync_times']
     )
-    return (
-        max(instante for instante in candidatos if instante <= agora),
-        min(instante for instante in candidatos if instante > agora),
-    )
+    return max(value for value in candidatos if value <= agora), min(value for value in candidatos if value > agora)
 
 
 def janelas_intervalo(

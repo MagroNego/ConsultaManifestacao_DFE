@@ -207,7 +207,8 @@ def test_post_direto_durante_bloqueio_nao_consulta_sefaz(tmp_path, monkeypatch, 
 def test_agendamento_durante_bloqueio_nao_consulta_sefaz(tmp_path, monkeypatch, pausa):
     from nfe_consulta.config import CNPJ_PADRAO
     from nfe_consulta.web.scheduler import executar_sincronizacao_automatica
-    cfg = settings_web(tmp_path)
+    from dataclasses import replace
+    cfg = replace(settings_web(tmp_path), auto_sync_enabled=True)
     criar_banco(cfg.database_path)
     banco = BancoManifestacoes(str(cfg.database_path))
     if pausa:

@@ -2,14 +2,16 @@
 
 ## Acesso e perfis
 
-Todas as telas de dados exigem login. **Criar minha conta** permite escolher usuário e senha de pelo menos 12 caracteres; o cadastro libera imediatamente o perfil comum. A criação de conta é acessível a quem alcançar a aplicação na rede.
+Todas as telas de dados exigem login. **Criar minha conta** exige e-mail único, usuário e senha de pelo menos 12 caracteres; o cadastro libera imediatamente o perfil comum. É possível entrar pelo e-mail ou pelo usuário. O vínculo cadastral não confirma a propriedade da caixa postal e não envia mensagem de verificação. A criação de conta é acessível a quem alcançar a aplicação na rede.
 
 | Perfil | Permissões |
 | --- | --- |
 | Usuário comum | Consulta, Status, Emissão, relatórios e Downloads |
 | Administrador | Permissões comuns, importação, sincronização manual, configuração e gestão de contas |
 
-Em **Admin → Gerenciar usuários**, o administrador pode cadastrar, alterar perfil, redefinir senha, ativar, desativar ou excluir contas. Mudanças de acesso revogam sessões. A exclusão exige confirmação e preserva dados fiscais e auditoria. O último administrador ativo é protegido. Senhas atuais não são exibidas: ficam armazenadas como hash.
+Em **Admin → Gerenciar usuários**, o administrador pode cadastrar, alterar perfil, redefinir senha, ativar, desativar ou excluir contas. Mudanças de acesso revogam sessões. A exclusão exige confirmação e preserva dados fiscais e auditoria. O último administrador ativo é protegido. Contas antigas continuam entrando pelo usuário; o administrador pode vincular um e-mail em Gerenciar usuários. Alterar o endereço encerra as sessões da conta. O e-mail de acesso não é adicionado automaticamente aos destinatários dos alertas.
+
+Senhas atuais não são recuperáveis: ficam armazenadas como hash. Nos campos de senha inicial e nova senha, Mostrar/Ocultar permite conferir somente o valor digitado antes de salvar.
 
 ## Consulta de manifestações
 
@@ -68,7 +70,9 @@ Usuários cancelam suas próprias solicitações; administradores podem cancelar
 
 **Status** mostra disponibilidade, última gravação, `ultNSU`, `maxNSU` e próxima tentativa. **Abrir logs** exibe execuções e intervalos. `ultNSU == maxNSU` indica que a distribuição alcançou o limite informado naquele retorno; não garante que toda nota emitida já esteja disponível.
 
-O AtlasDFE consulta externamente das **22:00 até antes de 04:00, Brasília**. Disparos: **22h, 23h, 00h, 01h, 02h e 03h**. Manual, automático e retentativas compartilham banco, certificado, cursor, trava e cooldown. O processo precisa permanecer ativo. A rotina manual exige as confirmações exibidas pela interface.
+O AtlasDFE consulta externamente das **22:00 até antes de 04:00, Brasília**. Disparos: **22h, 23h, 00h, 01h, 02h e 03h**. Manual, automático e retentativas compartilham banco, certificado, cursor, trava e cooldown. Em **Admin → Disparos automáticos**, marque ou desmarque **Ativar disparos automáticos**, informe os horários separados por vírgula e selecione os dias. Use **Salvar agendamento**. A mudança persiste e vale sem reiniciar. São aceitos até seis horários com intervalo mínimo de 60 minutos, dentro das 22h–04h. Os dias seguem a data civil: 01h de terça pertence à terça. Desativar impede novos disparos e retentativas; uma sincronização já iniciada termina normalmente. A reativação pode retomar a oportunidade mais recente da noite atual, respeitando bloqueios.
+
+O processo precisa permanecer ativo. A rotina manual exige as confirmações exibidas pela interface.
 
 `consNSU` permanece pausado (`NFE_RECOVERY_ENABLED=0`). “Intervalo recuperado” pode refletir documentos anteriores ou recebidos por `distNSU`; verifique as colunas de origem da execução. Intervalos completos não são pendências. A conferência cobre somente os intervalos registrados pelo app.
 

@@ -32,7 +32,7 @@ def test_cadastro_proprio_tem_acesso_imediato_mas_nunca_admin(tmp_path):
         assert 'Criar minha conta' in login_page
         assert 'class="button secondary" href="http://testserver/login">Entrar</a>' in login_page
         assert 'Confirmar senha' in client.get('/cadastro').text
-        data = {'csrf':csrf_token(PUBLIC_USER,cfg), 'username':'ana.teste', 'password':PASSWORD,
+        data = {'csrf':csrf_token(PUBLIC_USER,cfg), 'username':'ana.teste', 'email':'ana@example.com', 'password':PASSWORD,
                 'password_confirmation':PASSWORD, 'role':'admin', 'is_admin':'1'}
         assert client.post('/cadastro', data={**data,'csrf':'errado'}).status_code == 403
         assert app.state.admin_accounts.role('ana.teste') is None
@@ -56,7 +56,7 @@ def test_cadastro_proprio_tem_acesso_imediato_mas_nunca_admin(tmp_path):
 def test_cadastro_valida_senha_confirmacao_e_duplicatas(tmp_path):
     cfg, app = setup(tmp_path)
     with TestClient(app) as client:
-        data = {'csrf':csrf_token(PUBLIC_USER,cfg),'username':'novo','password':PASSWORD,
+        data = {'csrf':csrf_token(PUBLIC_USER,cfg),'username':'novo','email':'novo@example.com','password':PASSWORD,
                 'password_confirmation':'outra'}
         response = client.post('/cadastro',data=data)
         assert response.status_code == 400 and PASSWORD not in response.text

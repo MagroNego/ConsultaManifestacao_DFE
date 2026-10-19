@@ -1,5 +1,12 @@
 # Histórico de versões
 
+## Em preparação
+
+- Agenda automática configurável no Admin: ativação, dias e até seis horários, com persistência e aplicação sem reinício. Mantém janela 22h–04h e intervalo mínimo de 60 minutos.
+
+- Gestão de usuários com campos e ações organizados, exclusão recolhida e exibição da senha em digitação no Admin.
+- E-mail único obrigatório nos novos cadastros Web e login por e-mail ou usuário; contas antigas preservadas com vinculação administrativa. Troca de e-mail revoga sessões.
+
 ## Alterações na main após 2.6.0
 
 - Documentação técnica consolidada: instalação, autenticação, persistência, backup e operação.

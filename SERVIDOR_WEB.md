@@ -26,7 +26,7 @@ O endereço padrão é `127.0.0.1:8080`. Para acesso interno, use HTTPS por reve
 | `NFE_RECOVERY_ENABLED` | `0`; recuperação pontual pausada |
 | `NFE_WEB_AUDIT_LOG` | Padrão `logs/web_audit.log` |
 
-A janela é fixa: **22:00 ≤ horário ou horário < 04:00**, Brasília (UTC−3). Disparos às **22h, 23h, 00h, 01h, 02h e 03h**. A rotina considera os dias configurados e os bloqueios persistidos. Leitura local não depende dessa janela.
+A janela é fixa: **22:00 ≤ horário ou horário < 04:00**, Brasília (UTC−3). Disparos padrão às **22h, 23h, 00h, 01h, 02h e 03h**, configuráveis no Admin sem ampliar a janela. A rotina considera os dias configurados e os bloqueios persistidos. Leitura local não depende dessa janela.
 
 `NFE_AUTO_SYNC_ONCE_DATE`, `NFE_AUTO_SYNC_INTERVAL_HOURS`, `NFE_AUTO_SYNC_HOUR`, `NFE_AUTO_SYNC_MINUTE` e `NFE_SEFAZ_COOLDOWN_MINUTES` não substituem o agendamento atual nem o cooldown fixo de 60 minutos. Remova configurações legadas. Detalhes: [Distribuição e Qive](DISTRIBUICAO_DFE_QIVE.md).
 
@@ -38,6 +38,7 @@ Login obrigatório para todas as telas de dados. Cadastro próprio libera acesso
 
 | Arquivo padrão | Conteúdo |
 | --- | --- |
+| `secrets/auto-sync.json` | Estado, horários e dias da sincronização automática salvos pelo Admin |
 | `secrets/db-path.txt` | Banco fiscal selecionado |
 | `secrets/db-password.txt` | Senha SQLCipher |
 | `secrets/cert-path.txt` | Caminho do PFX/P12 |
@@ -57,6 +58,8 @@ Configure PFX/P12 em Admin; a aplicação referencia o arquivo original. Para Wi
 NFE_CERT_STORE=LocalMachine
 NFE_CERT_THUMBPRINT=<impressão digital do certificado>
 ```
+
+A agenda salva em `secrets/auto-sync.json` prevalece sobre `NFE_AUTO_SYNC_ENABLED` e `NFE_AUTO_SYNC_WEEKDAYS`. O Admin aplica as mudanças sem reiniciar o processo. Desativar não aborta uma sincronização ativa nem desabilita a função manual. Arquivo inválido impede a inicialização com mensagem de configuração, sem retornar silenciosamente aos padrões.
 
 O cliente atual usa PowerShell e o endpoint de produção:
 

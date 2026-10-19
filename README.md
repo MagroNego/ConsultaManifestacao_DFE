@@ -9,14 +9,16 @@ Aplicação Web para consulta local de manifestações de NF-e, importação de 
 | Runtime | Python 3.11+; CI com Python 3.12 |
 | Servidor | FastAPI/Uvicorn; um processo, um worker |
 | Banco fiscal | SQLite ou SQLCipher; caminho selecionado em Admin |
-| Acesso | Login obrigatório; cadastro próprio com perfil comum |
+| Acesso | Login por e-mail ou usuário; cadastro próprio com perfil comum |
 | Sincronização SEFAZ | Windows com PowerShell e certificado A1 |
 | Janela AtlasDFE | **22:00 inclusive até 04:00 exclusiva, Brasília (UTC−3)** |
-| Disparos automáticos | **22:00, 23:00, 00:00, 01:00, 02:00 e 03:00**, diariamente |
+| Disparos automáticos | **22:00, 23:00, 00:00, 01:00, 02:00 e 03:00** por padrão; configuráveis no Admin |
 | Janela solicitada ao Qive | **08:00–18:00**, incluindo novas tentativas |
 | Recuperação `consNSU` | Pausada por padrão: `NFE_RECOVERY_ENABLED=0` |
 | Alertas de e-mail | Somente Operação não Realizada (`210240`) |
 | Retenção | Downloads: 24 horas; histórico de sincronização: 30 dias |
+
+Em **Admin → Disparos automáticos**, ative/desative a agenda e escolha horários e dias sem reiniciar. São aceitos até seis horários dentro da janela, separados por pelo menos 60 minutos. A configuração salva prevalece sobre a ativação inicial do lançador.
 
 A interface e os testes locais também executam em Linux. O transporte SEFAZ e a leitura de certificados usam PowerShell; a implantação documentada para sincronização é Windows. A aprovação da CI Linux não valida comunicação real com a SEFAZ.
 

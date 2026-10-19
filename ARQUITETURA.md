@@ -7,7 +7,7 @@
 | `web/app.py` | Rotas, middleware, autorização e coordenação |
 | `web/auth.py`, `web/admin_accounts.py` | Contas, hash de senha, sessões e CSRF |
 | `web/consulta_local.py` | Consultas e filtros locais |
-| `web/scheduler.py`, `web/sync_runtime.py` | Agendamento, trava, cooldown e configuração |
+| `web/scheduler.py`, `web/auto_sync_config.py`, `web/sync_runtime.py` | Agendamento, trava, cooldown e configuração |
 | `janela_consulta.py` | Restrição de horário antes das chamadas externas |
 | `sincronizacao.py`, `distribuicao.py` | Fluxo distNSU e transporte SOAP/PowerShell |
 | `recuperacao_nsu.py` | Recuperação pontual e limite de consultas |
@@ -27,13 +27,15 @@ Respostas `distNSU` são persistidas antes do parser. A confirmação de process
 
 Importação usa a trava compartilhada com sincronização e não altera cursor. Cancelamentos homologados e marcações administrativas alimentam a situação local; remoção de marcação manual não desfaz evento da SEFAZ. CT-e é armazenado em `eventos_cte`, separado de manifestações. A ausência de vínculo não prova inexistência de conhecimento.
 
-Contas, perfis e sessões ficam em SQLite separado. Senhas usam PBKDF2; tokens de sessão, SHA-256. Alterações de acesso revogam sessões e preservam o último administrador ativo. Cadastro próprio sempre gera perfil comum. Toda rota de dados exige autenticação; rotas administrativas validam perfil no servidor.
+Contas, perfis e sessões ficam em SQLite separado. A migração adiciona e-mail opcional às contas antigas e um índice único sem distinção de maiúsculas. Novos cadastros Web exigem e-mail; autenticação aceita e-mail ou username e preserva username como identidade da sessão/auditoria. Conflitos entre usernames existentes e e-mails são recusados. Alterar e-mail revoga sessões. O vínculo ainda não possui confirmação de propriedade por mensagem. Senhas usam PBKDF2; tokens de sessão, SHA-256. Alterações de acesso revogam sessões e preservam o último administrador ativo. Cadastro próprio sempre gera perfil comum. Toda rota de dados exige autenticação; rotas administrativas validam perfil no servidor.
 
 ## Concorrência e agendamento
 
 A implantação exige um processo/worker. As travas locais não coordenam processos separados. O banco deve permanecer preferencialmente em disco local.
 
-Janela externa: **22:00 inclusive a 04:00 exclusiva, UTC−3**. Disparos: **22, 23, 00, 01, 02 e 03 horas**. O controle em `controle_agendamento_intervalo` evita repetir oportunidade concluída após reinício. Cooldown e pausas persistem no banco. A oportunidade mais recente elegível pode ser retomada; o agendador não reproduz todas as oportunidades perdidas.
+Janela externa: **22:00 inclusive a 04:00 exclusiva, UTC−3**. Disparos: **22, 23, 00, 01, 02 e 03 horas**. A agenda persistida em `secrets/auto-sync.json` substitui os padrões de ativação/dias/horários no runtime do agendador, sem modificar as regras manuais. O loop permanece aguardando quando desativado e é acordado por evento após salvar no Admin; uma execução ativa termina com a trava reservada. Horários usam data civil de Brasília, ficam dentro da janela e são separados por pelo menos 60 minutos.
+
+O controle em `controle_agendamento_intervalo` evita repetir oportunidade concluída após reinício. Cooldown e pausas persistem no banco. A oportunidade mais recente elegível pode ser retomada; o agendador não reproduz todas as oportunidades perdidas.
 
 `consNSU` inicia desabilitado. Se habilitado com lacunas, a recuperação tem prioridade e consome a execução antes de nova distribuição. Política completa: [Distribuição DF-e e Qive](DISTRIBUICAO_DFE_QIVE.md).
 

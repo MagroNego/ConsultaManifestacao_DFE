@@ -14,7 +14,7 @@ Todos os horários desta seção são de Brasília (UTC−3).
 
 O último retorno transcrito sobre o ajuste 08h–18h é uma confirmação de encaminhamento à equipe. Não equivale a evidência de configuração concluída. Arquive a confirmação final do Qive junto ao registro operacional da instalação.
 
-O AtlasDFE dispara às **22:00, 23:00, 00:00, 01:00, 02:00 e 03:00**, diariamente por padrão. Às 04:00 a janela fecha, sem novo disparo. A restrição alcança sincronização manual, automática, recuperação e novas tentativas, inclusive entre chamadas. Uma requisição já enviada pode terminar após 04:00; a próxima fica bloqueada. Consultas locais, importações e exportações não dependem dessa janela.
+O AtlasDFE dispara às **22:00, 23:00, 00:00, 01:00, 02:00 e 03:00**, diariamente por padrão. O Admin pode ativar/desativar e selecionar outros horários/dias sem reiniciar; a janela continua fixa e o intervalo mínimo entre horários é de 60 minutos. Às 04:00 a janela fecha, sem novo disparo. A restrição alcança sincronização manual, automática, recuperação e novas tentativas, inclusive entre chamadas. Uma requisição já enviada pode terminar após 04:00; a próxima fica bloqueada. Consultas locais, importações e exportações não dependem dessa janela.
 
 ## Informações fornecidas pelo suporte Qive
 
