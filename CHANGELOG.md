@@ -2,6 +2,8 @@
 
 ## Em preparação
 
+- Formulário de sincronização manual não é renderizado durante bloqueios. Requisições diretas continuam sujeitas à autorização, CSRF, janela e cooldown no servidor.
+
 - Agenda automática configurável no Admin: ativação, dias e até seis horários, com persistência e aplicação sem reinício. Mantém janela 22h–04h e intervalo mínimo de 60 minutos.
 
 - Gestão de usuários com campos e ações organizados, exclusão recolhida e exibição da senha em digitação no Admin.

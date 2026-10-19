@@ -194,13 +194,18 @@ def test_post_direto_durante_bloqueio_nao_consulta_sefaz(tmp_path, monkeypatch, 
     def proibido(*args, **kwargs):
         pytest.fail("POST durante bloqueio iniciou sincronização")
     monkeypatch.setattr("nfe_consulta.web.app.sincronizar_configurado", proibido)
+    banco_anterior = cfg.database_path.read_bytes()
     with TestClient(create_app(cfg)) as client:
         token = entrar_admin(client, cfg)
+        assert "data-sync-confirm" not in client.get("/atualizar").text
         resposta = client.post("/atualizar/sincronizar", data={
             "csrf": token, "max_lotes": "50", "confirmacao": "sincronizar",
+            "can_sync": "true", "enabled": "true", "force": "1",
         })
     assert resposta.status_code == 429
     assert "Sincronização bloqueada temporariamente" in resposta.text
+
+    assert cfg.database_path.read_bytes() == banco_anterior
 
 
 @pytest.mark.parametrize("pausa", [False, True])
@@ -734,6 +739,7 @@ def test_post_fora_do_horario_registra_janela_em_vez_de_cooldown(tmp_path, monke
     monkeypatch.setattr('nfe_consulta.web.app.sincronizar_configurado', proibido)
     with TestClient(create_app(cfg)) as client:
         token = entrar_admin(client, cfg)
+        assert "data-sync-confirm" not in client.get("/atualizar").text
         resposta = client.post('/atualizar/sincronizar', data={
             'csrf': token, 'max_lotes': '50', 'confirmacao': 'sincronizar'})
     registros = [json.loads(line.split(' ', 2)[2]) for line in cfg.audit_log.read_text().splitlines()]
