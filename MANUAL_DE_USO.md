@@ -2,26 +2,38 @@
 
 ## Acesso e perfis
 
-Todas as telas de dados exigem login. **Criar minha conta** permite escolher usuário e senha de pelo menos 12 caracteres; o cadastro libera imediatamente o perfil comum. A criação de conta é acessível a quem alcançar a aplicação na rede.
+Todas as telas de dados exigem login. **Criar minha conta** exige e-mail único, usuário e senha de pelo menos 12 caracteres; o cadastro libera imediatamente o perfil comum. É possível entrar pelo e-mail ou pelo usuário. O vínculo cadastral não confirma a propriedade da caixa postal e não envia mensagem de verificação. A criação de conta é acessível a quem alcançar a aplicação na rede.
 
 | Perfil | Permissões |
 | --- | --- |
 | Usuário comum | Consulta, Status, Emissão, relatórios e Downloads |
 | Administrador | Permissões comuns, importação, sincronização manual, configuração e gestão de contas |
 
-Em **Admin → Gerenciar usuários**, o administrador pode cadastrar, alterar perfil, redefinir senha, ativar, desativar ou excluir contas. Mudanças de acesso revogam sessões. A exclusão exige confirmação e preserva dados fiscais e auditoria. O último administrador ativo é protegido. Senhas atuais não são exibidas: ficam armazenadas como hash.
+Em **Admin → Gerenciar usuários**, o administrador pode cadastrar, alterar perfil, redefinir senha, ativar, desativar ou excluir contas. Mudanças de acesso revogam sessões. A exclusão exige confirmação e preserva dados fiscais e auditoria. O último administrador ativo é protegido. Contas antigas continuam entrando pelo usuário; o administrador pode vincular um e-mail em Gerenciar usuários. Alterar o endereço encerra as sessões da conta. O e-mail de acesso não é adicionado automaticamente aos destinatários dos alertas.
+
+Senhas atuais não são recuperáveis: ficam armazenadas como hash. Nos campos de senha inicial e nova senha, Mostrar/Ocultar permite conferir somente o valor digitado antes de salvar.
 
 ## Consulta de manifestações
 
 Filtre por data do evento, número da nota, chave, manifestação e situação. A data final inclui o dia inteiro. As páginas mostram até 100 registros. Emitente sem nome disponível é identificado pelo CNPJ extraído da chave.
 
-**Exportar Excel** inclui todas as páginas dos filtros aplicados, até 200 mil eventos. Chaves, protocolos e NSUs são texto. A consulta por TXT aceita uma chave de 44 dígitos por linha, até 10 mil chaves e 2 MB; usa exclusivamente o histórico local.
+**Exportar Excel** inclui todas as páginas dos filtros aplicados, até 200 mil eventos. Chaves, protocolos e NSUs são texto. A consulta por TXT oferece **CHAVES.txt** (uma chave de 44 dígitos por linha) e **notas.txt** (um número de NF de 1 a 9 dígitos por linha). Ambas usam exclusivamente o histórico local, com limite de 10 mil entradas e 2 MB. O ícone de interrogação abre o tutorial.
+
+Para números, salve um TXT UTF-8, sem cabeçalho, série ou pontuação:
+
+```text
+12345
+67890
+95022
+```
+
+Zeros à esquerda são aceitos e duplicatas numéricas são consideradas uma vez. A consulta inclui todas as chaves correspondentes ao número no banco do CNPJ configurado, sem escolher emitente ou série arbitrariamente. A planilha mantém chave/série e inclui **Numeros solicitados**, com contagem das correspondências e números não localizados. Não localizar significa ausência no banco disponível. Notas conhecidas sem manifestações também são incluídas. O relatório recusa resultados com mais de 100 mil notas; reduza a lista nesse caso.
 
 Ausência de evento significa ausência no banco disponível. A tela não consulta a situação atual da NF-e na SEFAZ.
 
 ## Emissão e importação
 
-Em **Admin → Importar XML**, envie os XMLs completos ou o ZIP obtido no Synchro. Confira importados, duplicados e recusados; o registro do lote fica restrito ao administrador. A importação acumula dados entre meses. Chaves duplicadas preservam a primeira importação.
+Em **Admin → Importar XML**, envie os XMLs completos ou o ZIP obtido no Synchro. Subpastas relativas de vários meses são percorridas automaticamente, inclusive pastas com horário no nome; não é necessário extrair ou reorganizar os XMLs. O app lê diretamente os membros do ZIP, sem extrair seus caminhos no disco. Caminhos absolutos/de unidade, referências à pasta superior, links simbólicos e dois-pontos no nome final do XML são recusados com motivo específico no registro. Confira importados, duplicados e recusados; o registro do lote fica restrito ao administrador. A importação acumula dados entre meses. Chaves duplicadas preservam a primeira importação.
 
 Aceita NF-e modelo 55 emitida pelo CNPJ configurado, com ou sem envelope `nfeProc`, e cancelamentos homologados compatíveis. Verifica estrutura mínima e correspondência de chave/emitente/número/série; não valida assinatura digital, schema fiscal completo ou autorização atual.
 
@@ -68,7 +80,9 @@ Usuários cancelam suas próprias solicitações; administradores podem cancelar
 
 **Status** mostra disponibilidade, última gravação, `ultNSU`, `maxNSU` e próxima tentativa. **Abrir logs** exibe execuções e intervalos. `ultNSU == maxNSU` indica que a distribuição alcançou o limite informado naquele retorno; não garante que toda nota emitida já esteja disponível.
 
-O AtlasDFE consulta externamente das **22:00 até antes de 04:00, Brasília**. Disparos: **22h, 23h, 00h, 01h, 02h e 03h**. Manual, automático e retentativas compartilham banco, certificado, cursor, trava e cooldown. O processo precisa permanecer ativo. A rotina manual exige as confirmações exibidas pela interface.
+O AtlasDFE consulta externamente das **22:00 até antes de 04:00, Brasília**. Disparos: **22h, 23h, 00h, 01h, 02h e 03h**. Manual, automático e retentativas compartilham banco, certificado, cursor, trava e cooldown. Em **Admin → Disparos automáticos**, marque ou desmarque **Ativar disparos automáticos**, informe os horários separados por vírgula e selecione os dias. Use **Salvar agendamento**. A mudança persiste e vale sem reiniciar. São aceitos até seis horários com intervalo mínimo de 60 minutos, dentro das 22h–04h. Os dias seguem a data civil: 01h de terça pertence à terça. Desativar impede novos disparos e retentativas; uma sincronização já iniciada termina normalmente. A reativação pode retomar a oportunidade mais recente da noite atual, respeitando bloqueios.
+
+O processo precisa permanecer ativo. A rotina manual exige as confirmações exibidas pela interface.
 
 `consNSU` permanece pausado (`NFE_RECOVERY_ENABLED=0`). “Intervalo recuperado” pode refletir documentos anteriores ou recebidos por `distNSU`; verifique as colunas de origem da execução. Intervalos completos não são pendências. A conferência cobre somente os intervalos registrados pelo app.
 

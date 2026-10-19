@@ -15,6 +15,7 @@ from pathlib import Path
 
 ITERATIONS = 600_000
 USERNAME = re.compile(r"[A-Za-z0-9._@-]{3,64}\Z")
+EMAIL = re.compile(r"[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+\Z")
 ROLES = {"consulta", "fiscal", "admin"}
 
 
@@ -59,6 +60,9 @@ class AdminAccounts:
                 db.execute("ALTER TABLE admins ADD COLUMN role TEXT NOT NULL DEFAULT 'admin' CHECK(role IN ('consulta','fiscal','admin'))")
                 # Requer novo login após atualizar a política de acesso.
                 db.execute("DELETE FROM admin_sessions")
+            if "email" not in {row[1] for row in db.execute("PRAGMA table_info(admins)")}:
+                db.execute("ALTER TABLE admins ADD COLUMN email TEXT COLLATE NOCASE")
+            db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_admins_email ON admins(email COLLATE NOCASE) WHERE email IS NOT NULL")
             if bootstrap_password and db.execute("SELECT 1 FROM admins LIMIT 1").fetchone() is None:
                 # O configurador anterior aceitava nomes que o cadastro novo restringe.
                 if len(bootstrap_password) < 12 or len(bootstrap_password) > 1024:
@@ -84,8 +88,8 @@ class AdminAccounts:
 
     def list_accounts(self) -> list[dict]:
         with closing(self._connect()) as db, db:
-            rows = db.execute("SELECT username, active, role FROM admins ORDER BY username COLLATE NOCASE").fetchall()
-        return [{"username": name, "active": bool(active), "role": role} for name, active, role in rows]
+            rows = db.execute("SELECT username, active, role, email FROM admins ORDER BY username COLLATE NOCASE").fetchall()
+        return [{"username": name, "active": bool(active), "role": role, "email": email} for name, active, role, email in rows]
 
     def role(self, username: str) -> str | None:
         with closing(self._connect()) as db:
@@ -98,21 +102,56 @@ class AdminAccounts:
         return row
 
     def authenticate(self, username: str, password: str) -> str | None:
-        if len(username) > 64 or len(password) > 1024:
+        if len(username) > 254 or len(password) > 1024:
             return None
-        row = self.account(username.strip())
+        with closing(self._connect()) as db:
+            rows = db.execute("SELECT username,password_hash FROM admins WHERE active=1 AND (username=? COLLATE NOCASE OR email=? COLLATE NOCASE)",
+                              (username.strip(), username.strip())).fetchall()
+        row = rows[0] if len(rows) == 1 else None
         if row and _verify(password, row[1]):
             return row[0]
         return None
 
-    def create(self, username: str, password: str, role: str = "consulta") -> None:
+    @staticmethod
+    def normalize_email(email: str) -> str:
+        email = email.strip().lower()
+        if len(email) > 254 or not EMAIL.fullmatch(email):
+            raise ValueError("Informe um e-mail válido.")
+        local, domain = email.rsplit("@", 1)
+        if len(local) > 64 or local.startswith(".") or local.endswith(".") or ".." in local or any(
+                len(label) > 63 or label.startswith("-") or label.endswith("-") for label in domain.split(".")):
+            raise ValueError("Informe um e-mail válido.")
+        return email
+
+    @staticmethod
+    def _check_identity(db, username: str, email: str | None):
+        if db.execute("SELECT 1 FROM admins WHERE email=? COLLATE NOCASE AND username<>? COLLATE NOCASE", (username, username)).fetchone():
+            raise ValueError("Este identificador já está vinculado a outra conta.")
+        if email and db.execute("SELECT 1 FROM admins WHERE (email=? COLLATE NOCASE OR username=? COLLATE NOCASE) AND username<>? COLLATE NOCASE",
+                                (email, email, username)).fetchone():
+            raise ValueError("Este e-mail já está vinculado a outra conta.")
+
+    def set_email(self, username: str, email: str) -> None:
+        email = self.normalize_email(email)
+        with closing(self._connect()) as db, db:
+            db.execute("BEGIN IMMEDIATE")
+            if not db.execute("SELECT 1 FROM admins WHERE username=?", (username,)).fetchone():
+                raise ValueError("Usuário não encontrado.")
+            self._check_identity(db, username, email)
+            db.execute("UPDATE admins SET email=? WHERE username=?", (email, username))
+            db.execute("DELETE FROM admin_sessions WHERE username=? COLLATE NOCASE", (username,))
+
+    def create(self, username: str, password: str, role: str = "consulta", email: str | None = None) -> None:
         username = username.strip()
         self._validate(username, password)
+        email = self.normalize_email(email) if email is not None else None
         if role not in ROLES:
             raise ValueError("Perfil inválido.")
         with closing(self._connect()) as db, db:
             try:
-                db.execute("INSERT INTO admins(username,password_hash,active,role) VALUES (?, ?, 1, ?)", (username, _hash_password(password), role))
+                db.execute("BEGIN IMMEDIATE")
+                self._check_identity(db, username, email)
+                db.execute("INSERT INTO admins(username,password_hash,active,role,email) VALUES (?, ?, 1, ?, ?)", (username, _hash_password(password), role, email))
             except sqlite3.IntegrityError as exc:
                 raise ValueError("Este usuário já existe.") from exc
 

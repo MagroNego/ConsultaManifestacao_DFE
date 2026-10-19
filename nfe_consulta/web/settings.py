@@ -105,6 +105,8 @@ class WebSettings:
     certificate_password_file: Path | None = None
     database_path_file: Path | None = None
     database_password_file: Path | None = None
+    auto_sync_config_path: Path | None = None
+    auto_sync_times: tuple[str, ...] = ('22:00', '23:00', '00:00', '01:00', '02:00', '03:00')
     auto_sync_enabled: bool = False
     recovery_enabled: bool = False
     auto_sync_interval_hours: int = 8
@@ -256,6 +258,7 @@ def get_settings() -> WebSettings:
         certificate_password_file=CERT_PASSWORD_FILE,
         database_path_file=DATABASE_PATH_FILE,
         database_password_file=DATABASE_PASSWORD_FILE,
+        auto_sync_config_path=RAIZ_PROJETO / "secrets" / "auto-sync.json",
         auto_sync_enabled=auto_sync_enabled,
         recovery_enabled=os.getenv("NFE_RECOVERY_ENABLED", "0").strip() == "1",
         auto_sync_interval_hours=auto_sync_interval_hours,

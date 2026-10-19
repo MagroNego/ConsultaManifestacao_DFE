@@ -59,6 +59,8 @@ from nfe_consulta.web.auth import (
     validate_csrf,
 )
 from nfe_consulta.web.admin_accounts import AdminAccounts
+from nfe_consulta.consulta_numeros import executar_consulta_numeros
+from nfe_consulta.web.auto_sync_config import load_schedule, save_schedule
 from nfe_consulta.web.scheduler import loop_sincronizacao_automatica
 from nfe_consulta.web.settings import WebSettings, get_settings
 from nfe_consulta.web.email_alerts import (
@@ -278,6 +280,9 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
     app.state.downloads = DownloadArchive(settings.audit_log.parent.parent / "dados" / "downloads")
     app.state.downloads_cleanup_task = None
     app.state.settings = settings
+    app.state.scheduler_settings = load_schedule(settings)
+    app.state.auto_sync_wake = asyncio.Event()
+    app.state.schedule_config_lock = asyncio.Lock()
     app.state.admin_accounts = AdminAccounts(
         settings.admin_accounts_path or settings.database_path.parent / "admin_accounts.db",
         bootstrap_username=settings.admin_username,
@@ -296,17 +301,16 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
     @app.on_event("startup")
     async def start_auto_sync():
         app.state.downloads_cleanup_task = asyncio.create_task(cleanup_loop(app.state.downloads))
-        if not settings.auto_sync_enabled:
-            return
         app.state.auto_sync_task = asyncio.create_task(
             loop_sincronizacao_automatica(app)
         )
         app.state.audit.write_system(
             "sefaz_scheduler",
             "iniciado",
-            horarios=["22:00", "01:00"],
+            horarios=list(app.state.scheduler_settings.auto_sync_times),
+            habilitado=app.state.scheduler_settings.auto_sync_enabled,
             recuperacao_cons_nsu=settings.recovery_enabled,
-            dias=list(settings.auto_sync_weekdays),
+            dias=list(app.state.scheduler_settings.auto_sync_weekdays),
             data_unica=settings.auto_sync_once_date.isoformat() if settings.auto_sync_once_date else None,
             max_lotes=settings.auto_sync_max_lotes,
         )
@@ -520,7 +524,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
     async def register_submit(
         request: Request, user: Annotated[WebUser, Depends(current_user)],
         csrf: str = Form(...), username: str = Form(...), password: str = Form(...),
-        password_confirmation: str = Form(...),
+        password_confirmation: str = Form(...), email: str = Form(""),
     ):
         validate_csrf(csrf, user, settings)
         if user.authenticated:
@@ -543,14 +547,15 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             if password != password_confirmation:
                 raise ValueError("As senhas não coincidem. Digite novamente.")
             # O perfil é fixo no servidor, independentemente do formulário.
-            await run_in_threadpool(app.state.admin_accounts.create, username, password, "fiscal")
+            email = app.state.admin_accounts.normalize_email(email)
+            await run_in_threadpool(app.state.admin_accounts.create, username, password, "fiscal", email)
         except ValueError as exc:
             return _render(request, "register.html", user, status_code=400, error=str(exc),
-                           username=username[:64])
+                           username=username[:64], email=email[:254])
         app.state.audit.write(request, user, "user_register", "ok")
         return _render(request, "login.html", user,
             admin_configured=app.state.admin_accounts.configured(),
-            success="Conta criada. Entre com seu usuário e senha.")
+            success="Conta criada. Entre com seu e-mail ou usuário e senha.")
 
     @app.get("/login", response_class=HTMLResponse, name="login_page")
     @app.get("/admin/login", response_class=HTMLResponse)
@@ -581,7 +586,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         password: str = Form(...),
     ):
         validate_csrf(csrf, user, settings)
-        if len(username) > 64 or len(password) > 1024:
+        if len(username) > 254 or len(password) > 1024:
             return _render(request, "login.html", user, status_code=400,
                            admin_configured=True, error="Usuário ou senha inválidos.")
 
@@ -681,6 +686,28 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         clear_admin_cookie(response, settings, secure=request.url.scheme == "https")
         return response
 
+    @app.post("/admin/agendamento", name="admin_schedule_update")
+    async def admin_schedule_update(
+        request: Request, user: Annotated[WebUser, Depends(require_admin)],
+        csrf: str = Form(...), enabled: bool = Form(False),
+        times: str = Form(""), weekdays: list[int] = Form([]),
+    ):
+        validate_csrf(csrf, user, settings)
+        async with app.state.schedule_config_lock:
+            try:
+                updated = await run_in_threadpool(save_schedule, app.state.scheduler_settings,
+                    enabled=enabled, times=[value.strip() for value in times.split(',')], weekdays=weekdays)
+            except ValueError as exc:
+                raise HTTPException(400, str(exc))
+            except OSError:
+                raise HTTPException(503, "Não foi possível salvar o agendamento. A configuração anterior foi preservada.")
+            app.state.scheduler_settings = updated
+            app.state.auto_sync_next_at = None
+            app.state.auto_sync_wake.set()
+        app.state.audit.write(request, user, "auto_sync_config", "ok", enabled=enabled,
+                              times=list(updated.auto_sync_times), weekdays=list(updated.auto_sync_weekdays))
+        return RedirectResponse(str(request.url_for("atualizar_page")) + "?schedule_saved=1", status_code=303)
+
     @app.get("/admin/contas", response_class=HTMLResponse, name="admin_accounts_page")
     async def admin_accounts_page(
         request: Request, user: Annotated[WebUser, Depends(require_admin)],
@@ -694,13 +721,16 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         request: Request, user: Annotated[WebUser, Depends(require_admin)],
         csrf: str = Form(...), action: str = Form(...), username: str = Form(...),
         password: str = Form(""), role: str = Form("fiscal"),
-        confirm_delete: bool = Form(False),
+        confirm_delete: bool = Form(False), email: str = Form(""),
     ):
         validate_csrf(csrf, user, settings)
         accounts = app.state.admin_accounts
         try:
             if action == "create":
-                await run_in_threadpool(accounts.create, username, password, role)
+                email = accounts.normalize_email(email)
+                await run_in_threadpool(accounts.create, username, password, role, email)
+            elif action == "email":
+                await run_in_threadpool(accounts.set_email, username, email)
             elif action == "role":
                 await run_in_threadpool(accounts.set_role, username, role)
             elif action in {"activate", "deactivate"}:
@@ -967,14 +997,18 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         user: Annotated[WebUser, Depends(require_export)],
         csrf: str = Form(...),
         files: UploadFile = File(...),
+        tipo_arquivo: str = Form("chaves"),
     ):
         validate_csrf(csrf, user, settings)
+        if tipo_arquivo not in {"chaves", "numeros"}:
+            raise HTTPException(400, "Tipo de consulta por arquivo inválido.")
+        audit_action = "excel_numeros" if tipo_arquivo == "numeros" else "excel_chaves"
 
         if not _database_path(settings).is_file():
             app.state.audit.write(
                 request,
                 user,
-                "excel_chaves",
+                audit_action,
                 "erro",
                 reason="database_missing",
             )
@@ -995,47 +1029,53 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
 
         temporario = Path(tempfile.mkdtemp(prefix="nfe-web-"))
         try:
-            chaves = temporario / "CHAVES.txt"
+            chaves = temporario / ("NOTAS.txt" if tipo_arquivo == "numeros" else "CHAVES.txt")
             resumo_upload = await consolidar_txts(
                 [files],
                 chaves,
                 max_bytes=settings.max_upload_bytes,
                 max_chaves=settings.max_keys,
+                tipo=tipo_arquivo,
             )
-            saida = temporario / NOME_PLANILHA
-
-            resultado = await run_in_threadpool(
-                executar_consulta,
-                ParametrosConsulta(
-                    chaves=chaves,
-                    banco=_database_path(settings),
-                    saida=saida,
-                    cnpj=CNPJ_PADRAO,
-                    uf=UF_PADRAO,
-                    sincronizar_sefaz=False,
-                    senha_banco=settings.current_database_password(),
-                ),
-            )
-
+            nome_planilha = "Consulta_Manifestacao_por_Numeros.xlsx" if tipo_arquivo == "numeros" else NOME_PLANILHA
+            saida = temporario / nome_planilha
+            if tipo_arquivo == "numeros":
+                resultado = await run_in_threadpool(executar_consulta_numeros, chaves,
+                    _database_path(settings), saida, CNPJ_PADRAO,
+                    senha=settings.current_database_password(), max_numeros=settings.max_keys)
+            else:
+                resultado = await run_in_threadpool(
+                    executar_consulta,
+                    ParametrosConsulta(
+                        chaves=chaves,
+                        banco=_database_path(settings),
+                        saida=saida,
+                        cnpj=CNPJ_PADRAO,
+                        uf=UF_PADRAO,
+                        sincronizar_sefaz=False,
+                        senha_banco=settings.current_database_password(),
+                    ),
+                )
             app.state.audit.write(
                 request,
                 user,
-                "excel_chaves",
+                audit_action,
                 "ok",
                 arquivos=resumo_upload.arquivos_txt,
-                chaves=resumo_upload.chaves,
+                entradas=resumo_upload.chaves,
+                tipo=tipo_arquivo,
                 notas=resultado.total,
                 com_evento=resultado.com_evento,
                 erros=resultado.com_erro,
             )
 
-            await archive_file(request, saida, filename=NOME_PLANILHA,
+            await archive_file(request, saida, filename=nome_planilha,
                 media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 documents=resultado.total,
                 period=period_label(evento.data for nota in resultado.resultados for evento in nota.manifestacoes))
             return FileResponse(
                 path=saida,
-                filename=NOME_PLANILHA,
+                filename=nome_planilha,
                 media_type=(
                     "application/vnd.openxmlformats-officedocument."
                     "spreadsheetml.sheet"
@@ -1058,7 +1098,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             app.state.audit.write(
                 request,
                 user,
-                "excel_chaves",
+                audit_action,
                 "erro",
                 reason=type(exc).__name__,
             )
@@ -1081,7 +1121,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             app.state.audit.write(
                 request,
                 user,
-                "excel_chaves",
+                audit_action,
                 "erro",
                 reason="unexpected",
             )

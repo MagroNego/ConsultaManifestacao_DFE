@@ -163,7 +163,7 @@ def test_admin_cadastra_comum_e_gerencia_acesso_com_csrf(tmp_path):
         token = helpers['login'](client, cfg)
         assert 'Gerenciar usuários' in client.get('/atualizar').text
         assert 'Usuário comum' in client.get('/admin/contas').text
-        data = {'csrf': token, 'action': 'create', 'username': 'novo', 'password': PASSWORD}
+        data = {'csrf': token, 'action': 'create', 'username': 'novo', 'email': 'novo@example.com', 'password': PASSWORD}
         assert client.post('/admin/contas', data={**data, 'csrf': 'invalido'}).status_code == 403
         assert app.state.admin_accounts.role('novo') is None
         assert client.post('/admin/contas', data=data, follow_redirects=False).status_code == 303

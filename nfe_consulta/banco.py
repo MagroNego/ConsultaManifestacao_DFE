@@ -502,23 +502,27 @@ class BancoManifestacoes:
             )
 
     def consultar_chave(self, chave: str, cnpj: str | None = None) -> ResultadoConsulta:
-        sql = (
-            "SELECT codigo, descricao, data_evento, protocolo, nsu, schema_xml "
-            "FROM manifestacoes WHERE chave = ?"
-        )
-        parametros = [chave]
-        if cnpj:
-            sql += " AND cnpj = ?"
-            parametros.append(cnpj)
-        sql += " ORDER BY data_evento, CAST(nsu AS INTEGER), id"
-        linhas = self.conexao.execute(sql, parametros).fetchall()
-        eventos = tuple(Manifestacao(*linha) for linha in linhas)
-        return ResultadoConsulta(
-            chave=chave,
-            status_codigo=0,
-            status_motivo="Historico local da Distribuicao DF-e",
-            protocolo_nfe=None,
-            manifestacoes=eventos,
-            ctes=linked_ctes(self.conexao, cnpj, [chave]).get(chave, ()) if cnpj else (),
-            cancelada=chave in cancelled_keys(self.conexao, cnpj, [chave]),
-        )
+        return consultar_chave_local(self.conexao, chave, cnpj)
+
+
+def consultar_chave_local(conexao, chave: str, cnpj: str | None = None) -> ResultadoConsulta:
+    sql = (
+        "SELECT codigo, descricao, data_evento, protocolo, nsu, schema_xml "
+        "FROM manifestacoes WHERE chave = ?"
+    )
+    parametros = [chave]
+    if cnpj:
+        sql += " AND cnpj = ?"
+        parametros.append(cnpj)
+    sql += " ORDER BY data_evento, CAST(nsu AS INTEGER), id"
+    linhas = conexao.execute(sql, parametros).fetchall()
+    eventos = tuple(Manifestacao(*linha) for linha in linhas)
+    return ResultadoConsulta(
+        chave=chave,
+        status_codigo=0,
+        status_motivo="Historico local da Distribuicao DF-e",
+        protocolo_nfe=None,
+        manifestacoes=eventos,
+        ctes=linked_ctes(conexao, cnpj, [chave]).get(chave, ()) if cnpj else (),
+        cancelada=chave in cancelled_keys(conexao, cnpj, [chave]),
+    )

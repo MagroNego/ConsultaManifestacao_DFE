@@ -22,6 +22,7 @@ async def consolidar_txts(
     *,
     max_bytes: int,
     max_chaves: int,
+    tipo: str = "chaves",
 ) -> UploadSummary:
     total_bytes = 0
     txts = 0
@@ -63,12 +64,12 @@ async def consolidar_txts(
             vistos.add(chave)
             chaves.append(chave)
             if len(chaves) > max_chaves:
-                raise ValueError(f"Envio excede o limite de {max_chaves:,} chaves.")
+                raise ValueError(f"Envio excede o limite de {max_chaves:,} {'números' if tipo == 'numeros' else 'chaves'}.")
 
     if txts == 0:
         raise ValueError("Selecione pelo menos um arquivo .txt.")
     if not chaves:
-        raise ValueError("Nenhuma chave foi encontrada nos TXT enviados.")
+        raise ValueError("Nenhum número foi encontrado no TXT enviado." if tipo == "numeros" else "Nenhuma chave foi encontrada nos TXT enviados.")
 
     destino.parent.mkdir(parents=True, exist_ok=True)
     destino.write_text("\n".join(chaves) + "\n", encoding="utf-8")

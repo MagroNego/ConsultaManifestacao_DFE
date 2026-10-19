@@ -45,13 +45,15 @@ $env:NFE_AUTO_SYNC_ENABLED = "0"
 6. Se houver alertas, configure SMTP e destinatários e use **Enviar e-mail de teste**.
 7. Confirme a configuração ativa do Qive antes de habilitar a captura conjunta. Consulte [Distribuição e Qive](DISTRIBUICAO_DFE_QIVE.md).
 
-Para ativar a rotina, pare o processo com `Ctrl+C` e inicie novamente:
+Para ativar a rotina, use **Admin → Disparos automáticos** e salve a configuração. Em instalações sem configuração salva, também é possível definir a ativação inicial pelo ambiente e reiniciar:
 
 ```powershell
 $env:NFE_AUTO_SYNC_ENABLED = "1"
 $env:NFE_RECOVERY_ENABLED = "0"
 .\INICIAR_WEB.cmd
 ```
+
+Após salvar pelo Admin, `secrets/auto-sync.json` prevalece sobre os padrões de ativação/dias do ambiente; preserve-o nas atualizações e backups.
 
 As variáveis acima valem para esse PowerShell e os processos iniciados por ele. Para serviço Windows, configure-as no ambiente do serviço. `WEB_CONFIG.example` é uma referência e **não é carregado automaticamente**.
 

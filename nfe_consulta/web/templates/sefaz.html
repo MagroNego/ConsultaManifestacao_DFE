@@ -65,8 +65,9 @@
       <span class="muted">NFeDistribuicaoDFe</span>
     </div>
 
-    <p class="muted">A atualização automática ocorre às 22:00, 23:00, 00:00, 01:00, 02:00 e 03:00 (Brasília). A sincronização manual também respeita a janela das 22h às 04h.</p>
+    <p class="muted">Os disparos automáticos seguem o agendamento configurado abaixo. Consultas manuais e automáticas respeitam a janela das 22h às 04h, no horário de Brasília.</p>
     {% if not request.app.state.settings.recovery_enabled %}<p class="muted">Teste do distNSU: consultas de recuperação consNSU pausadas; pendências preservadas.</p>{% endif %}
+    {% if status_web.can_sync %}
     <form action="{{ url_for('atualizar_sincronizar') }}" method="post" data-processing-form data-sync-confirm>
       <input type="hidden" name="csrf" value="{{ csrf }}">
 
@@ -76,16 +77,20 @@
       </label>
 
       <label class="sync-confirmation">
-        <input type="checkbox" name="confirmacao" value="sincronizar" required {% if not status_web.can_sync %}disabled{% endif %}>
+        <input type="checkbox" name="confirmacao" value="sincronizar" required>
         <span>Confirmo a consulta à SEFAZ e o bloqueio de novas tentativas por 60 minutos.</span>
       </label>
 
       <div class="actions">
-        <button class="button danger" type="submit" {% if not status_web.can_sync %}disabled{% endif %}>
+        <button class="button danger" type="submit">
           Sincronizar com a SEFAZ
         </button>
       </div>
     </form>
+
+    {% else %}
+    <p class="alert" role="status">Sincronização indisponível. Aguarde a abertura da janela das 22h às 04h e o término de eventuais pausas.</p>
+    {% endif %}
 
     <div class="cooldown-note">
       {% if status_web.can_sync %}
@@ -123,17 +128,8 @@
       <div>
         <span>Sincronização automática</span>
         <strong>
-          {% if request.app.state.settings.auto_sync_enabled %}
-            {% if request.app.state.settings.auto_sync_once_date %}
-              {% if request.app.state.auto_sync_next_at %}
-                Teste único · {{ request.app.state.settings.auto_sync_once_date.strftime("%d/%m/%Y") }}
-                às {{ "%02d:%02d"|format(request.app.state.settings.auto_sync_hour, request.app.state.settings.auto_sync_minute) }} (Brasília)
-              {% else %}
-                Tentativa única encerrada · confira o Status
-              {% endif %}
-            {% else %}
-              Ativa · 22:00, 23:00, 00:00, 01:00, 02:00 e 03:00 (Brasília)
-            {% endif %}
+          {% if request.app.state.scheduler_settings.auto_sync_enabled %}
+            Ativa · {{ request.app.state.scheduler_settings.auto_sync_times|join(', ') }} (Brasília)
           {% else %}
             Desativada
           {% endif %}
@@ -148,6 +144,25 @@
     </div>
   </section>
 </div>
+
+<section class="card accounts-section schedule-section">
+  <h2>Disparos automáticos</h2>
+  {% if request.query_params.get('schedule_saved') == '1' %}<div class="alert success" role="status">Agendamento salvo. A alteração já vale para os próximos disparos.</div>{% endif %}
+  <p class="schedule-window" role="note"><strong>Janela de consultas à SEFAZ: das 22h às 04h, horário de Brasília.</strong><br>Às 04h a janela fecha. Configure somente horários entre 22:00 e antes de 04:00, com pelo menos 60 minutos entre eles.</p>
+  <form action="{{ url_for('admin_schedule_update') }}" method="post" class="schedule-form">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label class="schedule-enabled"><input type="checkbox" name="enabled" value="true" {% if request.app.state.scheduler_settings.auto_sync_enabled %}checked{% endif %}><span>Ativar disparos automáticos</span></label>
+    <label class="field"><span>Horários dos disparos (Brasília)</span><input name="times" value="{{ request.app.state.scheduler_settings.auto_sync_times|join(', ') }}" required maxlength="64" aria-describedby="schedule-times-help"></label>
+    <p id="schedule-times-help" class="account-help">Separe por vírgulas. Exemplo: 22:00, 00:00, 02:00. Até seis horários por dia.</p>
+    <fieldset class="schedule-days"><legend>Dias da semana</legend>
+      {% for value, label in [(0, 'Seg'), (1, 'Ter'), (2, 'Qua'), (3, 'Qui'), (4, 'Sex'), (5, 'Sáb'), (6, 'Dom')] %}
+      <label><input type="checkbox" name="weekdays" value="{{ value }}" {% if value in request.app.state.scheduler_settings.auto_sync_weekdays %}checked{% endif %}><span>{{ label }}</span></label>
+      {% endfor %}
+    </fieldset>
+    <p class="account-help">Os dias usam a data civil de Brasília: 01:00 de terça pertence à terça-feira. Desativar impede novos disparos e retentativas automáticas; uma sincronização já iniciada termina normalmente. A sincronização manual continua sujeita à janela e ao cooldown.</p>
+    <div><button class="button primary" type="submit">Salvar agendamento</button></div>
+  </form>
+</section>
 
   <section class="card certificate-card">
   <div class="card-title">

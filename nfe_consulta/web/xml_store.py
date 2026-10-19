@@ -112,6 +112,24 @@ def read_document(data: bytes, cnpj: str):
     return meta, rows, retained
 
 
+def _zip_path_error(entry):
+    # Lê o membro diretamente do ZIP, sem extrair o caminho no filesystem.
+    # Dois-pontos em pastas relativas (ex.: horário do exportador) são metadados.
+    name = entry.orig_filename.replace("\\", "/")
+    parts = PurePosixPath(name)
+    if any(ord(char) < 32 or ord(char) == 127 for char in name):
+        return "Caminho no ZIP contém caracteres de controle."
+    if parts.is_absolute() or (parts.parts and re.match(r"^[A-Za-z]:", parts.parts[0])):
+        return "Caminho absoluto ou de unidade no ZIP; gere o arquivo com caminhos relativos."
+    if ".." in parts.parts:
+        return "Caminho no ZIP contém referência à pasta superior (..)."
+    if stat.S_ISLNK(entry.external_attr >> 16):
+        return "Link simbólico não permitido no ZIP."
+    if ":" in parts.name:
+        return "Nome do XML contém dois-pontos; fluxos alternativos não são permitidos."
+    return None
+
+
 def _documents(paths):
     count = expanded = 0
     for path, filename in paths:
@@ -141,8 +159,9 @@ def _documents(paths):
                             raise ValueError("Lote excede 5.000 documentos ou 250 MiB descompactados.")
                         name = entry.filename.replace("\\", "/")
                         parts = PurePosixPath(name)
-                        if parts.is_absolute() or ".." in parts.parts or ":" in name or stat.S_ISLNK(entry.external_attr >> 16):
-                            yield _name(name), None, "Caminho inseguro no ZIP."
+                        path_error = _zip_path_error(entry)
+                        if path_error:
+                            yield _name(name), None, path_error
                             continue
                         if parts.suffix.lower() != ".xml":
                             yield _name(name), None, "Arquivo ignorado: envie XMLs de NF-e."
