@@ -5,7 +5,6 @@
   <div class="card login-card">
     <div class="login-heading">
       <h1>Criar minha conta</h1>
-      <p>Informe seu e-mail e escolha seu usuário e sua senha para consultar e exportar relatórios. A conta terá acesso de usuário comum.</p>
     </div>
     {% if error %}<div class="alert error" role="alert">{{ error }}</div>{% endif %}
     <form action="{{ url_for('register_submit') }}" method="post" class="login-form">
@@ -17,8 +16,7 @@
       <label class="field"><span>Confirmar senha</span><input type="password" name="password_confirmation" required minlength="12" maxlength="1024" autocomplete="new-password"></label>
       <button class="button primary login-submit" type="submit">Criar conta</button>
     </form>
-    <p class="login-note">Após o cadastro, entre com seu e-mail ou usuário. Somente administradores acessam as configurações e gerenciam contas.</p>
-    <a href="{{ url_for('login_page') }}">Já tenho conta · Entrar</a>
+    <a class="button secondary login-submit" href="{{ url_for('login_page') }}">Entrar</a>
   </div>
 </section>
 {% endblock %}

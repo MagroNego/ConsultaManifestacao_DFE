@@ -84,7 +84,7 @@ def test_local_number_export_ui_csrf_and_validation(tmp_path,monkeypatch):
     with TestClient(app) as client:
         token=authenticated_user(client)
         html=client.get('/consulta').text
-        assert 'CHAVES.txt' in html and 'notas.txt' in html and 'Como preparar o arquivo TXT' in html
+        assert 'CHAVES.txt' in html and 'NOTAS.txt' in html and 'Como preparar o arquivo TXT' in html
         args=dict(data={'csrf':token,'tipo_arquivo':'numeros'},files={'files':('notas.txt',str(NUMBER),'text/plain')})
         assert client.post('/excel',**{**args,'data':{**args['data'],'csrf':'wrong'}}).status_code==403
         response=client.post('/excel',**args)

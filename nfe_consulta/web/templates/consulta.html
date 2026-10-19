@@ -226,7 +226,7 @@
         <pre><code>12345
 67890
 95022</code></pre>
-        <p>Salve como <strong>notas.txt</strong>, em UTF-8. Aceita de 1 a 9 dígitos e zeros à esquerda. Números repetidos na lista são considerados uma vez.</p>
+        <p>Salve como <strong>NOTAS.txt</strong>. Aceita de 1 a 9 dígitos e zeros à esquerda. Números repetidos na lista são considerados uma vez.</p>
         <p><strong>Por chave:</strong> coloque uma chave de acesso completa de 44 dígitos por linha e salve como <strong>CHAVES.txt</strong>.</p>
         <p>Limites: TXT de até 2 MB e 10 mil entradas. Não use cabeçalho, vírgulas, ponto e vírgula ou uma planilha renomeada.</p>
         <p>A consulta é local. Se um número corresponder a várias notas, todas serão incluídas com suas chaves e séries. A aba <strong>Numeros solicitados</strong> informa correspondências e números não encontrados.</p>
@@ -234,7 +234,7 @@
     </details>
   </div>
   <div class="file-query-grid">
-    {% for tipo, filename, description, action_label in [('chaves', 'CHAVES.txt', 'Uma chave de acesso de 44 dígitos por linha', 'Gerar Excel por chaves'), ('numeros', 'notas.txt', 'Um número de nota por linha', 'Gerar Excel por números')] %}
+    {% for tipo, filename, description, action_label in [('chaves', 'CHAVES.txt', 'Uma chave de acesso de 44 dígitos por linha', 'Gerar'), ('numeros', 'NOTAS.txt', 'Um número de nota por linha', 'Gerar')] %}
     <form action="{{ url_for('exportar_excel_chaves') }}" method="post" enctype="multipart/form-data" data-processing-form data-download-form class="file-query-form">
       <input type="hidden" name="csrf" value="{{ csrf }}">
       <input type="hidden" name="tipo_arquivo" value="{{ tipo }}">

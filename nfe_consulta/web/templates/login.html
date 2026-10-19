@@ -51,7 +51,7 @@
       </button>
     </form>
 
-    <p><a href="{{ url_for('register_page') }}">Criar minha conta</a></p>
+    <a class="button secondary login-submit" href="{{ url_for('register_page') }}">Criar conta</a>
     <p class="login-note">
       A sessão expira após {{ request.app.state.settings.admin_session_minutes }} minutos de inatividade.
     </p>

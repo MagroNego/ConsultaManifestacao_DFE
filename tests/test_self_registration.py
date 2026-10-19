@@ -29,7 +29,7 @@ def test_cadastro_proprio_tem_acesso_imediato_mas_nunca_admin(tmp_path):
     cfg, app = setup(tmp_path)
     with TestClient(app) as client:
         login_page = client.get('/login').text
-        assert 'Criar minha conta' in login_page
+        assert 'href="http://testserver/cadastro">Criar conta</a>' in login_page
         assert 'class="button secondary" href="http://testserver/login">Entrar</a>' in login_page
         assert 'Confirmar senha' in client.get('/cadastro').text
         data = {'csrf':csrf_token(PUBLIC_USER,cfg), 'username':'ana.teste', 'email':'ana@example.com', 'password':PASSWORD,
