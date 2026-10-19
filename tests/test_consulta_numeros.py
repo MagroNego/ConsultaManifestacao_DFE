@@ -59,13 +59,13 @@ def test_numbers_include_all_matches_missing_and_notes_without_events(tmp_path):
 
 @pytest.mark.parametrize('content',['numero\n123','123;456','123,456','0','-1','1234567890','１２３', '1e3', '123 456'])
 def test_invalid_numbers_are_rejected_before_generating(tmp_path,content):
-    source=tmp_path/'notas.txt';source.write_text(content)
+    source=tmp_path/'notas.txt';source.write_text(content, encoding='utf-8')
     with pytest.raises(ValueError,match='Linha 1'):
         ler_numeros(source)
 
 
 def test_number_limits_bom_and_empty_input(tmp_path):
-    source=tmp_path/'notas.txt';source.write_text('\ufeff00123\n123\n00456\n')
+    source=tmp_path/'notas.txt';source.write_text('\ufeff00123\n123\n00456\n', encoding='utf-8')
     assert list(ler_numeros(source)) == [123,456]
     with pytest.raises(ValueError):
         ler_numeros(source,max_numeros=2)
