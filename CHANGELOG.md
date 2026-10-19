@@ -2,6 +2,8 @@
 
 ## Em preparação
 
+- ZIPs aceitam subpastas relativas com dois-pontos em horários; mantém recusa de caminhos absolutos, travessia e links, sem extração para o filesystem. Registro de lote passa a detalhar o motivo de caminho recusado.
+
 - Consulta por notas.txt com um número por linha, todas as correspondências locais e aba de conferência dos números solicitados. Tutorial acessível pelo ícone de interrogação; seleção de arquivos independente por opção.
 
 - Formulário de sincronização manual não é renderizado durante bloqueios. Requisições diretas continuam sujeitas à autorização, CSRF, janela e cooldown no servidor.

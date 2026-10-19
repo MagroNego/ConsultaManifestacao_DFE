@@ -321,3 +321,43 @@ def test_novas_importacoes_nao_apagam_xml_legado_nem_dependem_dele(tmp_path):
     assert stored_xml(path, nova) == b''
     assert store.query_report(path, CNPJ_PADRAO)['total'] == 2
     assert store.query_report(path, CNPJ_PADRAO, kind='itens')['total'] == 2
+
+
+def test_zip_accepts_relative_synchro_folders_with_timestamp(tmp_path):
+    path, source = setup(tmp_path)
+    archive = tmp_path / 'synchro.zip'
+    archive.write_bytes(zip_bytes([
+        ('Synchro - 10-2026/Exportacao 08:34:49/nota.xml', xml()),
+        ('Synchro - 09-2026\\Exportacao 07:30:00\\nota.xml', xml()),
+    ]))
+    result = store.import_batch(path, CNPJ_PADRAO, [(archive, 'synchro.zip')])
+    assert (result['importadas'], result['duplicadas'], result['erros']) == (1, 1, 0)
+    assert store.query_report(path, CNPJ_PADRAO)['total'] == 1
+    assert not (tmp_path / 'Synchro - 10-2026').exists()
+
+
+@pytest.mark.parametrize('name', ['/absoluto/nota.xml', 'C:/dados/nota.xml', 'C:nota.xml', './C:/nota.xml',
+    '../nota.xml', 'pasta/../nota.xml', 'pasta\\..\\nota.xml', 'pasta/nota:fluxo.xml'])
+def test_zip_rejects_unsafe_paths_with_specific_reason(tmp_path, name):
+    path, source = setup(tmp_path)
+    archive = tmp_path / 'unsafe.zip'
+    archive.write_bytes(zip_bytes([(name, xml())]))
+    result = store.import_batch(path, CNPJ_PADRAO, [(archive, 'unsafe.zip')])
+    assert result['importadas'] == 0 and result['erros'] == 1
+    message = result['registros'][0]['mensagem']
+    assert any(term in message for term in ('absoluto', 'pasta superior', 'dois-pontos'))
+    assert store.query_report(path, CNPJ_PADRAO)['total'] == 0
+
+
+def test_zip_rejects_symbolic_link_even_with_relative_folder(tmp_path):
+    from zipfile import ZipInfo
+    import stat
+    path, source = setup(tmp_path)
+    archive = tmp_path / 'link.zip'
+    with ZipFile(archive, 'w') as output:
+        item = ZipInfo('Synchro 08:30:00/nota.xml')
+        item.create_system = 3
+        item.external_attr = (stat.S_IFLNK | 0o777) << 16
+        output.writestr(item, xml())
+    result = store.import_batch(path, CNPJ_PADRAO, [(archive, 'link.zip')])
+    assert result['importadas'] == 0 and result['erros'] == 1

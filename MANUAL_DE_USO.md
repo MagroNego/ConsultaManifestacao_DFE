@@ -33,7 +33,7 @@ Ausência de evento significa ausência no banco disponível. A tela não consul
 
 ## Emissão e importação
 
-Em **Admin → Importar XML**, envie os XMLs completos ou o ZIP obtido no Synchro. Confira importados, duplicados e recusados; o registro do lote fica restrito ao administrador. A importação acumula dados entre meses. Chaves duplicadas preservam a primeira importação.
+Em **Admin → Importar XML**, envie os XMLs completos ou o ZIP obtido no Synchro. Subpastas relativas de vários meses são percorridas automaticamente, inclusive pastas com horário no nome; não é necessário extrair ou reorganizar os XMLs. O app lê diretamente os membros do ZIP, sem extrair seus caminhos no disco. Caminhos absolutos/de unidade, referências à pasta superior, links simbólicos e dois-pontos no nome final do XML são recusados com motivo específico no registro. Confira importados, duplicados e recusados; o registro do lote fica restrito ao administrador. A importação acumula dados entre meses. Chaves duplicadas preservam a primeira importação.
 
 Aceita NF-e modelo 55 emitida pelo CNPJ configurado, com ou sem envelope `nfeProc`, e cancelamentos homologados compatíveis. Verifica estrutura mínima e correspondência de chave/emitente/número/série; não valida assinatura digital, schema fiscal completo ou autorização atual.
 
