@@ -59,6 +59,7 @@ from nfe_consulta.web.auth import (
     validate_csrf,
 )
 from nfe_consulta.web.admin_accounts import AdminAccounts
+from nfe_consulta.consulta_numeros import executar_consulta_numeros
 from nfe_consulta.web.auto_sync_config import load_schedule, save_schedule
 from nfe_consulta.web.scheduler import loop_sincronizacao_automatica
 from nfe_consulta.web.settings import WebSettings, get_settings
@@ -996,14 +997,18 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         user: Annotated[WebUser, Depends(require_export)],
         csrf: str = Form(...),
         files: UploadFile = File(...),
+        tipo_arquivo: str = Form("chaves"),
     ):
         validate_csrf(csrf, user, settings)
+        if tipo_arquivo not in {"chaves", "numeros"}:
+            raise HTTPException(400, "Tipo de consulta por arquivo inválido.")
+        audit_action = "excel_numeros" if tipo_arquivo == "numeros" else "excel_chaves"
 
         if not _database_path(settings).is_file():
             app.state.audit.write(
                 request,
                 user,
-                "excel_chaves",
+                audit_action,
                 "erro",
                 reason="database_missing",
             )
@@ -1024,47 +1029,53 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
 
         temporario = Path(tempfile.mkdtemp(prefix="nfe-web-"))
         try:
-            chaves = temporario / "CHAVES.txt"
+            chaves = temporario / ("NOTAS.txt" if tipo_arquivo == "numeros" else "CHAVES.txt")
             resumo_upload = await consolidar_txts(
                 [files],
                 chaves,
                 max_bytes=settings.max_upload_bytes,
                 max_chaves=settings.max_keys,
+                tipo=tipo_arquivo,
             )
-            saida = temporario / NOME_PLANILHA
-
-            resultado = await run_in_threadpool(
-                executar_consulta,
-                ParametrosConsulta(
-                    chaves=chaves,
-                    banco=_database_path(settings),
-                    saida=saida,
-                    cnpj=CNPJ_PADRAO,
-                    uf=UF_PADRAO,
-                    sincronizar_sefaz=False,
-                    senha_banco=settings.current_database_password(),
-                ),
-            )
-
+            nome_planilha = "Consulta_Manifestacao_por_Numeros.xlsx" if tipo_arquivo == "numeros" else NOME_PLANILHA
+            saida = temporario / nome_planilha
+            if tipo_arquivo == "numeros":
+                resultado = await run_in_threadpool(executar_consulta_numeros, chaves,
+                    _database_path(settings), saida, CNPJ_PADRAO,
+                    senha=settings.current_database_password(), max_numeros=settings.max_keys)
+            else:
+                resultado = await run_in_threadpool(
+                    executar_consulta,
+                    ParametrosConsulta(
+                        chaves=chaves,
+                        banco=_database_path(settings),
+                        saida=saida,
+                        cnpj=CNPJ_PADRAO,
+                        uf=UF_PADRAO,
+                        sincronizar_sefaz=False,
+                        senha_banco=settings.current_database_password(),
+                    ),
+                )
             app.state.audit.write(
                 request,
                 user,
-                "excel_chaves",
+                audit_action,
                 "ok",
                 arquivos=resumo_upload.arquivos_txt,
-                chaves=resumo_upload.chaves,
+                entradas=resumo_upload.chaves,
+                tipo=tipo_arquivo,
                 notas=resultado.total,
                 com_evento=resultado.com_evento,
                 erros=resultado.com_erro,
             )
 
-            await archive_file(request, saida, filename=NOME_PLANILHA,
+            await archive_file(request, saida, filename=nome_planilha,
                 media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 documents=resultado.total,
                 period=period_label(evento.data for nota in resultado.resultados for evento in nota.manifestacoes))
             return FileResponse(
                 path=saida,
-                filename=NOME_PLANILHA,
+                filename=nome_planilha,
                 media_type=(
                     "application/vnd.openxmlformats-officedocument."
                     "spreadsheetml.sheet"
@@ -1087,7 +1098,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             app.state.audit.write(
                 request,
                 user,
-                "excel_chaves",
+                audit_action,
                 "erro",
                 reason=type(exc).__name__,
             )
@@ -1110,7 +1121,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             app.state.audit.write(
                 request,
                 user,
-                "excel_chaves",
+                audit_action,
                 "erro",
                 reason="unexpected",
             )

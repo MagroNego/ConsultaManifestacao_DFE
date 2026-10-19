@@ -38,7 +38,7 @@ Acesse `http://127.0.0.1:8080`. Entre com a conta administrativa e configure o b
 
 - Consulta de manifestações por período do evento, nota, chave, tipo e situação.
 - Emissão: notas importadas, itens, impostos, retenções e cancelamentos registrados.
-- Consulta por TXT de chaves, exportação de todas as páginas filtradas e Downloads.
+- Consulta por TXT de chaves ou números de notas, exportação de todas as páginas filtradas e Downloads.
 - Vínculos de CT-e recebidos por eventos, com os campos efetivamente disponíveis.
 - Sincronização automática e manual administrativa, cursor NSU e diagnóstico de falhas.
 - Contas comuns, administração de usuários, remetente SMTP e e-mail de teste.

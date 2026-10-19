@@ -2,6 +2,8 @@
 
 ## Em preparação
 
+- Consulta por notas.txt com um número por linha, todas as correspondências locais e aba de conferência dos números solicitados. Tutorial acessível pelo ícone de interrogação; seleção de arquivos independente por opção.
+
 - Formulário de sincronização manual não é renderizado durante bloqueios. Requisições diretas continuam sujeitas à autorização, CSRF, janela e cooldown no servidor.
 
 - Agenda automática configurável no Admin: ativação, dias e até seis horários, com persistência e aplicação sem reinício. Mantém janela 22h–04h e intervalo mínimo de 60 minutos.

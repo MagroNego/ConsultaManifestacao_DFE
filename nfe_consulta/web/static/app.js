@@ -45,23 +45,18 @@
       updateThemeIcon();
     });
 
-    const inputs = [...document.querySelectorAll("[data-file-input]")];
-    const selection = document.querySelector("[data-selection]");
-
-    const updateSelection = () => {
-      if (!selection) return;
-      const files = inputs.flatMap((input) => [...input.files]);
-      if (!files.length) {
-        selection.textContent = "Nenhum arquivo selecionado";
-        return;
-      }
-      const txts = files.filter((file) => file.name.toLowerCase().endsWith(".txt"));
-      selection.textContent = txts.length === 1
-        ? "1 arquivo TXT selecionado"
-        : txts.length + " arquivos TXT selecionados";
-    };
-
-    inputs.forEach((input) => input.addEventListener("change", updateSelection));
+    document.querySelectorAll('[data-file-input]').forEach((input) => {
+      input.addEventListener('change', () => {
+        const scope = input.closest('form') || document;
+        const selection = scope.querySelector('[data-selection]');
+        if (!selection) return;
+        const files = [...scope.querySelectorAll('[data-file-input]')].flatMap(item => [...item.files]);
+        const txts = files.filter(file => file.name.toLowerCase().endsWith('.txt'));
+        selection.textContent = !files.length ? 'Nenhum arquivo selecionado'
+          : txts.length === 1 ? '1 arquivo TXT selecionado'
+          : txts.length + ' arquivos TXT selecionados';
+      });
+    });
 
     const formatDateInput = (input, completeYear = false) => {
       const cursor = input.selectionStart;

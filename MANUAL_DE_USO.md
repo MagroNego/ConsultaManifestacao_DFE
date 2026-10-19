@@ -17,7 +17,17 @@ Senhas atuais não são recuperáveis: ficam armazenadas como hash. Nos campos d
 
 Filtre por data do evento, número da nota, chave, manifestação e situação. A data final inclui o dia inteiro. As páginas mostram até 100 registros. Emitente sem nome disponível é identificado pelo CNPJ extraído da chave.
 
-**Exportar Excel** inclui todas as páginas dos filtros aplicados, até 200 mil eventos. Chaves, protocolos e NSUs são texto. A consulta por TXT aceita uma chave de 44 dígitos por linha, até 10 mil chaves e 2 MB; usa exclusivamente o histórico local.
+**Exportar Excel** inclui todas as páginas dos filtros aplicados, até 200 mil eventos. Chaves, protocolos e NSUs são texto. A consulta por TXT oferece **CHAVES.txt** (uma chave de 44 dígitos por linha) e **notas.txt** (um número de NF de 1 a 9 dígitos por linha). Ambas usam exclusivamente o histórico local, com limite de 10 mil entradas e 2 MB. O ícone de interrogação abre o tutorial.
+
+Para números, salve um TXT UTF-8, sem cabeçalho, série ou pontuação:
+
+```text
+12345
+67890
+95022
+```
+
+Zeros à esquerda são aceitos e duplicatas numéricas são consideradas uma vez. A consulta inclui todas as chaves correspondentes ao número no banco do CNPJ configurado, sem escolher emitente ou série arbitrariamente. A planilha mantém chave/série e inclui **Numeros solicitados**, com contagem das correspondências e números não localizados. Não localizar significa ausência no banco disponível. Notas conhecidas sem manifestações também são incluídas. O relatório recusa resultados com mais de 100 mil notas; reduza a lista nesse caso.
 
 Ausência de evento significa ausência no banco disponível. A tela não consulta a situação atual da NF-e na SEFAZ.
 

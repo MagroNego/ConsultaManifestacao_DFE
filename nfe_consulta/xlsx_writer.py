@@ -39,7 +39,7 @@ def _data_exibicao(iso: str) -> str:
     return data.strftime("%d/%m/%Y %H:%M") + sufixo
 
 
-def gravar_xlsx(caminho: str, resultados: list, cobertura: str) -> None:
+def gravar_xlsx(caminho: str, resultados: list, cobertura: str, *, numeros_solicitados: dict[int, int] | None = None) -> None:
     wb = Workbook()
     ws = wb.active
     ws.title = "Consulta_Manifestacao_YAB"
@@ -93,6 +93,20 @@ def gravar_xlsx(caminho: str, resultados: list, cobertura: str) -> None:
     ws.sheet_properties.pageSetUpPr.fitToPage = True
     ws.page_setup.fitToWidth = 1
     ws.page_setup.orientation = "landscape"
+
+    if numeros_solicitados is not None:
+        summary = wb.create_sheet("Numeros solicitados")
+        summary.append(["Número NF", "Notas localizadas", "Resultado"])
+        for number, count in cancellable_rows(numeros_solicitados.items()):
+            summary.append([number, count, "Não localizada no banco" if not count else
+                            "Localizada" if count == 1 else "Múltiplas notas; confira chave e série"])
+        for cell in summary[1]:
+            cell.font = Font(bold=True)
+            cell.fill = PatternFill("solid", fgColor="E7E7E7")
+        summary.freeze_panes = "A2"
+        summary.auto_filter.ref = summary.dimensions
+        for column, width in (("A", 16), ("B", 22), ("C", 52)):
+            summary.column_dimensions[column].width = width
 
     destino = Path(caminho)
     destino.parent.mkdir(parents=True, exist_ok=True)
