@@ -43,17 +43,11 @@ def gravar_xlsx(caminho: str, resultados: list, cobertura: str, *, numeros_solic
     ws = wb.active
     ws.title = "Consulta_Manifestacao_YAB"
     ws.sheet_view.zoomScale = 85
-    ws.freeze_panes = "D5"
-
-    ws["A1"] = "Consulta de manifestações"
-
-    encontradas = sum(bool(r.manifestacoes) for r in resultados)
-    ws["A2"] = f"{len(resultados)} chaves | {encontradas} com evento | {len(resultados)-encontradas} sem evento localizado"
-    ws.row_dimensions[3].height = 8
+    ws.freeze_panes = "D2"
 
     for coluna, titulo in enumerate(HEADERS, 1):
-        ws.cell(4, coluna, titulo)
-    for indice, resultado in enumerate(cancellable_rows(resultados), 5):
+        ws.cell(1, coluna, titulo)
+    for indice, resultado in enumerate(cancellable_rows(resultados), 2):
         numero, serie = numero_e_serie(resultado.chave)
         evento = resultado.manifestacoes[-1] if resultado.manifestacoes else None
         valores = [
@@ -80,8 +74,8 @@ def gravar_xlsx(caminho: str, resultados: list, cobertura: str, *, numeros_solic
         ws.cell(indice, 8).number_format = "0"
         ws.row_dimensions[indice].height = max(text_row_height(valores[8], 78), text_row_height(valores[9], 40), text_row_height(valores[3], 34))
 
-    configure_sheet(ws, header_row=4, widths=[51, 13, 10, 34, 31, 23, 13, 11, 78, 40, 19, 23], title=True)
-    ws.auto_filter.ref = f"A4:L{max(4, 4 + len(resultados))}"
+    configure_sheet(ws, header_row=1, widths=[51, 13, 10, 34, 31, 23, 13, 11, 78, 40, 19, 23])
+    ws.auto_filter.ref = f"A1:L{max(1, 1 + len(resultados))}"
 
     if numeros_solicitados is not None:
         summary = wb.create_sheet("Numeros solicitados")

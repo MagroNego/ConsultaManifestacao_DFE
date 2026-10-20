@@ -71,16 +71,12 @@ def gravar_eventos_xlsx(
     ws = wb.active
     ws.title = "Manifestacoes"
     ws.sheet_view.zoomScale = 85
-    ws.freeze_panes = "A5"
-
-    ws["A1"] = "Consulta de manifestações"
-    ws["A2"] = f"{len(eventos)} evento(s) | {_resumo_filtros(filtros)}"
-    ws.row_dimensions[3].height = 8
+    ws.freeze_panes = "A2"
 
     for coluna, titulo in enumerate(HEADERS, 1):
-        ws.cell(4, coluna, titulo)
+        ws.cell(1, coluna, titulo)
 
-    for indice, evento in enumerate(cancellable_rows(eventos), 5):
+    for indice, evento in enumerate(cancellable_rows(eventos), 2):
         valores = [
             evento.numero,
             evento.serie,
@@ -111,8 +107,8 @@ def gravar_eventos_xlsx(
 
         ws.row_dimensions[indice].height = max(text_row_height(evento.descricao, 34), text_row_height(evento.emitente, 44))
 
-    configure_sheet(ws, header_row=4, widths=[14, 10, 51, 13, 34, 24, 23, 19, 25, 44, 19, 23], title=True)
-    ws.auto_filter.ref = f"A4:L{max(4, 4 + len(eventos))}"
+    configure_sheet(ws, header_row=1, widths=[14, 10, 51, 13, 34, 24, 23, 19, 25, 44, 19, 23])
+    ws.auto_filter.ref = f"A1:L{max(1, 1 + len(eventos))}"
 
     destino = Path(caminho)
     destino.parent.mkdir(parents=True, exist_ok=True)

@@ -124,7 +124,7 @@ def test_links_in_public_ui_excel_csv_and_txt_lookup(tmp_path):
             assert 'Transportadora teste' in response.text
         csv = client.get('/xml/exportar?formato=csv&tipo=notas').content.decode('utf-8-sig')
         assert CTE in csv and 'Cancelado' in csv
-        for url, sheet, header_row in [('/xml/exportar?formato=xlsx', 'Notas', 1), ('/consulta/exportar', 'Manifestacoes', 4)]:
+        for url, sheet, header_row in [('/xml/exportar?formato=xlsx', 'Notas', 1), ('/consulta/exportar', 'Manifestacoes', 1)]:
             response = client.get(url)
             assert response.status_code == 200
             ws = load_workbook(BytesIO(response.content))[sheet]
@@ -155,11 +155,11 @@ def test_txt_workbook_includes_cte_preserves_manifestation(tmp_path):
     output = tmp_path / 'saida.xlsx'
     gravar_xlsx(str(output), [result], 'local')
     ws = load_workbook(output).active
-    assert ws['D5'].value == 'Sem evento localizado'
-    assert ws['K4'].value == 'Situação'
-    assert ws['L4'].value == 'CT-e vinculado'
-    assert ws['L5'].value == 'CT-e Vinculado'
-    assert ws['L5'].data_type == 's'
+    assert ws['D2'].value == 'Sem evento localizado'
+    assert ws['K1'].value == 'Situação'
+    assert ws['L1'].value == 'CT-e vinculado'
+    assert ws['L2'].value == 'CT-e Vinculado'
+    assert ws['L2'].data_type == 's'
 
 
 def test_xml_empty_installation_keeps_empty_state(tmp_path):

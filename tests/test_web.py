@@ -659,13 +659,13 @@ def test_exportacao_da_consulta_respeita_os_mesmos_filtros(tmp_path):
     assert resposta.content.startswith(b"PK")
     wb = load_workbook(BytesIO(resposta.content), read_only=True)
     ws = wb["Manifestacoes"]
-    assert ws["A5"].value == 91780
-    assert ws["E5"].value == "Operação não Realizada"
-    assert ws["J5"].value == "Fornecedor Teste"
+    assert ws["A2"].value == 91780
+    assert ws["E2"].value == "Operação não Realizada"
+    assert ws["J2"].value == "Fornecedor Teste"
     assert ws.max_column == 12
-    assert ws['K4'].value == 'Situação'
-    assert "Cancelamento" not in [c.value for c in ws[4]]
-    assert ws["A6"].value is None
+    assert ws['K1'].value == 'Situação'
+    assert "Cancelamento" not in [c.value for c in ws[1]]
+    assert ws["A3"].value is None
 
 
 def test_consulta_identifica_banco_sem_sincronizacao(tmp_path):

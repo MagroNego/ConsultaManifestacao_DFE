@@ -52,8 +52,8 @@ def test_exportacoes_tratam_texto_que_parece_formula(tmp_path):
     gravar_xlsx(str(destino), [resultado], "=SUM(2,2)")
     ws = load_workbook(destino).active
     assert ws.title == "Consulta_Manifestacao_YAB"
-    assert ws["A5"].data_type == "s"
-    assert ws["J5"].data_type == "s"
+    assert ws["A2"].data_type == "s"
+    assert ws["J2"].data_type == "s"
     assert ws["A3"].value is None
 
     texto = io.StringIO()

@@ -106,7 +106,7 @@ def test_all_ui_and_reports_use_same_cancellation_flag(tmp_path):
         for kind in ['notas', 'itens', 'retencoes']:
             report = client.get('/xml/exportar?formato=csv&tipo=' + kind).content.decode('utf-8-sig')
             assert 'Situação' in report and 'Cancelada' in report
-        for url, sheet, header_row in [('/xml/exportar?formato=xlsx', 'Notas', 1), ('/consulta/exportar?chave=' + KEY, 'Manifestacoes', 4)]:
+        for url, sheet, header_row in [('/xml/exportar?formato=xlsx', 'Notas', 1), ('/consulta/exportar?chave=' + KEY, 'Manifestacoes', 1)]:
             response = client.get(url)
             ws = load_workbook(BytesIO(response.content))[sheet]
             headers = [cell.value for cell in ws[header_row]]

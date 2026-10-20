@@ -2,6 +2,8 @@
 
 ## Relatórios Excel — 2026-10-20
 
+- Relatórios começam diretamente no cabeçalho da tabela, sem título, contagem ou linhas vazias antes dos dados.
+
 - Formatação sóbria compartilhada: cabeçalhos grafite, fonte Calibri, linhas em cinza claro e dimensões ajustadas.
 - Histórico com altura de linha proporcional ao conteúdo, filtros e painéis congelados preservados.
 - Coluna de CT-e mostra CT-e Vinculado quando existe associação; interface e CSV mantêm os detalhes.

@@ -48,9 +48,9 @@ def test_numbers_include_all_matches_missing_and_notes_without_events(tmp_path):
     assert next(item for item in result.resultados if item.chave==no_events).cancelada
     assert path.read_bytes() == before  # Nenhuma atualização fiscal/NSU.
     book=load_workbook(output)
-    assert book.active.max_row == 7
-    assert {book.active.cell(row,1).value for row in (5,6,7)} == {KEY,second,no_events}
-    assert all(book.active.cell(row,1).data_type=='s' for row in (5,6,7))
+    assert book.active.max_row == 4
+    assert {book.active.cell(row,1).value for row in (2,3,4)} == {KEY,second,no_events}
+    assert all(book.active.cell(row,1).data_type=='s' for row in (2,3,4))
     summary=list(book['Numeros solicitados'].values)
     assert summary[1][:2] == (NUMBER,2)
     assert summary[2][:2] == (NUMBER+1,1)

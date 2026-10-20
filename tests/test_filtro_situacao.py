@@ -57,7 +57,7 @@ def test_filters_apply_to_all_reports_and_exports(tmp_path, state, key):
             rows = list(csv.DictReader(StringIO(response.content.decode('utf-8-sig')), delimiter=';'))
             assert len(rows) == 1 and rows[0]['Chave Acesso'] == key
             assert rows[0]['Situação'] == expected
-        for url, sheets, header_row in [('/xml/exportar', ('Notas', 'Itens', 'Retencoes'), 1), ('/consulta/exportar', ('Manifestacoes',), 4)]:
+        for url, sheets, header_row in [('/xml/exportar', ('Notas', 'Itens', 'Retencoes'), 1), ('/consulta/exportar', ('Manifestacoes',), 1)]:
             response = client.get(url, params={'situacao': state, 'formato': 'xlsx'})
             assert response.status_code == 200
             wb = load_workbook(BytesIO(response.content))

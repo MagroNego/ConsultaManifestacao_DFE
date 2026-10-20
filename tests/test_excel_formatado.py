@@ -22,17 +22,16 @@ def test_numero_serie_e_chave_como_texto_no_excel(tmp_path):
     saida = tmp_path / "resultado.xlsx"
     gravar_xlsx(str(saida), [resultado], "Historico local")
     ws = load_workbook(saida, data_only=True).active
-    assert ws["A3"].value is None
-    assert ws["A4"].value == "Chave NF-e"
-    assert ws["A5"].value == CHAVE
-    assert ws["A5"].data_type == "s"
-    assert ws["B5"].value == 91779
-    assert ws["C5"].value == "001"
-    assert ws["D5"].value == "Ciência da Operação"
-    assert ws["E5"].value == "03/08/2026 11:47 UTC-03:00"
-    assert ws.auto_filter.ref == "A4:L5"
-    assert ws.freeze_panes == "D5"
-    assert ws["L5"].value == "Não localizado"
+    assert ws["A1"].value == "Chave NF-e"
+    assert ws["A2"].value == CHAVE
+    assert ws["A2"].data_type == "s"
+    assert ws["B2"].value == 91779
+    assert ws["C2"].value == "001"
+    assert ws["D2"].value == "Ciência da Operação"
+    assert ws["E2"].value == "03/08/2026 11:47 UTC-03:00"
+    assert ws.auto_filter.ref == "A1:L2"
+    assert ws.freeze_panes == "D2"
+    assert ws["L2"].value == "Não localizado"
     textos = " ".join(str(c.value or "") for row in ws.iter_rows() for c in row)
     assert "Cobertura:" not in textos
     assert "não comprova ausência de manifestação" not in textos
