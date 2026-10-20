@@ -102,6 +102,10 @@ class WebSettings:
     admin_cookie_name: str = "nfe_admin_session"
     admin_accounts_path: Path | None = None
     local_auth_enabled: bool = False
+    corporate_auth_enabled: bool = False
+    groups_header: str = "X-NFE-Groups"
+    allowed_groups: frozenset[str] = frozenset()
+    admin_groups: frozenset[str] = frozenset()
     certificate_path_file: Path | None = None
     certificate_password_file: Path | None = None
     database_path_file: Path | None = None
@@ -162,6 +166,9 @@ def get_settings() -> WebSettings:
         csrf_secret = secrets.token_urlsafe(32)
 
     local_auth_enabled = os.getenv("NFE_WEB_LOCAL_AUTH", "0").strip() == "1"
+    corporate_auth_enabled = os.getenv("NFE_WEB_CORPORATE_AUTH", "0").strip() == "1"
+    if corporate_auth_enabled and not proxy_secret:
+        proxy_secret = _ler_segredo(SECRETS_DIR / "web-proxy-secret.txt", rotulo="segredo do proxy corporativo")
     admin_password = _senha_admin() if local_auth_enabled else None
     admin_username = _usuario_admin() if local_auth_enabled else "admin"
     if admin_password and not 12 <= len(admin_password) <= 1024:
@@ -251,6 +258,10 @@ def get_settings() -> WebSettings:
         sync_cooldown_minutes=60,
         admin_username=admin_username,
         local_auth_enabled=local_auth_enabled,
+        corporate_auth_enabled=corporate_auth_enabled,
+        groups_header=os.getenv("NFE_WEB_GROUPS_HEADER", "X-NFE-Groups").strip(),
+        allowed_groups=_lista(os.getenv("NFE_WEB_ALLOWED_GROUPS")),
+        admin_groups=_lista(os.getenv("NFE_WEB_ADMIN_GROUPS")),
         admin_password=admin_password,
         admin_accounts_path=accounts_path,
         admin_session_minutes=admin_session_minutes,
@@ -276,3 +287,19 @@ def get_settings() -> WebSettings:
         smtp_user=os.getenv("NFE_SMTP_USER", "").strip(),
         smtp_security=smtp_security,
     )
+
+
+def validate_corporate_auth(settings: WebSettings) -> None:
+    """Recusa configuração incompleta em vez de liberar acesso de rede."""
+    if not settings.corporate_auth_enabled:
+        return
+    if settings.local_auth_enabled or settings.auth_mode != "proxy":
+        raise RuntimeError("Login corporativo exige NFE_WEB_AUTH_MODE=proxy e NFE_WEB_LOCAL_AUTH=0.")
+    if not settings.proxy_secret or len(settings.proxy_secret) < 32:
+        raise RuntimeError("Login corporativo exige segredo do proxy com pelo menos 32 caracteres.")
+    if not settings.allowed_groups and not settings.admin_groups:
+        raise RuntimeError("Configure grupos autorizados para o login corporativo.")
+    names = [settings.user_header, settings.name_header, settings.groups_header, settings.proxy_secret_header]
+    import re
+    if any(not re.fullmatch(r"[A-Za-z0-9-]+", name) for name in names) or len({name.lower() for name in names}) != 4:
+        raise RuntimeError("Cabeçalhos corporativos devem ter nomes válidos e distintos.")

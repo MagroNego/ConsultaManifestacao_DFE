@@ -1,5 +1,17 @@
 # Histórico de versões
 
+## Layout do Admin — 2026-10-20
+
+- Orientações agrupadas em oito guias contextuais acessíveis pelo botão de interrogação.
+- Menos texto permanente, janela SEFAZ visível e distribuição equilibrada dos painéis.
+- Ajuste de navegação em telas pequenas e fechamento dos guias por Escape ou clique fora.
+
+## Preparação de login corporativo — 2026-10-20
+
+- Integração opcional com gateway autenticado, grupos de Consulta/Administrador e identificação individual na auditoria.
+- Configuração incompleta bloqueia inicialização; credencial e grupos são validados no servidor. Login local permanece desativado.
+- Contrato de cabeçalhos e roteiro de homologação para o TI em SERVIDOR_WEB.md.
+
 ## Main após a release 2.6.0 — revisão de 2026-10-19
 
 A versão declarada continua 2.6.0. As alterações abaixo pertencem à main e não atualizam o ZIP já publicado dessa release.

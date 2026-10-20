@@ -270,6 +270,8 @@ def _certificado_web(settings: WebSettings) -> dict:
 
 def create_app(settings: WebSettings | None = None) -> FastAPI:
     settings = settings or get_settings()
+    from nfe_consulta.web.settings import validate_corporate_auth
+    validate_corporate_auth(settings)
     app = FastAPI(
         title="AtlasDFE",
         version=__version__,
@@ -343,6 +345,15 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         ):
             return JSONResponse({"detail": "Recurso de contas locais desativado."}, status_code=404,
                 headers={"Cache-Control": "no-store"})
+        if settings.corporate_auth_enabled and path != "/healthz" and not path.startswith("/static/"):
+            user = current_user(request)
+            if not user.authenticated:
+                return JSONResponse({"detail": "Autenticação corporativa necessária."}, status_code=401,
+                    headers={"Cache-Control": "no-store"})
+            if (path.startswith("/admin") or path.startswith("/atualizar") or
+                    path == "/xml/importar" or path.startswith("/xml/lote/")) and not user.is_admin:
+                return JSONResponse({"detail": "Permissão administrativa necessária."}, status_code=403,
+                    headers={"Cache-Control": "no-store"})
         protected = (path.startswith("/atualizar") or
                      (path.startswith("/admin/") and path not in {"/admin/login", "/admin/logout"}) or
                      path == "/xml/importar" or path.startswith("/xml/lote/"))

@@ -1506,3 +1506,38 @@ html[data-theme="dark"] .brand-logo-dark {
 .txt-help-content p { margin: 12px 0; }
 .txt-help-content pre { margin: 12px 0; padding: 12px; background: var(--panel-soft); border: 1px solid var(--border); border-radius: 8px; }
 @media (max-width: 760px) { .file-query-grid { grid-template-columns: minmax(0, 1fr); } }
+
+/* Guias contextuais do Admin: orientações sob demanda, estado sempre visível. */
+.admin-settings .admin-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.admin-settings .card-title { gap: 16px; }
+.heading-with-help { display: flex; align-items: center; gap: 12px; }
+.section-help { position: relative; flex: 0 0 auto; }
+.section-help > summary { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 1px solid var(--border); border-radius: 8px; color: var(--text); cursor: pointer; list-style: none; }
+.section-help > summary::-webkit-details-marker { display: none; }
+.section-help > summary:hover, .section-help[open] > summary { background: var(--panel-soft); }
+.section-help > summary:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
+.section-help-content { position: absolute; z-index: 20; top: calc(100% + 8px); right: 0; width: min(380px, calc(100vw - 64px)); max-height: 60vh; overflow-y: auto; overflow-wrap: anywhere; padding: 20px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow); font-size: 13px; line-height: 1.65; font-weight: 400; }
+.heading-with-help .section-help-content { left: 0; right: auto; }
+.section-help-content h3 { margin: 0 0 12px; font-size: 14px; }
+.section-help-content p { margin: 12px 0 0; }
+.section-help-content ol { padding-left: 20px; margin: 0; }
+.section-help-content li + li { margin-top: 8px; }
+.admin-window { margin: 0 0 18px; padding: 10px 12px; background: var(--panel-soft); border: 1px solid var(--border); border-radius: 8px; font-size: 13px; line-height: 1.5; }
+.admin-settings .field + .field { margin-top: 16px; }
+.admin-settings .field > span { font-size: 12px; }
+.admin-settings .account-help { margin: 0; }
+.admin-settings .schedule-form { max-width: none; gap: 16px; }
+.admin-settings .certificate-password-field { margin-top: 16px; }
+.manual-adjustment > summary { color: var(--text); font-size: 13px; }
+.manual-adjustment[open] > summary { margin-bottom: 18px; }
+@media (max-width: 760px) {
+  .admin-settings .admin-grid { grid-template-columns: minmax(0, 1fr); }
+  .admin-settings .card-title { flex-wrap: wrap; }
+  .heading-with-help { gap: 8px; }
+  .admin-settings .section-help-content { position: fixed; top: 18vh; left: 24px; right: 24px; width: auto; max-height: 64vh; }
+}
+
+@media (max-width: 760px) {
+  .tabs { min-width: 0; max-width: 100%; overflow-x: auto; }
+  .tabs a { flex: 0 0 auto; }
+}

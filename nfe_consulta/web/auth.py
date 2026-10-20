@@ -49,8 +49,33 @@ def admin_session_active(request: Request) -> bool:
     return _session_username(token, settings, request.app.state.admin_accounts) is not None
 
 
+def _corporate_user(request: Request, settings: WebSettings) -> WebUser:
+    # Só o gateway autenticado pode atestar identidade e grupos.
+    headers = (settings.proxy_secret_header, settings.user_header, settings.name_header, settings.groups_header)
+    if any(len(request.headers.getlist(name)) > 1 for name in headers):
+        return PUBLIC_USER
+    supplied = request.headers.get(settings.proxy_secret_header, "")
+    if not settings.proxy_secret or not hmac.compare_digest(supplied.encode(), settings.proxy_secret.encode()):
+        return PUBLIC_USER
+    username = request.headers.get(settings.user_header, "").strip().casefold()
+    groups_raw = request.headers.get(settings.groups_header, "")
+    if not username or len(username) > 254 or any(ord(c) < 33 or ord(c) == 127 for c in username) or len(groups_raw) > 16384:
+        return PUBLIC_USER
+    groups = {g.strip().casefold() for g in groups_raw.split(",") if g.strip()}
+    admin = bool(groups & settings.admin_groups)
+    if not admin and not groups & settings.allowed_groups:
+        return PUBLIC_USER
+    name = request.headers.get(settings.name_header, username).strip()[:254] or username
+    # Token interno para vincular CSRF à identidade e aos grupos; não é token do IdP.
+    identity = hmac.new(settings.csrf_secret.encode(),
+        (username + "|" + ",".join(sorted(groups))).encode(), hashlib.sha256).hexdigest()
+    return WebUser(username, name, admin, identity, "admin" if admin else "consulta")
+
+
 def current_user(request: Request) -> WebUser:
     settings: WebSettings = request.app.state.settings
+    if settings.corporate_auth_enabled:
+        return _corporate_user(request, settings)
     if not settings.local_auth_enabled:
         # Identidade técnica compartilhada; acesso de rede controlado pelo TI.
         return WebUser("acesso-rede", "Acesso de rede", True, "acesso-rede", "admin")

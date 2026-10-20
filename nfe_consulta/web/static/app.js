@@ -143,3 +143,18 @@
     });
   });
 })();
+
+// A ajuda funciona sem JavaScript; Escape e clique fora complementam o teclado.
+document.addEventListener("click", (event) => {
+  document.querySelectorAll(".section-help[open]").forEach((help) => {
+    if (!help.contains(event.target)) help.open = false;
+  });
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape") return;
+  const active = document.activeElement;
+  document.querySelectorAll(".section-help[open]").forEach((help) => {
+    help.open = false;
+    if (help.contains(active)) help.querySelector("summary").focus();
+  });
+});

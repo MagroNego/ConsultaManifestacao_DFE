@@ -42,3 +42,12 @@ NFE_SMTP_USER=
 # O app não verifica nem configura a janela do Qive.
 # Política e atendimento: DISTRIBUICAO_DFE_QIVE.md.
 
+
+# Login corporativo via gateway do TI (preparado, desativado por padrão).
+NFE_WEB_CORPORATE_AUTH=0
+# Para habilitar: LOCAL_AUTH=0, CORPORATE_AUTH=1, AUTH_MODE=proxy e grupos.
+# NFE_WEB_AUTH_MODE=proxy
+# NFE_WEB_ALLOWED_GROUPS=<id-grupo-consulta>
+# NFE_WEB_ADMIN_GROUPS=<id-grupo-admin>
+# Segredo compartilhado em secrets/web-proxy-secret.txt (32+ caracteres aleatórios).
+# Contrato, proteção de cabeçalhos e homologação: SERVIDOR_WEB.md.

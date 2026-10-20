@@ -31,6 +31,8 @@ Importação usa a trava compartilhada com sincronização e não altera cursor.
 
 Por padrão, não há login ou cadastro local. `current_user` fornece a identidade técnica compartilhada `acesso-rede`, com permissão administrativa, sem cookies de sessão. A autenticação fica a cargo da infraestrutura do TI. As rotas de contas respondem 404 e o banco de contas não é aberto. CSRF continua validado no servidor. O modo legado de contas está disponível somente com `NFE_WEB_LOCAL_AUTH=1`; nesse caso, preserva PBKDF2, sessões e perfis existentes.
 
+O modo corporativo opcional (`NFE_WEB_CORPORATE_AUTH=1`) exige um gateway autenticado com segredo compartilhado e grupos autorizados. `current_user` valida os cabeçalhos atestados pelo gateway; a autorização distingue Consulta e Administrador. Configuração incompleta impede iniciar o app e requisições sem identidade autorizada recebem 401. O app não implementa OIDC/SAML diretamente. Contrato e implantação: [Servidor Web](SERVIDOR_WEB.md#preparação-para-login-corporativo).
+
 ## Concorrência e agendamento
 
 A implantação exige um processo/worker. As travas locais não coordenam processos separados. O banco deve permanecer preferencialmente em disco local.

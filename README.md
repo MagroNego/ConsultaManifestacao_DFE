@@ -20,6 +20,8 @@ Documentação revisada em **19/10/2026** para o código da `main`, versão decl
 | Alertas de e-mail | Somente Operação não Realizada (`210240`) |
 | Retenção | Downloads: 24 horas; histórico de sincronização: 30 dias |
 
+O login corporativo pode ser habilitado pelo TI por um gateway autenticado, com grupos de Consulta e Administrador. Permanece desativado até a configuração: [contrato de integração](SERVIDOR_WEB.md#preparação-para-login-corporativo).
+
 Em **Admin → Disparos automáticos**, ative/desative a agenda e escolha horários e dias sem reiniciar. São aceitos até seis horários dentro da janela, separados por pelo menos 60 minutos. A configuração salva prevalece sobre a ativação inicial do lançador.
 
 A interface e os testes locais também executam em Linux. O transporte SEFAZ e a leitura de certificados usam PowerShell; a implantação documentada para sincronização é Windows. A aprovação da CI Linux não valida comunicação real com a SEFAZ.

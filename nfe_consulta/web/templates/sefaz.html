@@ -1,11 +1,18 @@
 {% extends "base.html" %}
 {% block title %}Admin · AtlasDFE{% endblock %}
 
+{% macro guide(title) -%}
+<details class="section-help">
+  <summary aria-label="Ajuda: {{ title }}" title="Ajuda: {{ title }}"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 0 1 5 .4c0 1.8-2.5 2-2.5 3.6"/><path d="M12 17h.01"/></svg></summary>
+  <div class="section-help-content"><h3>{{ title }}</h3>{{ caller() }}</div>
+</details>
+{%- endmacro %}
 {% block content %}
+<div class="admin-settings">
 <section class="page-heading">
   <div>
     <h1>Admin</h1>
-    <p>Configura o servidor e sincroniza o banco com a SEFAZ.</p>
+    <p>Configurações e sincronização.</p>
   </div>
 </section>
 <div class="actions">
@@ -26,47 +33,45 @@
   <a href="{{ url_for('xml_page') }}">Consultar Emissão</a>
 </div>
 {% endif %}
-<details class="card xml-import" open>
-  <summary>Importar XML</summary>
-  <p class="muted">Selecione XMLs de notas e cancelamentos homologados, ou um ZIP. O app guarda os dados para consulta e relatórios; obtenha o XML original no Synchro. Chaves repetidas preservam os dados já importados; o cancelamento atualiza sua situação.</p>
+<section class="card xml-import">
+  <div class="card-title"><h2>Importar XML</h2>
+  {% call guide('Importar XML') %}<ol><li>Selecione XMLs de NF-e emitidas pelo CNPJ configurado, eventos de cancelamento homologados ou ZIPs com subpastas.</li><li>Clique em <strong>Importar dados</strong> e confira o registro do lote.</li></ol><p>Limites: 100 MiB por envio, 250 MiB descompactados e 5.000 documentos. Chaves repetidas preservam os dados existentes; cancelamentos atualizam a situação.</p><p>O app guarda dados para relatórios. Obtenha o XML original no Synchro.</p>{% endcall %}</div>
   <form action="{{ url_for('xml_import') }}" method="post" enctype="multipart/form-data" data-processing-form>
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <label class="field"><span>Arquivos XML ou ZIP</span><input type="file" name="files" accept=".xml,.zip" multiple required></label>
-    <p class="muted">Até 100 MiB por envio, 250 MiB descompactados e 5.000 documentos. Somente NF-e emitidas pelo CNPJ configurado.</p>
     <div class="actions"><button class="button primary" type="submit">Importar dados</button></div>
   </form>
-</details>
+</section>
 
-<details class="card xml-import">
-  <summary>Alterar situação de notas</summary>
+<section class="card xml-import">
+  <div class="card-title"><h2>Alterar situação de notas</h2>{% call guide('Alterar situação de notas') %}<ol><li>Informe uma nota ou chave por linha, até 100 notas.</li><li>Se o número identificar mais de uma nota, use a chave de 44 dígitos.</li><li>Preencha o motivo e escolha a ação.</li></ol><p>A marcação é local e vale na Consulta, Emissão e novos relatórios. Remover a marcação manual não desfaz cancelamentos recebidos da SEFAZ.</p>{% endcall %}</div>
+  <details class="manual-adjustment"><summary>Abrir formulário</summary>
   <form action="{{ url_for('alterar_situacao_notas') }}" method="post">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <label class="field">
       <span>Número da NF ou chave de acesso</span>
       <textarea name="notas" rows="4" maxlength="16384" placeholder="Uma nota por linha" required></textarea>
-      <small class="muted">Até 100 notas. Se houver números repetidos, informe a chave de 44 dígitos.</small>
     </label>
     <label class="field">
       <span>Motivo da alteração</span>
       <input name="motivo" maxlength="500" required>
     </label>
-    <p class="muted">A marcação manual vale na Consulta, Emissão e nos novos relatórios. Removê-la mantém os cancelamentos recebidos da SEFAZ.</p>
     <div class="actions">
       <button class="button primary" name="acao" value="cancelar" type="submit">Marcar como cancelada</button>
       <button class="button" name="acao" value="remover" type="submit">Remover marcação manual</button>
     </div>
   </form>
 </details>
+</section>
 
 <div class="admin-grid">
   <section class="card">
     <div class="card-title">
       <h2>Sincronização SEFAZ</h2>
-      <span class="muted">NFeDistribuicaoDFe</span>
+      {% call guide('Sincronização SEFAZ') %}<p>Consulta o serviço NFeDistribuicaoDFe e grava os documentos no banco.</p><p>Consultas manuais e automáticas respeitam a janela de Brasília, pausas, trava de execução e intervalo de 60 minutos. O limite de lotes controla o trabalho desta execução.</p>{% if not request.app.state.settings.recovery_enabled %}<p>A recuperação consNSU está pausada; as pendências continuam salvas.</p>{% endif %}{% endcall %}
     </div>
 
-    <p class="muted">Os disparos automáticos seguem o agendamento configurado abaixo. Consultas manuais e automáticas respeitam a janela das 22h às 04h, no horário de Brasília.</p>
-    {% if not request.app.state.settings.recovery_enabled %}<p class="muted">Teste do distNSU: consultas de recuperação consNSU pausadas; pendências preservadas.</p>{% endif %}
+    <p class="admin-window">Janela SEFAZ · <strong>22h–04h</strong> · Brasília</p>
     {% if status_web.can_sync %}
     <form action="{{ url_for('atualizar_sincronizar') }}" method="post" data-processing-form data-sync-confirm>
       <input type="hidden" name="csrf" value="{{ csrf }}">
@@ -89,7 +94,7 @@
     </form>
 
     {% else %}
-    <p class="alert" role="status">Sincronização indisponível. Aguarde a abertura da janela das 22h às 04h e o término de eventuais pausas.</p>
+    <p class="alert" role="status">Sincronização indisponível no momento.</p>
     {% endif %}
 
     <div class="cooldown-note">
@@ -118,6 +123,7 @@
   <section class="card status-card">
     <div class="card-title">
       <h2>Última gravação</h2>
+      {% call guide('Última gravação') %}<p>Exibe o último estado salvo no banco local. <strong>ultNSU</strong> é o cursor processado e <strong>maxNSU</strong> é o limite informado pela SEFAZ.</p><p>Completo indica que os cursores coincidem na última consulta; não comprova a integridade de todo o histórico.</p>{% endcall %}
     </div>
 
     <div class="status-list">
@@ -146,20 +152,21 @@
 </div>
 
 <section class="card accounts-section schedule-section">
-  <h2>Disparos automáticos</h2>
+  <div class="card-title"><h2>Disparos automáticos</h2>
+  {% call guide('Disparos automáticos') %}<ol><li>Ative a rotina e informe até seis horários separados por vírgulas, como <strong>22:00, 00:00, 02:00</strong>.</li><li>Use horários entre 22:00 e antes de 04:00, com pelo menos 60 minutos entre eles.</li><li>Selecione os dias e salve. A alteração vale sem reiniciar.</li></ol><p>Os dias seguem a data civil de Brasília: 01h de terça pertence à terça-feira.</p><p>Desativar impede novos disparos e retentativas automáticas; a execução em andamento termina. Consultas manuais continuam sujeitas à janela e às pausas. O computador e o processo devem permanecer ativos.</p>{% endcall %}</div>
   {% if request.query_params.get('schedule_saved') == '1' %}<div class="alert success" role="status">Agendamento salvo. A alteração já vale para os próximos disparos.</div>{% endif %}
-  <p class="schedule-window" role="note"><strong>Janela de consultas à SEFAZ: das 22h às 04h, horário de Brasília.</strong><br>Às 04h a janela fecha. Configure somente horários entre 22:00 e antes de 04:00, com pelo menos 60 minutos entre eles.</p>
+  <p class="admin-window">Janela SEFAZ · <strong>22h–04h</strong> · Brasília</p>
   <form action="{{ url_for('admin_schedule_update') }}" method="post" class="schedule-form">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <label class="schedule-enabled"><input type="checkbox" name="enabled" value="true" {% if request.app.state.scheduler_settings.auto_sync_enabled %}checked{% endif %}><span>Ativar disparos automáticos</span></label>
     <label class="field"><span>Horários dos disparos (Brasília)</span><input name="times" value="{{ request.app.state.scheduler_settings.auto_sync_times|join(', ') }}" required maxlength="64" aria-describedby="schedule-times-help"></label>
-    <p id="schedule-times-help" class="account-help">Separe por vírgulas. Exemplo: 22:00, 00:00, 02:00. Até seis horários por dia.</p>
+    <p id="schedule-times-help" class="account-help">Até 6 horários, separados por vírgula. Intervalo mínimo: 60 min.</p>
     <fieldset class="schedule-days"><legend>Dias da semana</legend>
       {% for value, label in [(0, 'Seg'), (1, 'Ter'), (2, 'Qua'), (3, 'Qui'), (4, 'Sex'), (5, 'Sáb'), (6, 'Dom')] %}
       <label><input type="checkbox" name="weekdays" value="{{ value }}" {% if value in request.app.state.scheduler_settings.auto_sync_weekdays %}checked{% endif %}><span>{{ label }}</span></label>
       {% endfor %}
     </fieldset>
-    <p class="account-help">Os dias usam a data civil de Brasília: 01:00 de terça pertence à terça-feira. Desativar impede novos disparos e retentativas automáticas; uma sincronização já iniciada termina normalmente. A sincronização manual continua sujeita à janela e ao cooldown.</p>
+
     <div><button class="button primary" type="submit">Salvar agendamento</button></div>
   </form>
 </section>
@@ -167,7 +174,8 @@
   <section class="card certificate-card">
   <div class="card-title">
     <div>
-      <h2>Alertas por e-mail</h2>
+      <div class="heading-with-help"><h2>Alertas por e-mail</h2>
+      {% call guide('Alertas por e-mail') %}<ol><li>Informe o remetente e o usuário SMTP. No Gmail, use o mesmo e-mail nos dois campos.</li><li>Cadastre até 20 destinatários, um por linha ou separados por vírgula, e salve.</li><li>Use <strong>Enviar e-mail de teste</strong> para conferir o recebimento. Aguarde um minuto entre testes.</li></ol><p>Ao trocar a conta, atualize a senha de app em <code>secrets/smtp-password.txt</code>. Servidor e porta são configurados no ambiente; credenciais não são exibidas aqui.</p><p>Somente novos eventos de Operação não Realizada (210240) geram avisos. Eventos já gravados não são reenviados. Remover destinatários cancela seus avisos pendentes; deixar a lista vazia impede novos avisos.</p><p>O teste usa os destinatários salvos e não consulta a SEFAZ.</p>{% endcall %}</div>
       <span class="muted">Operação não Realizada</span>
     </div>
     <span class="status-dot {{ 'ok' if smtp_ready else 'bad' }}">
@@ -178,7 +186,6 @@
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <label class="field"><span>E-mail remetente</span><input type="email" name="sender" value="{{ email_sender }}" maxlength="254" required autocomplete="email"></label>
     <label class="field"><span>Usuário SMTP</span><input name="smtp_user" value="{{ email_smtp_user }}" maxlength="254" autocomplete="off"></label>
-    <p class="muted">No Gmail, use o mesmo e-mail nos dois campos. Ao trocar a conta, atualize também a senha de app em secrets/smtp-password.txt. A senha não é exibida nesta tela. Servidor e porta continuam configurados no ambiente.</p>
     <label class="field">
       <span>Destinatários</span>
       <textarea name="recipients" rows="4" maxlength="4000" placeholder="fiscal@empresa.com.br&#10;responsavel@empresa.com.br">{{ email_recipients }}</textarea>
@@ -187,15 +194,9 @@
       <button class="button primary" type="submit">Salvar alertas</button>
     </div>
   </form>
-  <p class="cooldown-note">
-    Um endereço por linha ou separados por vírgula, até 20. Ao remover um endereço, avisos ainda pendentes para ele são cancelados. Deixe vazio para não gerar novos avisos.
-    O aviso é criado quando um evento novo de Operação não Realizada (210240) entra no banco. Eventos já gravados não são reenviados.
-    {% if not smtp_ready %}Configure o servidor SMTP para realizar os envios.{% endif %}
-  </p>
   <form action="{{ url_for('atualizar_testar_email') }}" method="post">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <button class="button secondary" type="submit" {% if not smtp_ready or not email_recipients %}disabled{% endif %}>Enviar e-mail de teste</button>
-    <p class="muted">Envia uma mensagem de teste aos destinatários salvos, sem consultar a SEFAZ. Aguarde um minuto entre testes.</p>
   </form>
   {% if email_pending is not none %}
   <div class="meta-row"><span>Avisos pendentes</span><strong>{{ email_pending }}</strong></div>
@@ -211,7 +212,8 @@
 <section class="card certificate-card">
   <div class="card-title">
     <div>
-      <h2>Banco de dados</h2>
+      <div class="heading-with-help"><h2>Banco de dados</h2>
+      {% call guide('Banco de dados') %}<ol><li>Informe o caminho de um banco fiscal existente <strong>no servidor</strong>.</li><li>Clique em <strong>Validar e usar este banco</strong> e confira o estado.</li></ol><p>O banco não é enviado pelo navegador. Para SQLCipher, configure a senha em <code>secrets/db-password.txt</code>. Faça backup antes de trocar o arquivo e restrinja seu acesso no sistema operacional.</p>{% endcall %}</div>
       <span class="muted">SQLite / SQLCipher central</span>
     </div>
     {% if database_web.ready %}
@@ -266,16 +268,14 @@
     </div>
   </div>
 
-  <p class="cooldown-note">
-    O banco não é enviado pelo navegador. O servidor usa diretamente o arquivo no caminho informado.
-    Bancos criptografados usam a senha já protegida em <span class="mono">secrets\db-password.txt</span>.
-  </p>
+
 </section>
 
 <section class="card certificate-card">
   <div class="card-title">
     <div>
-      <h2>Certificado A1</h2>
+      <div class="heading-with-help"><h2>Certificado A1</h2>
+      {% call guide('Certificado A1') %}<ol><li>Informe o caminho do arquivo PFX/P12 no servidor e sua senha.</li><li>Clique em <strong>Validar e salvar certificado</strong>.</li></ol><p>Em uma configuração existente, deixe a senha em branco para manter a atual. O arquivo permanece na pasta informada; o app salva caminho e senha em arquivos locais protegidos.</p><p>A conta que executa o serviço precisa ter leitura do certificado e da chave privada. Para certificados do repositório Windows, a fonte é configurada no servidor.</p>{% endcall %}</div>
       <span class="muted">Configuração do servidor</span>
     </div>
     {% if certificate_web.ready %}
@@ -346,9 +346,7 @@
   <div class="alert error compact">{{ certificate_web.error }}</div>
   {% endif %}
 
-  <p class="cooldown-note">
-    O PFX permanece na pasta informada. A aplicação salva apenas o caminho e a senha em arquivos locais protegidos.
-    A conta que executa o serviço precisa ter permissão de leitura na pasta do certificado.
-  </p>
+
 </section>
+</div>
 {% endblock %}

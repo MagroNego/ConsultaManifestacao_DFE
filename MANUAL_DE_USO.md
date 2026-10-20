@@ -8,6 +8,8 @@ As ações são registradas com a identidade técnica compartilhada `acesso-rede
 
 As senhas do banco SQLCipher, certificado e SMTP continuam necessárias. Formulários mantêm a validação CSRF e as consultas à SEFAZ continuam limitadas à janela das 22h às 04h, com cooldown e trava.
 
+Quando o TI habilitar o modo corporativo, a autenticação acontece no gateway da empresa. A interface exibe o nome fornecido e as funções administrativas dependem dos grupos atribuídos. Não há cadastro nem troca de senha corporativa no AtlasDFE; encerramento de sessão fica a cargo do gateway.
+
 ## Consulta de manifestações
 
 Filtre por data do evento, número da nota, chave, manifestação e situação. A data final inclui o dia inteiro. As páginas mostram até 100 registros. Emitente sem nome disponível é identificado pelo CNPJ extraído da chave.
@@ -110,3 +112,7 @@ Remetente e usuário salvos na interface valem nos próximos envios sem reinicia
 | SMTP pendente | Conferir servidor, autenticação, destinatários e detalhe do erro |
 | Relatório não reflete alteração | Gerar novo arquivo com os filtros necessários |
 | Geração perdida após reinício | Solicitar novamente; tarefas são mantidas em memória |
+
+## Guias do Admin
+
+Cada tópico do Admin tem um botão **?** com instruções e limites da operação. Clique para abrir; use Escape ou clique fora para fechar. A janela SEFAZ e os estados de configuração permanecem visíveis sem abrir os guias.

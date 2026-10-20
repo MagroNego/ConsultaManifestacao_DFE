@@ -2,7 +2,7 @@
 
 ## Escopo desta revisão
 
-Documentação do estado da main em 19/10/2026. A versão declarada permanece 2.6.0, mas o ZIP publicado em 16/10/2026 não contém todas as alterações posteriores. Identifique a instalação pelo commit. O workflow não substitui uma release existente.
+Documentação da base da main em 19/10/2026, com preparação de login corporativo em 20/10/2026. A versão declarada permanece 2.6.0, mas o ZIP publicado em 16/10/2026 não contém todas as alterações posteriores. Identifique a instalação pelo commit. O workflow não substitui uma release existente.
 
 ## Comportamento atual
 
@@ -14,6 +14,8 @@ Documentação do estado da main em 19/10/2026. A versão declarada permanece 2.
 - Cancelamento cooperativo de exportações. No modo padrão, a identidade administrativa compartilhada permite cancelar qualquer solicitação. A serialização final do Excel pode concluir antes da limpeza.
 - Relatórios temporários por 24 horas. Logs de sincronização descartados após 30 dias, sujeitos também à rotação por tamanho; dados fiscais permanecem no banco.
 - Novos XMLs não são arquivados permanentemente. Respostas pendentes são preservadas até processamento; XMLs legados não são apagados automaticamente.
+
+O modo corporativo opcional está preparado para um gateway autenticado do TI, com autorização por grupos; permanece desativado até homologação. Veja o [contrato de integração](SERVIDOR_WEB.md#preparação-para-login-corporativo).
 
 ## Validação e limites
 

@@ -19,6 +19,7 @@ O endereço padrão é `127.0.0.1:8080`. Para acesso interno, use HTTPS por reve
 | `NFE_WEB_ROOT_PATH` | Prefixo da aplicação quando publicada em subcaminho pelo proxy |
 | `NFE_WEB_FORWARDED_ALLOW_IPS` | `127.0.0.1`; somente proxies confiáveis |
 | `NFE_DATABASE_PATH` | Caminho alternativo ao padrão; `secrets/db-path.txt` salvo pelo Admin prevalece |
+| `NFE_WEB_CORPORATE_AUTH` | `0`: desativado; `1`: exige gateway autenticado, segredo e grupos (seção abaixo) |
 | `NFE_WEB_LOCAL_AUTH` | `0`: sem login; `1`: modo legado com contas locais |
 | `NFE_ADMIN_ACCOUNTS_PATH` | Banco de contas; padrão `dados/admin_accounts.db` |
 | `NFE_ADMIN_SESSION_MINUTES` | Inatividade: 30 minutos; faixa aceita 5–480 |
@@ -34,7 +35,7 @@ A janela é fixa: **22:00 ≤ horário ou horário < 04:00**, Brasília (UTC−3
 
 ## Autenticação e segredos
 
-O acesso padrão dispensa login local, cadastro e senha de administrador (`NFE_WEB_LOCAL_AUTH=0`). Todos os acessos de rede têm permissão administrativa. A autenticação e a autorização devem ser configuradas pelo TI no proxy/infraestrutura. Não são interpretados cabeçalhos de identidade para conceder perfis nesse modo. `NFE_WEB_AUTH_MODE` e cabeçalhos de identidade não habilitam autenticação no modo padrão. As rotas de login, cadastro e gerenciamento de contas retornam 404. A auditoria local usa a identidade compartilhada `acesso-rede`; a identificação individual depende dos registros da infraestrutura. CSRF, limites de upload, trava e janela SEFAZ permanecem ativos.
+O acesso padrão dispensa login local, cadastro e senha de administrador (`NFE_WEB_LOCAL_AUTH=0`). Com o modo corporativo também desativado, todos os acessos de rede têm permissão administrativa. A autenticação e a autorização devem ser configuradas pelo TI no proxy/infraestrutura. Não são interpretados cabeçalhos de identidade para conceder perfis nesse modo. `NFE_WEB_AUTH_MODE=proxy` isoladamente não habilita autenticação; o modo corporativo exige ativação explícita. As rotas de login, cadastro e gerenciamento de contas retornam 404. A auditoria local usa a identidade compartilhada `acesso-rede`; a identificação individual depende dos registros da infraestrutura. CSRF, limites de upload, trava e janela SEFAZ permanecem ativos.
 
 O modo legado de contas pode ser reativado explicitamente com `NFE_WEB_LOCAL_AUTH=1` e reinício; nesse modo são usados os registros e sessões de `dados/admin_accounts.db`. Não é necessário executar `CONFIGURAR_ADMIN.cmd` no modo padrão. Os dados de contas existentes são preservados sem serem abertos ou alterados no modo sem login.
 
@@ -98,3 +99,53 @@ A fila `notificacoes_email` persiste no banco fiscal. Somente `210240` gera novo
 - Arquivos prontos ficam em `dados/downloads` por 24 horas. Downloads prontos não entram na fila de geração.
 - Auditoria: `logs/web_audit.log` e rotação. Ações de sincronização são descartadas após 30 dias; a rotação por tamanho pode removê-las antes. Arquivos de até 5 MiB, com cinco cópias; demais ações seguem essa rotação.
 - Backup completo é manual. Consulte [Banco e backup](SEGURANCA_BANCO.md).
+
+## Preparação para login corporativo
+
+O modo corporativo integra o app a um gateway de autenticação administrado pelo TI. O gateway realiza SSO com o provedor corporativo (por exemplo, Entra ID via OIDC); o AtlasDFE valida a credencial do gateway e aplica autorização por grupos. Não há cliente OIDC/SAML, tela de login corporativo ou validação de tokens do provedor dentro do app.
+
+O modo fica **desativado por padrão**. Para habilitar, configure no ambiente do processo e reinicie:
+
+```text
+NFE_WEB_LOCAL_AUTH=0
+NFE_WEB_CORPORATE_AUTH=1
+NFE_WEB_AUTH_MODE=proxy
+NFE_WEB_ALLOWED_GROUPS=<identificador do grupo Consulta>
+NFE_WEB_ADMIN_GROUPS=<identificador do grupo Administrador>
+```
+
+Gere um segredo aleatório de pelo menos 32 caracteres, diferente do segredo CSRF, e salve em `secrets/web-proxy-secret.txt`. Configure o mesmo valor somente no gateway. Alternativamente, use `NFE_WEB_PROXY_SECRET` no ambiente do serviço. Não inclua esse segredo no navegador, JavaScript, repositório ou logs. Ausência de segredo, grupos ou configuração compatível impede a inicialização; não há retorno automático ao acesso aberto.
+
+Contrato de cada requisição encaminhada pelo gateway:
+
+| Cabeçalho padrão | Conteúdo |
+| --- | --- |
+| `X-NFE-Proxy-Secret` | Segredo compartilhado entre gateway e app |
+| `X-NFE-User` | Identificador corporativo estável e único, como UPN/e-mail; até 254 caracteres, normalizado para minúsculas |
+| `X-NFE-Name` | Nome para exibição; opcional |
+| `X-NFE-Groups` | Identificadores dos grupos autorizados, separados por vírgula; até 16 KiB |
+
+Os nomes podem ser definidos com `NFE_WEB_PROXY_SECRET_HEADER`, `NFE_WEB_USER_HEADER`, `NFE_WEB_NAME_HEADER` e `NFE_WEB_GROUPS_HEADER`; devem ser distintos. Grupos são comparados por igualdade, sem distinção de maiúsculas. Use IDs estáveis do diretório e configure o gateway para enviá-los integralmente, inclusive quando o provedor exigir resolução adicional de grupos. `NFE_WEB_ADMIN_USERS` e opções `DEV_*` não concedem permissões neste modo.
+
+| Associação | Acesso |
+| --- | --- |
+| Grupo de consulta | Consulta, Status, Emissão, relatórios e Downloads |
+| Grupo administrativo | Acesso de consulta, importação, sincronização e configurações |
+| Nenhum grupo autorizado ou identidade/segredo inválido | HTTP 401 |
+| Consulta tentando função administrativa | HTTP 403 |
+
+O backend deve ficar inacessível aos clientes, preferencialmente em `127.0.0.1`, atrás de HTTPS. O gateway deve remover e sobrescrever **todos** os cabeçalhos acima recebidos do navegador, preencher identidade/grupos exclusivamente após autenticação e inserir o segredo apenas na conexão interna. Entre máquinas, proteja também o enlace gateway–app com TLS e firewall. O segredo autentica o gateway; o app confia na identidade que ele atesta.
+
+O TI configura cadastro do aplicativo no provedor, URL pública/callback, certificados TLS, grupos, MFA, expiração e logout no gateway. O AtlasDFE não cria usuários nem armazena senhas corporativas. Mudanças/revogação de grupos passam a valer quando o gateway atualizar sua sessão; tarefas de exportação já aceitas podem concluir. Não há botão de logout local nesse modo. A auditoria passa a identificar o operador pelo identificador corporativo. CSRF permanece obrigatório e vinculado à identidade e aos grupos. Relatórios locais continuam compartilhados conforme as regras atuais; SSO não cria segregação fiscal por usuário.
+
+`/healthz` e recursos estáticos permanecem públicos no backend; o gateway pode protegê-los adicionalmente. Rotas de cadastro e contas locais continuam desativadas. Em operação normal, o gateway trata o redirecionamento ao login antes de encaminhar requisições ao app.
+
+### Validação pelo TI
+
+1. Em homologação, iniciar com agenda desativada na configuração efetiva e sem envio SMTP real.
+2. Confirmar que acesso sem gateway ou com cabeçalhos forjados recebe 401.
+3. Validar uma conta de consulta: leitura/exportação permitidas; Admin, importação e POST direto de configuração recusados.
+4. Validar uma conta administrativa e confirmar CSRF, janela SEFAZ e auditoria individual.
+5. Remover a associação/autorização no provedor, renovar a sessão do gateway e confirmar a recusa. Validar logout e MFA conforme a política corporativa.
+
+Referência para o contrato de um gateway: [integração oficial do OAuth2 Proxy](https://oauth2-proxy.github.io/oauth2-proxy/7.11.x/configuration/integration/). O mapeamento entre os cabeçalhos do produto escolhido e os do AtlasDFE deve ser feito pelo TI; não há configuração de infraestrutura aplicada automaticamente.
