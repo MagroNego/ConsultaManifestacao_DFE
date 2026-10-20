@@ -9,10 +9,9 @@ from datetime import datetime
 from pathlib import Path
 
 from openpyxl import Workbook
-from openpyxl.styles import Alignment, Font, PatternFill
-from openpyxl.utils import get_column_letter
 
-from nfe_consulta.cte import export_label
+from nfe_consulta.cte import spreadsheet_label
+from nfe_consulta.xlsx_style import configure_sheet, style_cell, text_row_height
 from nfe_consulta.web.consulta_local import EventoNota, FiltrosEventos, TIPOS_MANIFESTACAO
 
 
@@ -75,15 +74,11 @@ def gravar_eventos_xlsx(
     ws.freeze_panes = "A5"
 
     ws["A1"] = "Consulta de manifestações"
-    ws["A1"].font = Font(size=12, bold=True)
     ws["A2"] = f"{len(eventos)} evento(s) | {_resumo_filtros(filtros)}"
     ws.row_dimensions[3].height = 8
 
     for coluna, titulo in enumerate(HEADERS, 1):
-        celula = ws.cell(4, coluna, titulo)
-        celula.font = Font(bold=True)
-        celula.fill = PatternFill("solid", fgColor="E7E7E7")
-        celula.alignment = Alignment(vertical="center")
+        ws.cell(4, coluna, titulo)
 
     for indice, evento in enumerate(cancellable_rows(eventos), 5):
         valores = [
@@ -98,14 +93,14 @@ def gravar_eventos_xlsx(
             _excel_datetime(evento.recebido_em),
             evento.emitente,
             evento.situacao,
-            export_label(evento.ctes),
+            spreadsheet_label(evento.ctes),
         ]
 
         for coluna, valor in enumerate(valores, 1):
             celula = ws.cell(indice, coluna, valor)
             if isinstance(valor, str):
                 celula.data_type = "s"
-            celula.alignment = Alignment(vertical="center", wrap_text=coluna == 5)
+            style_cell(celula, alternate=indice % 2 == 0, wrap=coluna in (5, 10), center=coluna in (2, 4))
 
         for coluna in (2, 3, 4, 7, 8):
             ws.cell(indice, coluna).number_format = "@"
@@ -114,15 +109,10 @@ def gravar_eventos_xlsx(
             if isinstance(ws.cell(indice, coluna).value, datetime):
                 ws.cell(indice, coluna).number_format = "dd/mm/yyyy hh:mm:ss"
 
-    larguras = [13, 9, 49, 12, 31, 22, 22, 17, 22, 42, 31, 65]
-    for coluna, largura in enumerate(larguras, 1):
-        ws.column_dimensions[get_column_letter(coluna)].width = largura
+        ws.row_dimensions[indice].height = max(text_row_height(evento.descricao, 34), text_row_height(evento.emitente, 44))
 
+    configure_sheet(ws, header_row=4, widths=[14, 10, 51, 13, 34, 24, 23, 19, 25, 44, 19, 23], title=True)
     ws.auto_filter.ref = f"A4:L{max(4, 4 + len(eventos))}"
-    ws.print_options.horizontalCentered = False
-    ws.sheet_properties.pageSetUpPr.fitToPage = True
-    ws.page_setup.fitToWidth = 1
-    ws.page_setup.orientation = "landscape"
 
     destino = Path(caminho)
     destino.parent.mkdir(parents=True, exist_ok=True)

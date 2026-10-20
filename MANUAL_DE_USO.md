@@ -56,7 +56,7 @@ Para notas emitidas pela Yorozu, o cancelamento próprio não retorna ao emitent
 
 Em **Admin → Alterar situação de notas**, informe até 100 números/chaves e o motivo. Números ambíguos exigem chave. Se houver entrada inválida, nenhuma nota do pedido é alterada. **Remover marcação manual** desfaz somente a correção interna, preservando cancelamentos recebidos por XML/NSU. A operação não transmite evento à SEFAZ.
 
-Abra **CT-e vinculado** para ver os conhecimentos recebidos. Número, chave, transportadora e data aparecem somente quando disponíveis. Cada vínculo é exibido em uma linha, com rolagem horizontal quando necessário. **Vínculo identificado** não implica chave conhecida. **CT-e cancelado** indica todos os vínculos apresentados cancelados; não cancela a NF-e. **Não localizado** indica ausência no banco, não inexistência na SEFAZ. Não há download de XML completo de CT-e.
+Abra **CT-e vinculado** para ver os conhecimentos recebidos. Número, chave, transportadora e data aparecem somente quando disponíveis. Cada vínculo é exibido em uma linha, com rolagem horizontal quando necessário. **Vínculo identificado** não implica chave conhecida. **CT-e cancelado** indica todos os vínculos apresentados cancelados; não cancela a NF-e. **Não localizado** indica ausência no banco, não inexistência na SEFAZ. Não há download de XML completo de CT-e. Nos relatórios Excel, a coluna indica **CT-e Vinculado** quando há associação registrada ou **Não localizado** quando não há. Esse indicador não representa autorização atual; os detalhes e eventuais cancelamentos ficam na interface e no CSV.
 
 Relatórios já gerados preservam o estado da geração. Gere novamente após importações ou correções.
 

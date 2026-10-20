@@ -130,7 +130,7 @@ def test_links_in_public_ui_excel_csv_and_txt_lookup(tmp_path):
             ws = load_workbook(BytesIO(response.content))[sheet]
             headers = [cell.value for cell in ws[header_row]]
             value = ws.cell(header_row + 1, headers.index('CT-e vinculado') + 1).value
-            assert CTE in value and 'Cancelado' in value
+            assert value == 'CT-e Vinculado'
     banco = BancoManifestacoes(str(cfg.database_path))
     assert len(banco.consultar_chave(NFE, CNPJ_PADRAO).ctes) == 1
     banco.fechar()
@@ -158,7 +158,7 @@ def test_txt_workbook_includes_cte_preserves_manifestation(tmp_path):
     assert ws['D5'].value == 'Sem evento localizado'
     assert ws['K4'].value == 'Situação'
     assert ws['L4'].value == 'CT-e vinculado'
-    assert ws['L5'].value == 'Vínculo identificado · chave não informada'
+    assert ws['L5'].value == 'CT-e Vinculado'
     assert ws['L5'].data_type == 's'
 
 

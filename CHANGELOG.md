@@ -1,5 +1,11 @@
 # Histórico de versões
 
+## Relatórios Excel — 2026-10-20
+
+- Formatação sóbria compartilhada: cabeçalhos grafite, fonte Calibri, linhas em cinza claro e dimensões ajustadas.
+- Histórico com altura de linha proporcional ao conteúdo, filtros e painéis congelados preservados.
+- Coluna de CT-e mostra CT-e Vinculado quando existe associação; interface e CSV mantêm os detalhes.
+
 ## Layout do Admin — 2026-10-20
 
 - Orientações agrupadas em oito guias contextuais acessíveis pelo botão de interrogação.

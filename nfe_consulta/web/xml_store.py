@@ -15,8 +15,8 @@ from zipfile import BadZipFile, ZipFile
 
 from defusedxml import ElementTree as ET
 from openpyxl import Workbook
-from openpyxl.styles import Font, PatternFill
-from openpyxl.utils import get_column_letter
+from nfe_consulta.cte import spreadsheet_label
+from nfe_consulta.xlsx_style import configure_sheet, style_cell, text_row_height
 
 from nfe_consulta.seguranca_banco import abrir_banco
 from nfe_consulta.cte import linked_ctes, export_label
@@ -357,6 +357,8 @@ def export_excel(reports):
             values = []
             for key in columns:
                 value = row.get(key, "")
+                if key == "CT-e vinculado":
+                    value = spreadsheet_label(value and value != "Não localizado")
                 if key == "Data Emissao" and value:
                     for pattern in ("%Y-%m-%d", "%d/%m/%Y"):
                         try:
@@ -376,6 +378,7 @@ def export_excel(reports):
             sheet.append(values)
             for column_index in range(1, len(columns) + 1):
                 cell = sheet.cell(row_index, column_index)
+                style_cell(cell, alternate=row_index % 2 == 0, wrap=columns[column_index - 1] in {"Descricao", "Emitente Razao", "Destinatario Razao"})
                 if isinstance(cell.value, date):
                     cell.number_format = "dd/mm/yyyy"
                 elif isinstance(cell.value, str):
@@ -383,13 +386,11 @@ def export_excel(reports):
                     cell.number_format = "@"
                 elif cell.value is not None:
                     cell.number_format = "#,##0" if cell.value == int(cell.value) else "#,##0.0000"
-        for cell in sheet[1]:
-            cell.font = Font(color="FFFFFF", bold=True)
-            cell.fill = PatternFill("solid", fgColor="193D65")
+            sheet.row_dimensions[row_index].height = max([30] + [text_row_height(row.get(key, ""), 42) for key in ("Descricao", "Emitente Razao", "Destinatario Razao") if key in columns])
+        widths = [51 if "Chave" in key else 42 if "Razao" in key or key == "Descricao" else 23 if key == "CT-e vinculado" else 20 for key in columns]
+        configure_sheet(sheet, header_row=1, widths=widths)
         sheet.freeze_panes = "A2"
         sheet.auto_filter.ref = sheet.dimensions
-        for index, key in enumerate(columns, 1):
-            sheet.column_dimensions[get_column_letter(index)].width = 48 if "Chave" in key else 36 if "Razao" in key or key == "Descricao" else 18
     out = BytesIO()
     check_export_cancelled()
     workbook.save(out)

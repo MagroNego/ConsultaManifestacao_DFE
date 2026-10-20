@@ -7,10 +7,9 @@ from datetime import datetime
 from pathlib import Path
 
 from openpyxl import Workbook
-from openpyxl.styles import Alignment, Font, PatternFill
-from openpyxl.utils import get_column_letter
 
-from nfe_consulta.cte import export_label
+from nfe_consulta.cte import spreadsheet_label
+from nfe_consulta.xlsx_style import configure_sheet, style_cell, text_row_height
 from nfe_consulta.cancelamento import status_label
 from nfe_consulta.validacao import numero_e_serie
 
@@ -47,17 +46,13 @@ def gravar_xlsx(caminho: str, resultados: list, cobertura: str, *, numeros_solic
     ws.freeze_panes = "D5"
 
     ws["A1"] = "Consulta de manifestações"
-    ws["A1"].font = Font(size=12, bold=True)
 
     encontradas = sum(bool(r.manifestacoes) for r in resultados)
     ws["A2"] = f"{len(resultados)} chaves | {encontradas} com evento | {len(resultados)-encontradas} sem evento localizado"
     ws.row_dimensions[3].height = 8
 
     for coluna, titulo in enumerate(HEADERS, 1):
-        celula = ws.cell(4, coluna, titulo)
-        celula.font = Font(bold=True)
-        celula.fill = PatternFill("solid", fgColor="E7E7E7")
-        celula.alignment = Alignment(vertical="center")
+        ws.cell(4, coluna, titulo)
     for indice, resultado in enumerate(cancellable_rows(resultados), 5):
         numero, serie = numero_e_serie(resultado.chave)
         evento = resultado.manifestacoes[-1] if resultado.manifestacoes else None
@@ -72,27 +67,21 @@ def gravar_xlsx(caminho: str, resultados: list, cobertura: str, *, numeros_solic
                       for e in resultado.manifestacoes),
             resultado.erro or "",
             status_label(resultado.cancelada),
-            export_label(resultado.ctes),
+            spreadsheet_label(resultado.ctes),
         ]
         for coluna, valor in enumerate(valores, 1):
             celula = ws.cell(indice, coluna, valor)
             if isinstance(valor, str):
                 celula.data_type = "s"  # impede formula de conteudo externo
-            celula.alignment = Alignment(vertical="center", wrap_text=coluna in (4, 9, 10))
+            style_cell(celula, alternate=indice % 2 == 0, wrap=coluna in (4, 9, 10), center=coluna in (3, 7, 8))
         for coluna in (1, 3, 6, 7):
             ws.cell(indice, coluna).number_format = "@"
         ws.cell(indice, 2).number_format = "0"
         ws.cell(indice, 8).number_format = "0"
-        ws.row_dimensions[indice].height = min(70, max(30, 15 * len(resultado.manifestacoes)))
+        ws.row_dimensions[indice].height = max(text_row_height(valores[8], 78), text_row_height(valores[9], 40), text_row_height(valores[3], 34))
 
-    larguras = [49, 12, 9, 31, 26, 21, 12, 10, 58, 31, 31, 65]
-    for i, largura in enumerate(larguras, 1):
-        ws.column_dimensions[get_column_letter(i)].width = largura
+    configure_sheet(ws, header_row=4, widths=[51, 13, 10, 34, 31, 23, 13, 11, 78, 40, 19, 23], title=True)
     ws.auto_filter.ref = f"A4:L{max(4, 4 + len(resultados))}"
-    ws.print_options.horizontalCentered = False
-    ws.sheet_properties.pageSetUpPr.fitToPage = True
-    ws.page_setup.fitToWidth = 1
-    ws.page_setup.orientation = "landscape"
 
     if numeros_solicitados is not None:
         summary = wb.create_sheet("Numeros solicitados")
@@ -100,13 +89,13 @@ def gravar_xlsx(caminho: str, resultados: list, cobertura: str, *, numeros_solic
         for number, count in cancellable_rows(numeros_solicitados.items()):
             summary.append([number, count, "Não localizada no banco" if not count else
                             "Localizada" if count == 1 else "Múltiplas notas; confira chave e série"])
-        for cell in summary[1]:
-            cell.font = Font(bold=True)
-            cell.fill = PatternFill("solid", fgColor="E7E7E7")
+        for row in cancellable_rows(summary.iter_rows(min_row=2)):
+            for cell in row:
+                style_cell(cell, alternate=cell.row % 2 == 0, wrap=cell.column == 3)
+            summary.row_dimensions[row[0].row].height = 30
+        configure_sheet(summary, header_row=1, widths=[18, 23, 54])
         summary.freeze_panes = "A2"
         summary.auto_filter.ref = summary.dimensions
-        for column, width in (("A", 16), ("B", 22), ("C", 52)):
-            summary.column_dimensions[column].width = width
 
     destino = Path(caminho)
     destino.parent.mkdir(parents=True, exist_ok=True)

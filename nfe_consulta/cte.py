@@ -109,3 +109,8 @@ def linked_ctes(connection, cnpj, keys):
 
 def export_label(items):
     return ' | '.join(f'{item.label}' + (f' · {item.chave}' if item.chave else '') for item in items) or 'Não localizado'
+
+
+def spreadsheet_label(items):
+    """Indicador de vínculo no Excel; detalhes permanecem na interface e no CSV."""
+    return 'CT-e Vinculado' if items else 'Não localizado'
