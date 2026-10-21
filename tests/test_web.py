@@ -176,7 +176,7 @@ def test_admin_pode_disparar_atualizacao_sefaz(tmp_path, monkeypatch):
     assert "Últimas sincronizações" in history.text
     assert "Manual" in history.text
     assert "Execução concluída" in history.text
-    assert ">2</td>" in history.text
+    assert ">2</strong>" in history.text
     assert chamadas[0].max_lotes == 25
     assert chamadas[0].cooldown_minutos == 60
 

@@ -144,8 +144,6 @@ def read_sync_history(path: Path, limit: int = 10, *, now: datetime | None = Non
                 detail = "Recuperação de pendências; consulta de novos documentos adiada"
             if outcome == "ignorado":
                 detail = _REASONS.get(reason, "Tentativa não executada")
-            if payload.get("recuperacao_cons_nsu") is False:
-                detail = (detail + ". " if detail else "") + "Recuperação consNSU pausada; fila preservada"
             interrupted = reason in {"fora_janela", "NfeJanelaConsultaErro"} and any(
                 type(payload.get(key)) is int and payload[key] > 0
                 for key in ("lotes_gravados", "recuperados_na_tentativa")
@@ -156,7 +154,7 @@ def read_sync_history(path: Path, limit: int = 10, *, now: datetime | None = Non
                 detail += ". " + _ACTIONS[reason]
             diagnostic, next_attempt, reference, quando = _diagnostico(payload)
             if not quando:
-                timestamp += " (servidor)"
+                timestamp = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S").strftime("%d/%m/%Y %H:%M:%S") + " (servidor)"
             if quando:
                 timestamp = datetime.fromisoformat(quando).strftime("%d/%m/%Y %H:%M:%S") + " (Brasília)"
             items.append(SyncHistoryItem(

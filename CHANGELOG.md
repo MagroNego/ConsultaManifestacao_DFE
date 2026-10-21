@@ -1,5 +1,11 @@
 # Histórico de versões
 
+## Histórico de sincronização — 2026-10-21
+
+- Execuções apresentadas em lista responsiva, com resultado e contagens visíveis e diagnóstico recolhido.
+- Remove do Status o bloco de recuperações antigas e o aviso repetido de consNSU pausado, preservando auditoria, fila e avisos de pendências reais.
+- Padroniza a apresentação das datas sem converter registros antigos de fuso desconhecido.
+
 ## Relatórios Excel — 2026-10-20
 
 - Relatórios começam diretamente no cabeçalho da tabela, sem título, contagem ou linhas vazias antes dos dados.

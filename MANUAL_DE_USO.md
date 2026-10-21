@@ -77,13 +77,13 @@ No modo padrão sem login, os acessos compartilham a identidade técnica e podem
 
 ## Status e sincronização
 
-**Status** mostra disponibilidade, última gravação, `ultNSU`, `maxNSU` e próxima tentativa. **Abrir logs** exibe execuções e intervalos. `ultNSU == maxNSU` indica que a distribuição alcançou o limite informado naquele retorno; não garante que toda nota emitida já esteja disponível.
+**Status** mostra disponibilidade, última gravação, `ultNSU`, `maxNSU` e próxima tentativa. **Abrir logs** exibe uma lista de execuções com horário, origem, resultado, documentos distNSU e manifestações adicionadas. Abra **Detalhes** para ver motivo, lotes, diagnóstico, referência e próxima tentativa. Contagens ausentes aparecem como —, sem assumir zero. `ultNSU == maxNSU` indica que a distribuição alcançou o limite informado naquele retorno; não garante que toda nota emitida já esteja disponível.
 
 O AtlasDFE consulta externamente das **22:00 até antes de 04:00, Brasília**. Disparos padrão: **22h, 23h, 00h, 01h, 02h e 03h**. Manual, automático e retentativas compartilham banco, certificado, cursor, trava e cooldown. Em **Admin → Disparos automáticos**, marque ou desmarque **Ativar disparos automáticos**, informe os horários separados por vírgula e selecione os dias. Use **Salvar agendamento**. A mudança persiste e vale sem reiniciar. São aceitos até seis horários com intervalo mínimo de 60 minutos, dentro das 22h–04h. Os dias seguem a data civil: 01h de terça pertence à terça. Desativar impede novos disparos e retentativas; uma sincronização já iniciada termina normalmente. A reativação pode retomar a oportunidade mais recente da noite atual, respeitando bloqueios.
 
 O processo precisa permanecer ativo. A rotina manual exige as confirmações exibidas pela interface.
 
-`consNSU` permanece pausado (`NFE_RECOVERY_ENABLED=0`). “Intervalo recuperado” pode refletir documentos anteriores ou recebidos por `distNSU`; verifique as colunas de origem da execução. Intervalos completos não são pendências. A conferência cobre somente os intervalos registrados pelo app.
+`consNSU` permanece pausado (`NFE_RECOVERY_ENABLED=0`), com a fila preservada no banco. O bloco de intervalos antigos e o aviso repetido da fila não aparecem nos logs do Status. Recuperações efetivamente registradas continuam disponíveis nos detalhes da execução; pendências reais permanecem sinalizadas no resumo do Status.
 
 Os registros de execução de sincronização são eliminados quando ultrapassam 30 dias. O log também gira por tamanho e pode descartar registros antes desse prazo; não há garantia de 30 dias completos. A limpeza não exclui notas, manifestações, NSUs ou pendências. Registros antigos podem usar o horário do servidor; registros identificados como Brasília devem ser lidos nesse fuso.
 

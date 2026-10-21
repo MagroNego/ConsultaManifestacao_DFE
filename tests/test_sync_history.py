@@ -64,3 +64,17 @@ def test_historico_identifica_execucao_somente_recuperacao(tmp_path):
     item = read_sync_history(path, now=datetime(2026, 10, 15, tzinfo=timezone.utc))[0]
     assert 'Recuperação de pendências' in item.detail
     assert item.recovered_documents == 20
+
+
+def test_historico_omite_aviso_repetido_sem_remover_pausa_ou_alterar_log(tmp_path):
+    path = tmp_path / 'audit.log'
+    payload = {'action': 'sefaz_sync_auto', 'result': 'ignorado', 'reason': 'cooldown',
+               'recuperacao_cons_nsu': False, 'eventos_novos': 0}
+    original = '2026-10-21 03:00:00 ' + json.dumps(payload) + '\n'
+    path.write_text(original)
+    item = read_sync_history(path, now=datetime(2026, 10, 21, 7, tzinfo=timezone.utc))[0]
+    assert item.detail == 'Intervalo entre consultas ainda ativo'
+    assert item.new_events == 0
+    assert item.current_documents is None
+    assert item.when == '21/10/2026 03:00:00 (servidor)'
+    assert path.read_text() == original

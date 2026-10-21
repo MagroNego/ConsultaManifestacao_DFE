@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Status · AtlasDFE{% endblock %}
 {% block content %}
+<div class="status-page">
 <section class="page-heading">
   <div>
     <h1>Status</h1>
@@ -71,7 +72,7 @@
     {% if status_web.recovery_pending %}
     {% if request.app.state.settings.recovery_enabled %}
     Há NSUs na fila de recuperação. Consultas das 22h às 04h: até 20 NSUs por execução, descontando as consultas pontuais da última hora, respeitando o bloqueio e os limites de consulta.
-    {% else %}A fila de recuperação está preservada e pausada para o teste do distNSU.{% endif %}
+    {% else %}A recuperação está desativada; os intervalos pendentes permanecem registrados.{% endif %}
     {% else %}
     Há documentos que não puderam ser recuperados. O intervalo continua pendente de conferência.
     {% endif %}
@@ -89,49 +90,45 @@
     <svg class="sync-logs-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
   </summary>
   <div class="sync-logs-content">
-  <section class="sync-logs-recovery" aria-labelledby="recovery-heading">
-    <div class="card-title"><h2 id="recovery-heading">Recuperação de documentos</h2></div>
-  {% if status_web.recovery_received or status_web.recovery_unavailable %}
-  <div class="alert compact">Recuperação de intervalos: {{ status_web.recovery_received }} documento(s) recebido(s) · {{ status_web.recovery_unavailable }} NSU(s) sem documento disponível. A conferência cobre os intervalos registrados pelo app.</div>
-  {% endif %}
-  {% for inicio, fim, recebidos, total in status_web.recovery_intervals %}
-  <div class="alert compact">
-    <strong>NSU {{ inicio }} a {{ fim }}</strong> · {{ recebidos }} de {{ total }} documentos recebidos
-    · {% if recebidos == total %}Intervalo recuperado{% elif status_web.recovery_pending and not request.app.state.settings.recovery_enabled %}Recuperação pausada{% elif status_web.recovery_pending %}Em recuperação{% else %}Pendências não resolvidas{% endif %}
-    <progress value="{{ recebidos }}" max="{{ total }}" style="display:block;width:100%;margin-top:8px" aria-label="Progresso do intervalo NSU {{ inicio }} a {{ fim }}">{{ recebidos }} de {{ total }}</progress>
-  </div>
-  {% endfor %}
-  {% if not status_web.recovery_intervals and not status_web.recovery_received and not status_web.recovery_unavailable %}
-    <p class="muted">Nenhuma recuperação de intervalos registrada.</p>
-  {% endif %}
-  </section>
   <section aria-labelledby="sync-history-heading">
   <div class="card-title"><h2 id="sync-history-heading">Últimas sincronizações</h2></div>
-  <p class="muted">Atual: distNSU. Recuperação anterior: consNSU. Manifestações adicionadas são novas no banco, mesmo quando o evento é antigo. Execuções anteriores à atualização não têm contagem separada.</p>
+  <p class="sync-history-caption">Abra uma execução para consultar o diagnóstico e a próxima tentativa.</p>
   {% if sync_history %}
-  <div class="table-wrap">
-    <table class="query-table">
-      <thead><tr><th>Quando</th><th>Origem</th><th>Resultado</th><th>Lotes</th><th>Sincronização atual</th><th>Recuperação anterior</th><th>Total de manifestações adicionadas</th><th>Detalhe</th></tr></thead>
-      <tbody>
-      {% for item in sync_history %}
-        <tr>
-          <td>{{ item.when }}</td><td>{{ item.origin }}</td><td>{{ item.result }}</td>
-          <td>{{ item.lots if item.lots is not none else '—' }}</td>
-          <td style="white-space:nowrap">{% if item.current_documents is not none %}{{ item.current_documents }} docs · {{ item.current_events }} manifestações{% else %}Sem registro separado{% endif %}</td>
-          <td style="white-space:nowrap">{% if item.recovered_documents is not none %}{{ item.recovered_documents }} docs · {{ item.recovered_events }} manifestações{% else %}Sem registro separado{% endif %}</td>
-          <td>{{ item.new_events if item.new_events is not none else '—' }}</td>
-          <td>{{ item.detail or '—' }}
-            {% if item.diagnostic %}<p>{{ item.diagnostic }}</p>{% endif %}
-            {% if item.next_attempt %}<p>Próxima tentativa permitida: {{ item.next_attempt }}</p>{% endif %}
-            {% if item.reference %}<p>Referência: <span class="mono">{{ item.reference }}</span></p>{% endif %}
-          </td>
-        </tr>
-      {% endfor %}
-      </tbody>
-    </table>
-  </div>
+  <ol class="sync-history-list">
+    {% for item in sync_history %}
+    <li>
+      <details class="sync-record">
+        <summary>
+          <span class="sync-record-date"><strong>{{ item.when.replace(' (servidor)', '').replace(' (Brasília)', '') }}</strong><small>{{ item.origin }} · {{ 'Horário do servidor' if '(servidor)' in item.when else 'Brasília' }}</small></span>
+          <span class="sync-record-result {{ 'is-success' if item.result == 'Execução concluída' else 'is-error' if item.result == 'Falhou' else 'is-neutral' }}">{{ item.result }}</span>
+          <span class="sync-record-count"><small>Documentos distNSU</small><strong>{{ item.current_documents if item.current_documents is not none else '—' }}</strong></span>
+          <span class="sync-record-count"><small>Manifestações adicionadas</small><strong>{{ item.new_events if item.new_events is not none else '—' }}</strong></span>
+          <span class="sync-record-expand">Detalhes<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span>
+        </summary>
+        <div class="sync-record-body">
+          {% if item.detail %}<p class="sync-record-note">{{ item.detail }}</p>{% endif %}
+          <dl class="sync-record-metrics">
+            <div><dt>Lotes consultados</dt><dd>{{ item.lots if item.lots is not none else 'Não informado' }}</dd></div>
+            <div><dt>Manifestações via distNSU</dt><dd>{{ item.current_events if item.current_events is not none else 'Não informado' }}</dd></div>
+            {% if item.recovered_documents or item.recovered_events %}
+            <div><dt>Documentos via consNSU</dt><dd>{{ item.recovered_documents if item.recovered_documents is not none else 'Não informado' }}</dd></div>
+            <div><dt>Manifestações via consNSU</dt><dd>{{ item.recovered_events if item.recovered_events is not none else 'Não informado' }}</dd></div>
+            {% endif %}
+            {% if item.next_attempt %}<div><dt>Próxima tentativa permitida</dt><dd>{{ item.next_attempt }}</dd></div>{% endif %}
+          </dl>
+          {% if item.diagnostic %}
+          <ul class="sync-diagnostic-list">{% for part in item.diagnostic.split(' · ') %}<li>{{ part }}</li>{% endfor %}</ul>
+          {% endif %}
+          {% if item.reference %}<p class="sync-reference">Referência <span class="mono">{{ item.reference }}</span></p>{% endif %}
+        </div>
+      </details>
+    </li>
+    {% endfor %}
+  </ol>
+  <p class="sync-history-footnote">Contagens ausentes aparecem como —. Manifestações adicionadas são novas no banco, mesmo que o evento seja antigo.</p>
   {% else %}<p class="muted">Nenhuma sincronização registrada no histórico.</p>{% endif %}
 </section>
   </div>
 </details>
+</div>
 {% endblock %}
