@@ -75,7 +75,7 @@ class VinculoCTe:
 
     @property
     def label(self):
-        return f'CT-e {self.numero} · {self.status}' if self.chave else f'{self.status} · chave não informada'
+        return f'CT-e {self.numero} · {self.status}' if self.chave else self.status
 
 
 def linked_ctes(connection, cnpj, keys):
