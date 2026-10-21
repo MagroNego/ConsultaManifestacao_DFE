@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from nfe_consulta.janela_consulta import BRASILIA
 from nfe_consulta.web.sync_diagnostics import detalhes_erro
 from nfe_consulta.web.log_retention import SYNC_RETENTION_DAYS, log_instant
 
@@ -46,6 +47,9 @@ class SyncHistoryItem:
     diagnostic: str = ""
     next_attempt: str = ""
     reference: str = ""
+    attempts: tuple[SyncHistoryItem, ...] = ()
+    group_key: str = ""
+    group_when: str = ""
 
 
 _ACTIONS = {
@@ -114,8 +118,6 @@ def read_sync_history(path: Path, limit: int = 10, *, now: datetime | None = Non
         if not candidate.is_file():
             continue
         for line in reversed(_tail_lines(candidate)):
-            if len(items) >= limit:
-                return tuple(items)
             try:
                 timestamp = line[:19]
                 datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S")
@@ -153,12 +155,43 @@ def read_sync_history(path: Path, limit: int = 10, *, now: datetime | None = Non
             if reason in _ACTIONS and outcome == "erro":
                 detail += ". " + _ACTIONS[reason]
             diagnostic, next_attempt, reference, quando = _diagnostico(payload)
-            if not quando:
-                timestamp = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S").strftime("%d/%m/%Y %H:%M:%S") + " (servidor)"
-            if quando:
-                timestamp = datetime.fromisoformat(quando).strftime("%d/%m/%Y %H:%M:%S") + " (Brasília)"
+            # Registros novos têm instante UTC confiável; não inferir o fuso do prefixo legado.
+            parsed = None
+            for value in (quando, payload.get('logged_at_utc')):
+                if isinstance(value, str):
+                    try:
+                        candidate_time = datetime.fromisoformat(value)
+                        if candidate_time.tzinfo is not None:
+                            parsed = candidate_time.astimezone(BRASILIA)
+                            break
+                    except (ValueError, OverflowError):
+                        pass
+            if parsed is not None:
+                timestamp = parsed.strftime('%d/%m/%Y %H:%M:%S') + ' (Brasília)'
+            else:
+                parsed = datetime.strptime(timestamp, '%Y-%m-%d %H:%M:%S')
+                timestamp = parsed.strftime('%d/%m/%Y %H:%M:%S') + ' (servidor)'
+            group_key = group_when = ''
+            if payload['action'] == 'sefaz_sync_auto':
+                slot = None
+                value = payload.get('scheduled_for')
+                if isinstance(value, str):
+                    try:
+                        candidate_slot = datetime.fromisoformat(value)
+                        if candidate_slot.tzinfo is not None:
+                            slot = candidate_slot.astimezone(BRASILIA)
+                    except (ValueError, OverflowError):
+                        pass
+                if slot is not None:
+                    group_key = 'scheduled:' + slot.isoformat()
+                    group_when = slot.strftime('%d/%m/%Y %H:%M') + ' (Brasília)'
+                else:
+                    # Compatibilidade: agrupar por data/hora, somente no mesmo fuso conhecido.
+                    zone = 'Brasília' if parsed.tzinfo is not None else 'servidor'
+                    group_key = f'{zone}:{parsed:%Y-%m-%dT%H}'
+                    group_when = f'{parsed:%d/%m/%Y %H}h ({zone})'
             items.append(SyncHistoryItem(
-                when=timestamp,
+                when=timestamp, group_key=group_key, group_when=group_when,
                 origin="Automática" if payload["action"] == "sefaz_sync_auto" else "Manual",
                 result=("Interrompida pelo horário" if interrupted else "Parcial" if incomplete else
                         {"ok": "Execução concluída", "erro": "Falhou", "ignorado": "Não executada"}[outcome]),
@@ -171,4 +204,26 @@ def read_sync_history(path: Path, limit: int = 10, *, now: datetime | None = Non
                 recovered_documents=payload.get('documentos_recuperados') if type(payload.get('documentos_recuperados')) is int else None,
                 recovered_events=payload.get('manifestacoes_recuperadas') if type(payload.get('manifestacoes_recuperadas')) is int else None,
             ))
-    return tuple(items)
+    return _group_history(items, limit)
+
+
+def _group_history(items: list[SyncHistoryItem], limit: int) -> tuple[SyncHistoryItem, ...]:
+    """Uma linha por oportunidade automática; tentativas e contagens originais preservadas."""
+    groups: dict[str, list[SyncHistoryItem]] = {}
+    order: list[str] = []
+    for index, item in enumerate(items):
+        key = item.group_key or f'manual:{index}'
+        if key not in groups:
+            order.append(key)
+            groups[key] = []
+        groups[key].append(item)
+    result = []
+    for key in order[:max(0, limit)]:
+        attempts = groups[key]
+        # O estado da última execução efetiva prevalece sobre esperas posteriores.
+        primary = next((item for item in attempts if item.result != 'Não executada'), attempts[0])
+        if primary.group_key and len(attempts) > 1:
+            primary = replace(primary, when=primary.group_when, attempts=tuple(reversed(attempts)),
+                              next_attempt=attempts[0].next_attempt or primary.next_attempt)
+        result.append(primary)
+    return tuple(result)

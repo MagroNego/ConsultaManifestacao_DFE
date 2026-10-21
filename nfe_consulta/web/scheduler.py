@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from nfe_consulta.janela_consulta import NfeJanelaConsultaErro, proxima_abertura
+from nfe_consulta.janela_consulta import BRASILIA, NfeJanelaConsultaErro, proxima_abertura
 
 import asyncio
 from datetime import date, datetime, time, timedelta, timezone
@@ -168,10 +168,15 @@ async def executar_sincronizacao_automatica(
         return None
     dia = dia_agendado or datetime.now().astimezone().date()
 
+    def audit_result(result, **details):
+        details.setdefault('quando', datetime.now(BRASILIA).isoformat())
+        if janela_agendada is not None and janela_agendada.tzinfo is not None:
+            details['scheduled_for'] = janela_agendada.astimezone(BRASILIA).isoformat()
+        app.state.audit.write_system('sefaz_sync_auto', result, **details)
+
     lock = app.state.sync_lock
     if not lock.acquire(blocking=False):
-        app.state.audit.write_system(
-            "sefaz_sync_auto",
+        audit_result(
             "ignorado",
             reason="sync_in_progress",
         )
@@ -186,27 +191,24 @@ async def executar_sincronizacao_automatica(
                 audit=app.state.audit,
             )
         except NfeJanelaConsultaErro as exc:
-            app.state.audit.write_system("sefaz_sync_auto", "ignorado", reason="fora_janela", **detalhes_erro(exc))
+            audit_result("ignorado", reason="fora_janela", **detalhes_erro(exc))
             return proxima_abertura(agora_brasilia())
         except NfeLimiteConsultaErro as exc:
-            app.state.audit.write_system(
-                "sefaz_sync_auto",
+            audit_result(
                 "ignorado",
                 reason="cooldown",
                 **detalhes_erro(exc),
             )
             return await asyncio.to_thread(proxima_tentativa_permitida, settings)
         except NfeConsumoIndevidoErro as exc:
-            app.state.audit.write_system(
-                "sefaz_sync_auto",
+            audit_result(
                 "erro",
                 reason="consumo_indevido_656",
                 **detalhes_erro(exc),
             )
             return await asyncio.to_thread(proxima_tentativa_permitida, settings)
         except Exception as exc:
-            app.state.audit.write_system(
-                "sefaz_sync_auto",
+            audit_result(
                 "erro",
                 reason=type(exc).__name__,
                 **detalhes_erro(exc),
@@ -220,14 +222,12 @@ async def executar_sincronizacao_automatica(
                 else:
                     await asyncio.to_thread(registrar_execucao_agendada, settings, dia)
         except Exception as exc:
-            app.state.audit.write_system(
-                "sefaz_sync_auto", "erro",
+            audit_result("erro",
                 reason=f"schedule_state_{type(exc).__name__}",
             )
             return proxima_abertura(janelas_diarias(agora_brasilia(), times=getattr(settings, "auto_sync_times", None), weekdays=getattr(settings, "auto_sync_weekdays", tuple(range(7))))[1])
 
-        app.state.audit.write_system(
-            "sefaz_sync_auto",
+        audit_result(
             "ok",
             lotes=resumo.lotes,
             eventos_novos=resumo.eventos_novos,

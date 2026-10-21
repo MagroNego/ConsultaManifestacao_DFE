@@ -78,3 +78,47 @@ def test_historico_omite_aviso_repetido_sem_remover_pausa_ou_alterar_log(tmp_pat
     assert item.current_documents is None
     assert item.when == '21/10/2026 03:00:00 (servidor)'
     assert path.read_text() == original
+
+
+def test_agrupa_espera_e_conclusao_por_hora_sem_somar_ou_misturar_manual(tmp_path):
+    path = tmp_path / 'audit.log'
+    records = [
+        {'action':'sefaz_sync_auto', 'result':'ignorado', 'reason':'cooldown', 'quando':'2026-10-21T02:00:00-03:00'},
+        {'action':'sefaz_sync_auto', 'result':'ok', 'documentos_atuais':33, 'eventos_novos':8, 'logged_at_utc':'2026-10-21T05:01:54+00:00'},
+        {'action':'sefaz_sync', 'result':'ok', 'eventos_novos':1, 'quando':'2026-10-21T02:05:00-03:00'},
+    ]
+    path.write_text(''.join('2026-10-21 05:00:00 '+json.dumps(p)+'\n' for p in records))
+    items=read_sync_history(path, now=datetime(2026,10,21,8,tzinfo=timezone.utc))
+    assert len(items)==2 and items[0].origin=='Manual'
+    group=items[1]
+    assert group.when=='21/10/2026 02h (Brasília)'
+    assert group.result=='Execução concluída' and group.new_events==8 and group.current_documents==33
+    assert [a.result for a in group.attempts]==['Não executada','Execução concluída']
+    assert 'Intervalo' in group.attempts[0].detail
+
+
+def test_agendamento_expresso_agrupa_retentativa_em_outra_hora_e_na_rotacao(tmp_path):
+    path=tmp_path/'audit.log'
+    slot='2026-10-20T22:30:00-03:00'
+    older={'action':'sefaz_sync_auto','result':'ignorado','reason':'cooldown','scheduled_for':slot,'quando':'2026-10-20T22:30:00-03:00'}
+    newer={'action':'sefaz_sync_auto','result':'ok','scheduled_for':slot,'quando':'2026-10-21T00:01:00-03:00','eventos_novos':0}
+    path.with_name('audit.log.1').write_text('2026-10-20 22:30:00 '+json.dumps(older)+'\n')
+    path.write_text('2026-10-21 00:01:00 '+json.dumps(newer)+'\n')
+    items=read_sync_history(path,limit=1,now=datetime(2026,10,21,8,tzinfo=timezone.utc))
+    assert len(items)==1 and len(items[0].attempts)==2
+    assert items[0].when=='20/10/2026 22:30 (Brasília)'
+    assert items[0].new_events==0
+
+
+def test_agrupamento_preserva_falha_antes_de_espera_e_separa_dias(tmp_path):
+    path=tmp_path/'audit.log'
+    records=[
+        {'result':'ok','quando':'2026-10-20T02:01:00-03:00'},
+        {'result':'erro','reason':'consumo_indevido_656','quando':'2026-10-21T02:00:00-03:00'},
+        {'result':'ignorado','reason':'cooldown','quando':'2026-10-21T02:02:00-03:00'},
+    ]
+    path.write_text(''.join('2026-10-21 05:00:00 '+json.dumps(dict(action='sefaz_sync_auto',**p))+'\n' for p in records))
+    items=read_sync_history(path,now=datetime(2026,10,21,8,tzinfo=timezone.utc))
+    assert len(items)==2 and items[0].result=='Falhou'
+    assert '656' in items[0].detail and len(items[0].attempts)==2
+    assert items[1].attempts==()

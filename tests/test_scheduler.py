@@ -116,13 +116,10 @@ def test_sincronizacao_automatica_nao_concorre_com_manual(monkeypatch):
     finally:
         lock.release()
 
-    assert eventos == [
-        (
-            "sefaz_sync_auto",
-            "ignorado",
-            {"reason": "sync_in_progress"},
-        )
-    ]
+    assert len(eventos) == 1
+    action, result, details = eventos[0]
+    assert (action, result, details['reason']) == ('sefaz_sync_auto', 'ignorado', 'sync_in_progress')
+    assert datetime.fromisoformat(details['quando']).tzinfo is not None
 
 
 def test_falha_automatica_nao_marca_dia_como_concluido(monkeypatch):
@@ -500,3 +497,26 @@ def test_recuperacao_pausada_nao_antecipa_proximo_disparo(monkeypatch):
         pytest.fail('A fila pausada não deve reagendar consultas')
     monkeypatch.setattr('nfe_consulta.web.status_view.read_web_status', proibido)
     assert scheduler.proxima_recuperacao_nsu(SimpleNamespace(recovery_enabled=False)) is None
+
+
+def test_retentativa_e_conclusao_registram_mesma_janela(monkeypatch):
+    from nfe_consulta.modelos import NfeLimiteConsultaErro
+    records=[]
+    slot=scheduler.horario_unico(date(2026,10,21),2,0)
+    cfg=SimpleNamespace(auto_sync_max_lotes=50,sync_cooldown_minutes=60)
+    app=SimpleNamespace(state=SimpleNamespace(settings=cfg,sync_lock=threading.Lock(),
+        audit=SimpleNamespace(write_system=lambda action,result,**data:records.append((result,data)))))
+    calls=[]
+    def sync(*args,**kwargs):
+        calls.append(1)
+        if len(calls)==1:
+            raise NfeLimiteConsultaErro('intervalo')
+        return SimpleNamespace(lotes=1,eventos_novos=8,ult_nsu='33',max_nsu='33',completo=True,cache=False)
+    monkeypatch.setattr(scheduler,'sincronizar_configurado',sync)
+    monkeypatch.setattr(scheduler,'proxima_tentativa_permitida',lambda settings:slot)
+    monkeypatch.setattr(scheduler,'registrar_janela_concluida',lambda *args:None)
+    asyncio.run(scheduler.executar_sincronizacao_automatica(app,janela_agendada=slot))
+    asyncio.run(scheduler.executar_sincronizacao_automatica(app,janela_agendada=slot))
+    assert [result for result,_ in records]==['ignorado','ok']
+    assert all(data['scheduled_for']==slot.isoformat() for _,data in records)
+    assert all(datetime.fromisoformat(data['quando']).tzinfo is not None for _,data in records)

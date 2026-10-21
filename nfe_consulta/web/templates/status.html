@@ -99,14 +99,38 @@
     <li>
       <details class="sync-record">
         <summary>
-          <span class="sync-record-date"><strong>{{ item.when.replace(' (servidor)', '').replace(' (Brasília)', '') }}</strong><small>{{ item.origin }} · {{ 'Horário do servidor' if '(servidor)' in item.when else 'Brasília' }}</small></span>
+          <span class="sync-record-date"><strong>{{ item.when.replace(' (servidor)', '').replace(' (Brasília)', '') }}</strong><small>{{ item.origin }} · {{ 'Horário do servidor' if '(servidor)' in item.when else 'Brasília' }}{% if item.attempts %} · {{ item.attempts|length }} tentativas{% endif %}</small></span>
           <span class="sync-record-result {{ 'is-success' if item.result == 'Execução concluída' else 'is-error' if item.result == 'Falhou' else 'is-neutral' }}">{{ item.result }}</span>
           <span class="sync-record-count"><small>Documentos distNSU</small><strong>{{ item.current_documents if item.current_documents is not none else '—' }}</strong></span>
           <span class="sync-record-count"><small>Manifestações adicionadas</small><strong>{{ item.new_events if item.new_events is not none else '—' }}</strong></span>
           <span class="sync-record-expand">Detalhes<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span>
         </summary>
         <div class="sync-record-body">
-          {% if item.detail %}<p class="sync-record-note">{{ item.detail }}</p>{% endif %}
+          {% if item.attempts %}
+          <section class="sync-attempts" aria-label="Tentativas nesta faixa de horário">
+            <h3>Tentativas nesta faixa de horário</h3>
+            <ol>{% for attempt in item.attempts %}
+              <li><strong>{{ attempt.when }}</strong><span>{{ attempt.result }}</span>
+                {% if attempt.detail %}<p>{{ attempt.detail }}</p>{% endif %}
+                {% if attempt.lots is not none or attempt.current_documents is not none or attempt.new_events is not none %}
+                <dl class="sync-record-metrics">
+                  <div><dt>Lotes</dt><dd>{{ attempt.lots if attempt.lots is not none else '—' }}</dd></div>
+                  <div><dt>Documentos distNSU</dt><dd>{{ attempt.current_documents if attempt.current_documents is not none else '—' }}</dd></div>
+                  <div><dt>Manifestações distNSU</dt><dd>{{ attempt.current_events if attempt.current_events is not none else '—' }}</dd></div>
+                  <div><dt>Manifestações adicionadas</dt><dd>{{ attempt.new_events if attempt.new_events is not none else '—' }}</dd></div>
+                  {% if attempt.recovered_documents or attempt.recovered_events %}
+                  <div><dt>Documentos via consNSU</dt><dd>{{ attempt.recovered_documents if attempt.recovered_documents is not none else '—' }}</dd></div>
+                  <div><dt>Manifestações via consNSU</dt><dd>{{ attempt.recovered_events if attempt.recovered_events is not none else '—' }}</dd></div>
+                  {% endif %}
+                </dl>
+                {% endif %}
+                {% if attempt.diagnostic %}<ul class="sync-diagnostic-list">{% for part in attempt.diagnostic.split(' · ') %}<li>{{ part }}</li>{% endfor %}</ul>{% endif %}
+                {% if attempt.next_attempt %}<p>Próxima tentativa permitida: {{ attempt.next_attempt }}</p>{% endif %}
+                {% if attempt.reference %}<p class="sync-reference">Referência <span class="mono">{{ attempt.reference }}</span></p>{% endif %}
+              </li>
+            {% endfor %}</ol>
+          </section>
+          {% elif item.detail %}<p class="sync-record-note">{{ item.detail }}</p>{% endif %}
           <dl class="sync-record-metrics">
             <div><dt>Lotes consultados</dt><dd>{{ item.lots if item.lots is not none else 'Não informado' }}</dd></div>
             <div><dt>Manifestações via distNSU</dt><dd>{{ item.current_events if item.current_events is not none else 'Não informado' }}</dd></div>
@@ -116,16 +140,16 @@
             {% endif %}
             {% if item.next_attempt %}<div><dt>Próxima tentativa permitida</dt><dd>{{ item.next_attempt }}</dd></div>{% endif %}
           </dl>
-          {% if item.diagnostic %}
+          {% if item.diagnostic and not item.attempts %}
           <ul class="sync-diagnostic-list">{% for part in item.diagnostic.split(' · ') %}<li>{{ part }}</li>{% endfor %}</ul>
           {% endif %}
-          {% if item.reference %}<p class="sync-reference">Referência <span class="mono">{{ item.reference }}</span></p>{% endif %}
+          {% if item.reference and not item.attempts %}<p class="sync-reference">Referência <span class="mono">{{ item.reference }}</span></p>{% endif %}
         </div>
       </details>
     </li>
     {% endfor %}
   </ol>
-  <p class="sync-history-footnote">Contagens ausentes aparecem como —. Manifestações adicionadas são novas no banco, mesmo que o evento seja antigo.</p>
+  <p class="sync-history-footnote">As contagens da linha correspondem à última execução efetiva. Contagens ausentes aparecem como —. Manifestações adicionadas são novas no banco, mesmo que o evento seja antigo.</p>
   {% else %}<p class="muted">Nenhuma sincronização registrada no histórico.</p>{% endif %}
 </section>
   </div>

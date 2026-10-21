@@ -2,6 +2,8 @@
 
 ## Histórico de sincronização — 2026-10-21
 
+- Agrupa tentativas automáticas por horário agendado, com compatibilidade por data/hora para registros antigos e detalhes preservados. Execuções manuais permanecem separadas.
+
 - Execuções apresentadas em lista responsiva, com resultado e contagens visíveis e diagnóstico recolhido.
 - Remove do Status o bloco de recuperações antigas e o aviso repetido de consNSU pausado, preservando auditoria, fila e avisos de pendências reais.
 - Padroniza a apresentação das datas sem converter registros antigos de fuso desconhecido.

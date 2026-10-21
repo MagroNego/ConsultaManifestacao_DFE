@@ -1581,3 +1581,12 @@ html[data-theme="dark"] .brand-logo-dark {
   .sync-diagnostic-list { grid-template-columns: minmax(0, 1fr); }
   .status-page .metric-value { overflow-wrap: anywhere; }
 }
+
+.sync-attempts { margin: 0 0 22px; }
+.sync-attempts h3 { margin: 0 0 14px; font-size: 13px; }
+.sync-attempts > ol { margin: 0; padding-left: 20px; }
+.sync-attempts > ol > li { padding: 8px 0 14px 4px; }
+.sync-attempts > ol > li + li { border-top: 1px solid var(--border); }
+.sync-attempts > ol > li > strong { display: block; font-size: 12px; font-variant-numeric: tabular-nums; }
+.sync-attempts > ol > li > span { color: var(--muted); font-size: 12px; }
+.sync-attempts p { margin: 6px 0; }
