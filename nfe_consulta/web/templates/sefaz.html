@@ -27,43 +27,6 @@
 <div class="alert error">{{ error }}</div>
 {% endif %}
 
-{% if batch %}
-<div class="alert success">Lote processado: {{ batch.importadas }} importada(s), {{ batch.cancelamentos|default(0) }} cancelamento(s), {{ batch.duplicadas }} duplicada(s), {{ batch.erros }} erro(s)/ignorada(s).
-  <a data-download-link href="{{ url_for('xml_batch_log', lote=request.query_params.get('lote')) }}">Baixar registro do lote</a>
-  <a href="{{ url_for('xml_page') }}">Consultar Emissão</a>
-</div>
-{% endif %}
-<section class="card xml-import">
-  <div class="card-title"><h2>Importar XML</h2>
-  {% call guide('Importar XML') %}<ol><li>Selecione XMLs de NF-e emitidas pelo CNPJ configurado, eventos de cancelamento homologados ou ZIPs com subpastas.</li><li>Clique em <strong>Importar dados</strong> e confira o registro do lote.</li></ol><p>Limites: 100 MiB por envio, 250 MiB descompactados e 5.000 documentos. Chaves repetidas preservam os dados existentes; cancelamentos atualizam a situação.</p><p>O app guarda dados para relatórios. Obtenha o XML original no Synchro.</p>{% endcall %}</div>
-  <form action="{{ url_for('xml_import') }}" method="post" enctype="multipart/form-data" data-processing-form>
-    <input type="hidden" name="csrf" value="{{ csrf }}">
-    <label class="field"><span>Arquivos XML ou ZIP</span><input type="file" name="files" accept=".xml,.zip" multiple required></label>
-    <div class="actions"><button class="button primary" type="submit">Importar dados</button></div>
-  </form>
-</section>
-
-<section class="card xml-import">
-  <div class="card-title"><h2>Alterar situação de notas</h2>{% call guide('Alterar situação de notas') %}<ol><li>Informe uma nota ou chave por linha, até 100 notas.</li><li>Se o número identificar mais de uma nota, use a chave de 44 dígitos.</li><li>Preencha o motivo e escolha a ação.</li></ol><p>A marcação é local e vale na Consulta, Emissão e novos relatórios. Remover a marcação manual não desfaz cancelamentos recebidos da SEFAZ.</p>{% endcall %}</div>
-  <details class="manual-adjustment"><summary>Abrir formulário</summary>
-  <form action="{{ url_for('alterar_situacao_notas') }}" method="post">
-    <input type="hidden" name="csrf" value="{{ csrf }}">
-    <label class="field">
-      <span>Número da NF ou chave de acesso</span>
-      <textarea name="notas" rows="4" maxlength="16384" placeholder="Uma nota por linha" required></textarea>
-    </label>
-    <label class="field">
-      <span>Motivo da alteração</span>
-      <input name="motivo" maxlength="500" required>
-    </label>
-    <div class="actions">
-      <button class="button primary" name="acao" value="cancelar" type="submit">Marcar como cancelada</button>
-      <button class="button" name="acao" value="remover" type="submit">Remover marcação manual</button>
-    </div>
-  </form>
-</details>
-</section>
-
 <div class="admin-grid">
   <section class="card">
     <div class="card-title">

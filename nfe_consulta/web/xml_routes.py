@@ -118,6 +118,23 @@ def register_xml_routes(app, settings, render, database_path):
             fim=selected.data_final_br if selected else data_final,
             history=history, batch=batch, error=error, ctes=ctes, situacao=situacao, item=item)
 
+    @app.get("/xml/importar")
+    async def xml_import_page(request: Request, user: Annotated[WebUser, Depends(require_admin)],
+                              lote: int | None = None, situacao_ok: int | None = None,
+                              situacao_acao: str | None = None):
+        batch, error = None, None
+        if lote is not None:
+            try:
+                _, batch = await run_in_threadpool(store.import_history, database_path(settings),
+                    password=settings.current_database_password(), batch_id=lote)
+            except Exception:
+                error = "Não foi possível consultar o resultado da importação."
+        success = None
+        if situacao_ok is not None:
+            success = (f"Marcação manual removida de {situacao_ok} nota(s). Cancelamentos da SEFAZ permanecem válidos."
+                       if situacao_acao == "remover" else f"{situacao_ok} nota(s) marcada(s) como Cancelada.")
+        return render(request, "xml_import.html", user, batch=batch, error=error, success=success)
+
     @app.post("/xml/importar")
     async def xml_import(request: Request, user: Annotated[WebUser, Depends(require_admin)]):
         # Os parâmetros File/Form do FastAPI usam max_files=1000 antes da rota.
@@ -176,7 +193,7 @@ def register_xml_routes(app, settings, render, database_path):
                 await upload.close()
         app.state.audit.write(request, user, "xml_import", "ok", lote=summary["id"],
             importadas=summary["importadas"], cancelamentos=summary["cancelamentos"], duplicadas=summary["duplicadas"], erros=summary["erros"])
-        return RedirectResponse(request.url_for("atualizar_page").include_query_params(lote=summary["id"]), status_code=303)
+        return RedirectResponse(request.url_for("xml_import_page").include_query_params(lote=summary["id"]), status_code=303)
 
     @app.get("/xml/exportar")
     async def xml_export(request: Request, user: Annotated[WebUser, Depends(require_export)],

@@ -59,7 +59,10 @@ def test_admin_only_csrf_and_ui_export(tmp_path):
         data = {'notas': '124', 'motivo': 'Correção', 'acao': 'cancelar'}
         assert client.post('/admin/notas/situacao', data=data, follow_redirects=False).status_code == 401
         token = h['helpers']['web']['entrar_admin'](client, cfg)
-        assert 'Alterar situação de notas' in client.get('/atualizar').text
+        assert 'Alterar situação de notas' not in client.get('/atualizar').text
+        assert 'Alterar situação de notas' in client.get('/xml/importar').text
+        assert 'Importar XML' in client.get('/xml/importar').text
+        assert '/xml/importar' in client.get('/xml').text
         assert client.post('/admin/notas/situacao', data={**data, 'csrf': 'invalid'}).status_code == 403
         response = client.post('/admin/notas/situacao', data={**data, 'csrf': token})
         assert response.status_code == 200 and '1 nota(s) marcada(s)' in response.text

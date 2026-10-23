@@ -173,10 +173,15 @@ def test_web_lote_manifestacao_sem_download_xml_export_e_permissoes(tmp_path, mo
     with TestClient(app) as client:
         authenticated_user(client)
         assert client.get('/xml',follow_redirects=False).status_code == 200
+        assert 'emission-import-button' not in client.get('/xml').text
+        assert client.get('/xml/importar', follow_redirects=False).status_code == 303
         token = login(client, cfg)
+        assert 'emission-import-button' in client.get('/xml').text
+        assert client.get('/xml/importar').status_code == 200
         assert client.post('/xml/importar', data={'csrf':'errado'}, files={'files':('a.xml',xml())}).status_code == 403
         response = client.post('/xml/importar', data={'csrf':token}, files={'files':('mensal.zip',zip_bytes([('a.xml',xml())]),'application/zip')})
         assert response.status_code == 200 and '1 importada(s)' in response.text
+        assert response.url.path == '/xml/importar'
         assert '=1+1' in client.get('/xml').text
         assert client.get('/xml/arquivo/'+CHAVE).status_code == 404
         assert client.get('/xml/arquivo/'+'9'*44).status_code == 404

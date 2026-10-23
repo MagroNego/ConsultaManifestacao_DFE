@@ -1,5 +1,9 @@
 # Histórico de versões
 
+## Emissão — 2026-10-23
+
+- Botão Importar na Emissão reúne importação XML/ZIP e alteração manual da situação das notas, com resultado do lote e permissões administrativas preservados.
+
 ## Histórico de sincronização — 2026-10-21
 
 - Agrupa tentativas automáticas por horário agendado, com compatibilidade por data/hora para registros antigos e detalhes preservados. Execuções manuais permanecem separadas.

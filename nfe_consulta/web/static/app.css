@@ -1591,3 +1591,6 @@ html[data-theme="dark"] .brand-logo-dark {
 .sync-attempts > ol > li > strong { display: block; font-size: 12px; font-variant-numeric: tabular-nums; }
 .sync-attempts > ol > li > span { color: var(--muted); font-size: 12px; }
 .sync-attempts p { margin: 6px 0; }
+
+.emission-heading-actions { align-items: center; gap: 16px; flex-wrap: wrap; margin-top: 0; }
+.emission-import-button { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }

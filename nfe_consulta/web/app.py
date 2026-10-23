@@ -1281,7 +1281,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             lock.release()
         app.state.audit.write(request, user, "manual_note_status", "ok", count=count, operation=acao)
         return RedirectResponse(
-            request.url_for("atualizar_page").include_query_params(situacao_ok=count, situacao_acao=acao),
+            request.url_for("xml_import_page").include_query_params(situacao_ok=count, situacao_acao=acao),
             status_code=303,
         )
 
